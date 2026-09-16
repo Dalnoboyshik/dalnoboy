@@ -1202,7 +1202,14 @@ function makeOrder(fromIdx,mustCompatible){
   if(mustCompatible||local)ct=pool.length?pick(pool):pick(Object.keys(CARGO));
   else if(pool.length&&Math.random()<0.7)ct=pick(pool);else ct=pick(Object.keys(CARGO));
   if(!local&&!hasLicense(ct))return null;
-  const [wMin,wMax]=CARGO[ct].w;let w=rnd(wMin,wMax);w=Math.max(0.01,Math.min(w,curCap()*0.9));w=r3(w);
+const [wMin,wMax]=CARGO[ct].w;
+const capLimit=curCap();
+// Тяжёлые грузы (min >= 2 т) подстраиваем под 0.47*cap снизу и cap сверху.
+// Лёгкие (мебель, техника и т.п.) остаются как есть.
+const realMin=Math.min(wMin, Math.max(0.1, capLimit*0.47));
+const realMax=Math.min(wMax, capLimit);
+let w=rnd(realMin, realMax);
+w=Math.max(0.01, w); w=r3(w);
   const rating=Math.round(rnd(2,5)*10)/10;
   const rm=rating>=4.4?1.15:rating>=3.8?1.08:rating>=3.2?1.00:rating>=2.5?0.95:0.90;
   const wmul=weightMul(w);const otype=orderTypeInfo();const ti=ORDER_TYPE[otype];
