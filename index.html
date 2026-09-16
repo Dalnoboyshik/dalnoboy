@@ -2467,12 +2467,15 @@ function advanceTime(gameMin){
     const ord=['winter','spring','summer','autumn'];const i=ord.indexOf(S.season);
     S.season=ord[(i+1)%4];toast(`🌦️ ${SEASONS[S.season].n}`,'info');
   }
-  for(let i=S.contracts.length-1;i>=0;i--){
+   for(let i=S.contracts.length-1;i>=0;i--){
     const c=S.contracts[i];
-    if(S.gameTime>c.deadline&&c.tripsLeft>0){
-      moneySpend(c.penalty,`Провал ${c.company}`);
+    if(c.accepted && S.gameTime>c.deadline && c.tripsLeft>0){
+      const fine=Math.min(c.penalty, Math.max(0,S.money));
+      if(fine>0) moneySpend(fine,`Провал ${c.company}`);
       S.reputation=clamp(S.reputation-5,0,100);
-      toast(`❌ Контракт провален! ${fmt(c.penalty)} ₽`,'bad');
+      toast(`❌ Контракт ${c.company} провален. Штраф: ${fmt(fine)} ₽`,'bad');
+      S.contracts.splice(i,1);
+    } else if(!c.accepted && S.gameTime>c.deadline){
       S.contracts.splice(i,1);
     }
   }
