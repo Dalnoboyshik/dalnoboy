@@ -1128,6 +1128,17 @@ function truckLoad(){return S.activeOrders.reduce((s,o)=>s+o.weight,0);}
 function isIP(){return S.firmLevel==='ip'||S.firmLevel==='ooo';}
 function isOOO(){return S.firmLevel==='ooo';}
 function firmLevelName(){return {person:'Физлицо',self:'Самозанятый',ip:'ИП',ooo:'ООО'}[S.firmLevel];}
+	function firmStatusQuote(){
+  if(S.firmLevel==='ip') return {
+    title:'📄 Индивидуальный предприниматель',
+    text:'Теперь вы — ИП. Это ваш бизнес: своя касса, свой учёт, своя ответственность. Никаких начальников — только вы и дорога. Ставки выросли на 20%, доступны безнал, лицензии и наём водителей.'
+  };
+  if(S.firmLevel==='ooo') return {
+    title:'🏢 Общество с ограниченной ответственностью',
+    text:'ООО — это уже серьёзный уровень. Юрлицо, штат, филиалы, международные рейсы. Ставки +30%, лимиты парка расширены, открыт доступ к тендерам и зарубежным базам.'
+  };
+  return null;
+}
 function firmLevelBonus(){return {person:1.00,self:1.10,ip:1.20,ooo:1.30}[S.firmLevel];}
 function ratingCls(r){if(r>=4.4)return'g';if(r>=3.8)return'lg';if(r>=3.2)return'y';if(r>=2.5)return'o';return'r';}
 function genCompany(){const p=pick(CO_PRE);if(p==='ИП')return `ИП ${pick(CO_SUR)} ${pick(['А.','В.','С.','Д.','М.','П.'])}.`;return `${p} «${pick(CO_NAME)}»`;}
@@ -3689,12 +3700,17 @@ function firmGeneralContent(){
   const daw=S.drivers.filter(d=>d.status==='trip').length;
   const hq=S.bases.length?CITIES[S.bases[0].cityIdx].n:(S.startCity!==null?CITIES[S.startCity].n:'—');
   const rep=S.reputation;
+  const quote=firmStatusQuote();
   return `<div class="firm-head">
     <h2>${S.firmName||'—'}</h2>
     <div class="sub">${firmLevelName()} · основана в день ${S.firmFounded||1}</div>
     <div class="rep-bar" style="margin-top:8px"><i style="width:${rep}%"></i></div>
     <div class="sub" style="margin-top:4px">Репутация: ${Math.round(rep)} / 100</div>
   </div>
+  ${quote?`<div class="card hl" style="margin-top:6px">
+    <div class="row"><b>${quote.title}</b></div>
+    <div class="muted" style="font-size:11.5px;line-height:1.5;margin-top:4px">${quote.text}</div>
+  </div>`:''}
   <h3>Информация</h3><div class="card">
     <div class="row"><span class="muted">Статус</span><b>${firmLevelName()}</b></div>
     <div class="row"><span class="muted">Штаб</span><b>${hq}</b></div>
