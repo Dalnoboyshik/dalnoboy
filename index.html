@@ -820,7 +820,7 @@ const S = {
   contracts: [], activeQuests: {},
   achievements: {},
   achEffects:{rate:0,fuel:0,buy:0,biz:0,income:0,hrBonus:0},
-  finance:{income:0,expense:0,history:[]},
+   finance:{income:0,expense:0,history:[],monthIncome:0,monthExpense:0},
    news:{items:[],lastRead:0,unreadNotify:0},
   stats:{totalTrips:0,totalKm:0,deliveryTotal:0,deliveriesDone:0,kicked:0},
   reputation: 30,
@@ -942,8 +942,18 @@ function firmLevelBonus(){return {person:1.00,self:1.10,ip:1.20,ooo:1.30}[S.firm
 function ratingCls(r){if(r>=4.4)return'g';if(r>=3.8)return'lg';if(r>=3.2)return'y';if(r>=2.5)return'o';return'r';}
 function genCompany(){const p=pick(CO_PRE);if(p==='ИП')return `ИП ${pick(CO_SUR)} ${pick(['А.','В.','С.','Д.','М.','П.'])}.`;return `${p} «${pick(CO_NAME)}»`;}
 function genDriverName(){return `${pick(DRIVER_NAMES)} ${pick(CO_SUR)}`;}
-function moneyAdd(amt,desc){if(amt<=0)return;S.money+=amt;S.finance.income+=amt;S.finance.history.push({t:S.gameTime,delta:amt,desc});if(S.finance.history.length>200)S.finance.history.shift();}
-function moneySpend(amt,desc){if(amt<=0)return;S.money-=amt;S.finance.expense+=amt;S.finance.history.push({t:S.gameTime,delta:-amt,desc});if(S.finance.history.length>200)S.finance.history.shift();}
+function moneyAdd(amt,desc){
+  if(amt<=0)return;
+  S.money+=amt;S.finance.income+=amt;S.finance.monthIncome+=amt;
+  S.finance.history.push({t:S.gameTime,delta:amt,desc});
+  if(S.finance.history.length>200)S.finance.history.shift();
+}
+function moneySpend(amt,desc){
+  if(amt<=0)return;
+  S.money-=amt;S.finance.expense+=amt;S.finance.monthExpense+=amt;
+  S.finance.history.push({t:S.gameTime,delta:-amt,desc});
+  if(S.finance.history.length>200)S.finance.history.shift();
+}
 function addNews(txt,cls,cat){
   S.news.items.unshift({t:S.gameTime,txt,cls:cls||'info',cat:cat||'activity'});
   if(S.news.items.length>50)S.news.items.pop();
@@ -2112,8 +2122,16 @@ function advanceTime(gameMin){
     if(fix>0){const disc=hasStaff('accountant')?0.7:1;moneySpend(Math.round(fix*disc),'ПФР/ФФОМС');
      addNews(`📄 ПФР/ФФОМС: ${fmt(Math.round(fix*disc))} ₽`,'warn','finance');}
     let tr=0;if(S.firmLevel==='self')tr=0.06;else if(S.firmLevel==='ip')tr=0.06;else if(S.firmLevel==='ooo')tr=0.08;
-    if(tr>0){let tax=Math.round(S.finance.income*tr*0.2);if(hasStaff('accountant'))tax=Math.round(tax*0.7);
-      if(tax>0){moneySpend(tax,'Налог');addNews(`📄 Налог: ${fmt(tax)} ₽`,'warn','finance');}}
+    if(tr>0){
+      // === Налог считается от дохода ЗА ПОСЛЕДНИЕ 30 ДНЕЙ, а не за всю игру ===
+      let tax=Math.round(S.finance.monthIncome*tr*0.2);
+      if(hasStaff('accountant'))tax=Math.round(tax*0.7);
+      if(tax>0){moneySpend(tax,'Налог');addNews(`📄 Налог: ${fmt(tax)} ₽ (доход за месяц: ${fmt(S.finance.monthIncome)} ₽)`,'warn','finance');}
+      else{addNews(`📄 Налог: 0 ₽ (доход за месяц: ${fmt(S.finance.monthIncome)} ₽)`,'info','finance');}
+    }
+    // Сбрасываем счётчики месяца
+    S.finance.monthIncome=0;
+    S.finance.monthExpense=0;
   }
   const q=Math.floor(S.gameTime/(1440*90))+1;
   if(q!==S.taxQuarter){S.taxQuarter=q;
@@ -3870,6 +3888,9 @@ function loadGame(){
     if(!S.regionRep)S.regionRep={NW:30,C:30,S:30,V:30,U:30,SIB:30,FE:30,N:30};
     if(!S.leasesCount)S.leasesCount=0;
     if(!S.activeQuests)S.activeQuests={};
+	      if(!S.finance)S.finance={income:0,expense:0,history:[],monthIncome:0,monthExpense:0};
+    if(S.finance.monthIncome===undefined)S.finance.monthIncome=0;
+    if(S.finance.monthExpense===undefined)S.finance.monthExpense=0;
     if(!S.news)S.news={items:[]};
     if(!S.routeFilter)S.routeFilter={from:null,to:null};
     if(S.houseLevel===undefined)S.houseLevel=0;
