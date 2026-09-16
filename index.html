@@ -4448,10 +4448,10 @@ function showStartCityPicker(){
   let saved=null;
   try{saved=localStorage.getItem(SAVE_KEY);}catch(e){console.warn('localStorage недоступен:',e);}
   if(saved){
-    $('modalBox').innerHTML=`<h2>🚛 Дальнобойщик v18.2</h2>
+        $('modalBox').innerHTML=`<h2>🚛 Дальнобойщик v18.2</h2>
       <p>Найдено сохранение. Продолжить или начать заново?</p>
-      <button class="wide ok" id="btnContinue">▶️ Продолжить</button>
-      <button class="wide bad" id="btnNewGame" style="margin-top:6px">🆕 Новая игра</button>`;
+      <button class="wide ok" id="btnContinue" style="font-size:32px;padding:32px 24px;min-height:100px;line-height:1.2;font-weight:700">▶️ Продолжить</button>
+      <button class="wide bad" id="btnNewGame" style="margin-top:16px;font-size:32px;padding:32px 24px;min-height:100px;line-height:1.2;font-weight:700">🆕 Новая игра</button>`;
     $('modal').classList.add('show');
     $('btnContinue').onclick=()=>{
       if(loadGame()){Modal.next();
