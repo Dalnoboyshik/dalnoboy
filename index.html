@@ -2659,10 +2659,30 @@ function driverTick(dt){
 function advanceTime(gameMin){
   const h=gameMin/60;S.gameTime+=gameMin;
   payIncome(gameMin);
-  let sal=0;for(const d of S.drivers)if(d.sick<=0)sal+=d.salary/720;
-   if(sal>0) moneySpend(sal*h,'Зарплаты водителей');
-  const ss=staffSalaryTotal();
-    if(ss>0) moneySpend(ss/720*h,'Зарплаты офиса');
+ // Зарплаты — аванс 15-го и зарплата 30-го числа каждого игрового месяца
+const prevDay = Math.floor((S.gameTime - gameMin) / 1440);
+const currDay = Math.floor(S.gameTime / 1440);
+if(currDay > prevDay){
+  const dayOfMonth = (currDay % 30) + 1; // 1..30
+  const driverSalTotal = S.drivers.reduce((s,d)=>s+(d.sick<=0?d.salary:0),0);
+  const officeSalTotal = staffSalaryTotal();
+  const totalSal = driverSalTotal + officeSalTotal;
+
+  if(dayOfMonth === 15 && totalSal > 0){
+    const avans = Math.round(totalSal * 0.5);
+    if(avans > 0){
+      moneySpend(avans, `Аванс зарплаты · ${S.drivers.length} вод. + офис`);
+      addNews(`💼 Аванс: ${fmt(avans)} ₽`, 'warn', 'finance');
+    }
+  }
+  if(dayOfMonth === 30 && totalSal > 0){
+    const sal = Math.round(totalSal * 0.5);
+    if(sal > 0){
+      moneySpend(sal, `Зарплата · ${S.drivers.length} вод. + офис`);
+      addNews(`💰 Зарплата: ${fmt(sal)} ₽`, 'warn', 'finance');
+    }
+  }
+}
   if(S.bases.length)S.reputation=clamp(S.reputation+h*0.05,0,100);
   const house=HOUSES[S.houseLevel];
   if(house.repBonus>0&&S.houseCityIdx===S.truck.cityIndex)S.reputation=clamp(S.reputation+h*house.repBonus,0,100);
@@ -2837,8 +2857,48 @@ function obligationsList(){
       : `Дохода в месяце пока нет — только фикс ${fmt(fix)} ₽`
   });
 }
-  const sal=S.drivers.reduce((s,d)=>s+d.salary,0);
-  if(sal>0)list.push({ic:'💼',txt:`Зарплаты · ${S.drivers.length} вод.`,sum:sal,days:15,progress:0});
+const driverSal = S.drivers.reduce((s,d)=>s+(d.sick<=0?d.salary:0),0);
+const officeSal = staffSalaryTotal();
+const totalSal = driverSal + officeSal;
+if(totalSal > 0){
+  const currDay = Math.floor(S.gameTime / 1440);
+  const dayOfMonth = (currDay % 30) + 1; // 1..30
+
+  // Дней до 15-го
+  let daysToAvans;
+  if(dayOfMonth < 15) daysToAvans = 15 - dayOfMonth;
+  else if(dayOfMonth === 15) daysToAvans = 0;
+  else daysToAvans = 15 + 30 - dayOfMonth;
+
+  // Дней до 30-го
+  let daysToSalary;
+  if(dayOfMonth < 30) daysToSalary = 30 - dayOfMonth;
+  else if(dayOfMonth === 30) daysToSalary = 0;
+  else daysToSalary = 30;
+
+  const avansSum = Math.round(totalSal * 0.5);
+  const salarySum = Math.round(totalSal * 0.5);
+  const staffLabel = S.staff.length > 0
+    ? `${S.drivers.length} вод. + ${S.staff.length} офис`
+    : `${S.drivers.length} вод.`;
+
+  list.push({
+    ic:'💼',
+    txt:`Аванс · ${staffLabel}`,
+    sum: avansSum,
+    days: daysToAvans,
+    progress: 0,
+    note: `15-е число`
+  });
+  list.push({
+    ic:'💰',
+    txt:`Зарплата · ${staffLabel}`,
+    sum: salarySum,
+    days: daysToSalary,
+    progress: 0,
+    note: `30-е число`
+  });
+}
   return list.sort((a,b)=>a.days-b.days);
 }
 function calcPassivePerWeek(){return weeklyProfit();}
