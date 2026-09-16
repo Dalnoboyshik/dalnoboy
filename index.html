@@ -1101,7 +1101,13 @@ function curV(){const v=curVehInst();return v?VEHICLES[v.model]:VEHICLES.vaz2106
 function curT(){const t=curTrlInst();return t?TRAILERS[t.model]:null;}
 function upLevel(inst,k){return inst&&inst.upgrades?(inst.upgrades[k]||0):0;}
 function vehSpeed(inst){return Math.round(VEHICLES[inst.model].speed*(1+upLevel(inst,'chip')*0.05));}
-function vehCons(inst){const season=SEASONS[S.season];const base=VEHICLES[inst.model].cons*(1-upLevel(inst,'aero')*0.07);return base*season.fuelMul*(1+S.achEffects.fuel);}
+function vehCons(inst){
+  const season=SEASONS[S.season];
+  const base=VEHICLES[inst.model].cons*(1-upLevel(inst,'aero')*0.07);
+  const overload=truckLoad()/Math.max(0.1,curCap());
+  const overloadMul=overload>1?1+(overload-1)*0.4:1;
+  return base*season.fuelMul*(1+S.achEffects.fuel)*overloadMul;
+}
 function vehTank(inst){return Math.round(VEHICLES[inst.model].tank*(1+upLevel(inst,'tank')*0.25));}
 function serviceIntervalOf(inst){
   const v=VEHICLES[inst.model];
@@ -1123,8 +1129,11 @@ function servicePenalty(inst){
 }
 function vehWearRate(inst){
   const base=(VEHICLES[inst.model].wearRate||0.05)*WEAR_MULT*(1-upLevel(inst,'tires')*0.20);
-  return base*servicePenalty(inst);
-}/* ===== ТО и ресурс ===== */
+  const overload=truckLoad()/Math.max(0.1,curCap());
+  const overloadPenalty=overload>1?1+(overload-1)*2.5:1;
+  return base*servicePenalty(inst)*overloadPenalty;
+}
+	/* ===== ТО и ресурс ===== */
 function getInstMaxKm(inst){
   if(inst.maxKm)return inst.maxKm;
   const base=VEHICLES[inst.model].maxKm||500000;
@@ -1232,7 +1241,7 @@ function countVehiclesByClass(model){const cat=vehCategory(model);let n=0;for(co
 function canBuyMoreOfClass(model){const cat=vehCategory(model);return countVehiclesByClass(model)<vehicleLimits()[cat];}
 
 /* ============ ЭКОНОМИКА ============ */
-function baseRatePerKm(km){return 55+120*Math.exp(-km/1200);}
+function baseRatePerKm(km){return 10+28*Math.exp(-km/1100);}
 function weightMul(w){
   if(w<=0.5)return 0.50;
   if(w<=1)return 0.50+(w-0.5)*0.40;
@@ -1360,10 +1369,13 @@ const EVENTS = {
     {id:'dog',w:5,fn:()=>{const v=curVehInst();if(v)v.wear=Math.min(100,v.wear+2);return{t:'🐕 <b>Собака бросилась под колёса</b><br>Успел затормозить, но не без последствий.',c:'warn'};}},
   ],
   mid:[
-      {id:'police',w:25,fn:()=>{
-      const inst=curVehInst();const hasIns=hasOsago(inst);
-      let fine=20000;if(hasIns)fine=5000;
-      const noPlate = !inst || !inst.plate;
+{id:'police',w:25,fn:()=>{
+  const inst=curVehInst();const hasIns=hasOsago(inst);
+  const overload=truckLoad()/Math.max(0.1,curCap());
+  const isOverload=overload>1.001;
+  let fine=20000;if(hasIns)fine=5000;
+  if(isOverload)fine=Math.round(fine*(1+(overload-1)*4));
+  const noPlate = !inst || !inst.plate;
       if(noPlate) fine = Math.round(fine*1.5);
       if(S.money<fine)return{t:'🚔 <b>Тебя тормознули на посту</b><br>Начал «бодаться», а инспектор попался принципиальный. Денег на штраф нет — долг повиснет.',c:'warn'};
       moneySpend(fine,'Штраф ГИБДД');
@@ -1396,9 +1408,12 @@ const EVENTS = {
     {id:'theft',w:20,fn:()=>{const v=curVehInst();if(!v)return null;const b=v.fuel;v.fuel=0;return{t:`🛢️ <b>Слили бак на стоянке</b><br>Пока спал, кто-то поработал шлангом. Минус ${Math.round(b)} литров.`,c:'bad'};}},
     {id:'robbery',w:15,fn:()=>{const loss=Math.round(S.money*0.15);if(loss<1)return null;moneySpend(loss,'Ограбление');return{t:`🚨 <b>Напали на стоянке</b><br>Отобрали часть налички. Потеря: <b>${fmt(loss)} ₽</b>`,c:'bad'};}},
     {id:'fire',w:10,fn:()=>{const v=curVehInst();if(!v)return null;v.wear=Math.min(100,v.wear+50);moneySpend(100000,'Пожар');return{t:'🔥 <b>Загорелся моторный отсек</b><br>Огнетушителем потушил, но ремонт и эвакуация: <b>−100 000 ₽</b>',c:'bad'};}},
-    {id:'vipCheck',w:10,fn:()=>{
-      const inst=curVehInst();const hasIns=hasOsago(inst);const noPlate=!inst||!inst.plate;
-      let fine=80000;if(hasIns)fine=15000;
+  {id:'vipCheck',w:10,fn:()=>{
+  const inst=curVehInst();const hasIns=hasOsago(inst);const noPlate=!inst||!inst.plate;
+  const overload=truckLoad()/Math.max(0.1,curCap());
+  const isOverload=overload>1.001;
+  let fine=80000;if(hasIns)fine=15000;
+  if(isOverload)fine=Math.round(fine*(1+(overload-1)*5));
       if(noPlate)fine=Math.round(fine*1.5);
       if(S.money<fine)return{t:'🚔 <b>VIP-проверка на трассе</b><br>Инспектор нашёл нарушения и выписал штраф. Но денег нет — долг повиснет.',c:'warn'};
       moneySpend(fine,'VIP-проверка');
@@ -1418,7 +1433,13 @@ function tryRoadEvent(dt){
    const r=Math.random();let cls;
   if(r<EVENT_CLASS.pos)cls='pos';else if(r<EVENT_CLASS.pos+EVENT_CLASS.minor)cls='minor';
   else if(r<EVENT_CLASS.pos+EVENT_CLASS.minor+EVENT_CLASS.mid)cls='mid';else cls='sev';
-  
+    // Перегруз повышает шанс попасть в категорию ГИБДД
+  const overloadForEvent = truckLoad()/Math.max(0.1,curCap());
+  if(overloadForEvent > 1.001 && cls !== 'mid' && cls !== 'sev'){
+    if(Math.random() < (overloadForEvent-1)*1.5){
+      cls = 'mid';
+    }
+  }
   // Госномер влияет на события ГИБДД (mid)
   if(cls === 'mid'){
     const mul = plateStopMultiplier(curVehInst());
@@ -1905,7 +1926,9 @@ function tryTravel(dest){
   if(SEASONS[S.season].northClosed&&CITIES[dest].type==='north'){toast('❄️ Север закрыт','bad');return;}
   if(S.floodUntil&&S.floodUntil>S.gameTime&&CITIES[dest].n.includes('Владивосток')){toast('🌊 ДВ закрыт','bad');return;}
   if(CITIES[dest].intl&&!isOOO()){toast('🌍 После ООО','bad');return;}
-  const sm=SEASONS[S.season].speedMul;
+  const overload=truckLoad()/Math.max(0.1,curCap());
+const overloadSpeed=overload>1?Math.max(0.5,1-(overload-1)*0.7):1;
+const sm=SEASONS[S.season].speedMul*overloadSpeed;
   if(cur===dest){
     const lo=S.activeOrders.filter(o=>o.local&&o.from===dest);
     if(!lo.length){toast('🏙️ Нет локальных','bad');return;}
@@ -1983,7 +2006,7 @@ function takeOrder(id,payType){
   if(!compatibleWith(o)){toast('🚫 Не подходит','bad');return;}
   if(!hasLicense(o.ctype)){toast(`📜 Нужна лицензия`,'bad');return;}
   if(payType==='bank'&&!isIP()){toast('📄 Нужно ИП','bad');return;}
-  if(truckLoad()+o.weight>curCap()+0.001){toast('📦 Не влезет','bad');return;}
+  if(truckLoad()+o.weight>curCap()*1.5+0.001){toast('🚫 Перегруз более 150% — не поедет','bad');return;}
   atiOrders=atiOrders.filter(x=>x.id!==id);
   S.activeOrders.push({...o,payType,acceptedAt:S.gameTime});
   toast(`📦 Принят: ${CITIES[o.from].n}${o.local?'':' → '+CITIES[o.to].n}`,'ok');updateUI();
@@ -2012,7 +2035,9 @@ function deliverAt(idx){
     }
     const res=rollPayment(o.rating);
     const base=o.payType==='bank'?o.totalBank:o.totalCash;
-    const pay=Math.round(base*res.mult*baseRateBonus())-lateFine;
+    let pay=Math.round(base*res.mult*baseRateBonus())-lateFine;
+if(del.length>=3) pay=Math.round(pay*1.10); // +10% за 3+ грузов
+if(del.length>=5) pay=Math.round(pay*1.05); // ещё +5% за 5+
     total+=pay;
     S.stats.deliveryTotal+=pay;S.stats.deliveriesDone++;S.stats.totalTrips++;
     S.stats.totalKm+=o.km;if(res.mult===0)S.stats.kicked++;
@@ -2874,7 +2899,9 @@ function closeAllDropdowns(){
 function orderCard(o){
   const ci=CARGO[o.ctype];const comp=compatibleWith(o);
   const here=S.truck.cityIndex===o.from;const myCity=S.truck.cityIndex!==null;
-  const cashOk=!S.truck.traveling&&here&&comp&&hasLicense(o.ctype)&&(truckLoad()+o.weight<=curCap()+0.001);
+const wouldOverload=(truckLoad()+o.weight)>curCap()+0.001;
+const overkill=(truckLoad()+o.weight)>curCap()*1.5+0.001;
+const cashOk=!S.truck.traveling&&here&&comp&&hasLicense(o.ctype)&&!overkill;
   const bankOk=cashOk&&isIP();
   const ttl=Math.max(0,Math.round(o.expires-S.gameTime));
   const ttlPct=clamp(ttl/12,0,100);
@@ -2885,15 +2912,17 @@ function orderCard(o){
   if(!comp)sb+=`<span class="badge no">не подходит</span>`;
   if(!hasLicense(o.ctype))sb+=`<span class="badge no">нужна лицензия</span>`;
   if(!here&&myCity)sb+=`<span class="badge no">не ваш город</span>`;
-  if(truckLoad()+o.weight>curCap()+0.001)sb+=`<span class="badge no">не влезет</span>`;
+if(wouldOverload&&!overkill)sb+=`<span class="badge urgent">⚠️ Перегруз</span>`;
+if(overkill)sb+=`<span class="badge no">не влезет (>150%)</span>`;
   const tB=o.orderType==='express'?`<span class="badge express">🔴 Экспресс ×1.8</span>`
         :o.orderType==='urgent'?`<span class="badge urgent">🟡 Срочный ×1.3</span>`
         :`<span class="badge">🟢 Обычный</span>`;
   let btns='';
   if(!myCity)btns=`<span class="muted" style="font-size:10px">Выберите город</span>`;
   else{
-    btns+=`<button data-take-cash="${o.id}" ${cashOk?'':'disabled'} style="${cashOk?'background:#15583a;border-color:#1f8a58':''}">💵 ${fmt(o.totalCash)} ₽</button>`;
-    if(isIP())btns+=`<button data-take-bank="${o.id}" ${bankOk?'':'disabled'} style="margin-left:4px;${bankOk?'background:#1a5ba0;border-color:#2b7bd4':''}">🏦 ${fmt(o.totalBank)} ₽</button>`;
+   btns+=`<button data-take-cash="${o.id}" ${cashOk?'':'disabled'} style="${cashOk?(wouldOverload?'background:#8a4a14;border-color:#c87a00':'background:#15583a;border-color:#1f8a58'):''}">💵 ${fmt(o.totalCash)} ₽${wouldOverload?' ⚠️':''}</button>`;
+	  const overloadStyle=(wouldOverload&&cashOk)?'background:#8a4a14;border-color:#c87a00':'';
+    if(isIP())btns+=`<button data-take-bank="${o.id}" ${bankOk?'':'disabled'} style="margin-left:4px;${bankOk?(wouldOverload?'background:#8a4a14;border-color:#c87a00':'background:#1a5ba0;border-color:#2b7bd4'):''}">🏦 ${fmt(o.totalBank)} ₽${wouldOverload?' ⚠️':''}</button>`;
   }
   const quickRouteBtn=!o.local?`<button class="route-quick" data-quick-route="${o.id}">🔍 Только этот маршрут</button>`:'';
   return `<div class="card ${here&&comp?'hl':''}" style="${comp?'':'opacity:.55'}" data-hl="${o.id}">
@@ -2971,7 +3000,9 @@ function renderTrips(){
     html+=`<div class="card"><div class="row"><span class="route">${curV().icon} ${curV().n}
       <small>${S.truck.cityIndex!==null?CITIES[S.truck.cityIndex].n:'—'}</small></span></div></div>`;
   }
-  html+=`<h3>📦 Грузы · ${r3(truckLoad())}/${curCap()} т</h3>`;
+ const overloadPct=Math.round(truckLoad()/curCap()*100);
+const overloadCls=overloadPct>100?'color:#ff6b6b':overloadPct>85?'color:#ffb84d':'';
+html+=`<h3>📦 Грузы · <span style="${overloadCls}">${r3(truckLoad())}/${curCap()} т</span>${overloadPct>100?` <span class="badge urgent">⚠️ ${overloadPct}%</span>`:''}</h3>`;
   if(!S.activeOrders.length)html+=`<div class="empty">Нет грузов</div>`;
   else for(const o of S.activeOrders){
     const ci=CARGO[o.ctype];
