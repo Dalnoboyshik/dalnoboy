@@ -3004,10 +3004,10 @@ function renderOrders(){
     <div class="rf-picker" id="rfTo" data-role="to"><span class="lbl ${S.routeFilter.to===null?'ph':''}">${toLbl}</span><span class="arrow">▼</span></div>
     <button class="clr" id="rfClr">×</button>
   </div></div>`;
-  html+=`<h3>📍 Из ${here!==null?CITIES[here].n:'—'} · ${mine.length}</h3>`;
-  html+=mine.length?mine.map(o=>orderCard(o)).join(''):`<div class="empty">Нет заказов</div>`;
-  html+=`<h3 style="margin-top:6px">🌍 Другие · ${other.length}</h3>`;
-  html+=other.length?other.slice(0,25).map(o=>orderCard(o)).join(''):`<div class="empty">Пусто</div>`;
+ html+=`<div style="font-size:10px;padding:6px 0 2px;text-transform:uppercase;letter-spacing:.05em;font-weight:700;color:#8ba0bd">📍 Из ${here!==null?CITIES[here].n:'—'} · ${mine.length}</div>`;
+html+=mine.length?mine.map(o=>orderCard(o)).join(''):`<div class="empty">Нет заказов</div>`;
+html+=`<div style="font-size:10px;padding:10px 0 2px;text-transform:uppercase;letter-spacing:.05em;font-weight:700;color:#8ba0bd">🌍 Другие · ${other.length}</div>`;
+html+=other.length?other.slice(0,25).map(o=>orderCard(o)).join(''):`<div class="empty">Пусто</div>`;
   p.innerHTML=html;
   p.querySelectorAll('[data-srt]').forEach(b=>{b.onclick=()=>{const k=b.dataset.srt;
     if(k==='reset'){sortBy={field:'total',dir:-1};}else if(sortBy.field===k)sortBy.dir=-sortBy.dir;
@@ -3051,42 +3051,54 @@ function closeAllDropdowns(){
 function orderCard(o){
   const ci=CARGO[o.ctype];const comp=compatibleWith(o);
   const here=S.truck.cityIndex===o.from;const myCity=S.truck.cityIndex!==null;
-const wouldOverload=(truckLoad()+o.weight)>curCap()+0.001;
-const overkill=(truckLoad()+o.weight)>curCap()*1.5+0.001;
-const cashOk=!S.truck.traveling&&here&&comp&&hasLicense(o.ctype)&&!overkill;
+  const wouldOverload=(truckLoad()+o.weight)>curCap()+0.001;
+  const overkill=(truckLoad()+o.weight)>curCap()*1.5+0.001;
+  const cashOk=!S.truck.traveling&&here&&comp&&hasLicense(o.ctype)&&!overkill;
   const bankOk=cashOk&&isIP();
   const ttl=Math.max(0,Math.round(o.expires-S.gameTime));
   const ttlPct=clamp(ttl/12,0,100);
-  const route=o.local
-    ?`<span class="route">${ci.icon} 🏙️ ${CITIES[o.from].n} <span style="color:#7ad6ff">(лок)</span><small>${ci.n} · ${r3(o.weight)} т · ${o.km} км</small></span>`
-    :`<span class="route">${ci.icon} ${CITIES[o.from].n} → ${CITIES[o.to].n}<small>${ci.n} · ${r3(o.weight)} т · ${fmt(o.km)} км</small></span>`;
+  // Тип заказа бейджем
+  const typeBadge = o.orderType==='express'
+    ? `<span class="badge express">🔴 Экспресс ×1.8</span>`
+    : o.orderType==='urgent'
+    ? `<span class="badge urgent">🟡 Срочный ×1.3</span>`
+    : `<span class="badge">🟢 Обычный</span>`;
+  const localTag = o.local ? ` <span style="color:#7ad6ff;font-size:11px">🏙️ (лок)</span>` : '';
+  const routeLbl = `${CITIES[o.from].n} → ${CITIES[o.to].n}`;
   let sb='';
-  if(!comp)sb+=`<span class="badge no">не подходит</span>`;
-  if(!hasLicense(o.ctype))sb+=`<span class="badge no">нужна лицензия</span>`;
-  if(!here&&myCity)sb+=`<span class="badge no">не ваш город</span>`;
-if(wouldOverload&&!overkill)sb+=`<span class="badge urgent">⚠️ Перегруз</span>`;
-if(overkill)sb+=`<span class="badge no">не влезет (>150%)</span>`;
-  const tB=o.orderType==='express'?`<span class="badge express">🔴 Экспресс ×1.8</span>`
-        :o.orderType==='urgent'?`<span class="badge urgent">🟡 Срочный ×1.3</span>`
-        :`<span class="badge">🟢 Обычный</span>`;
+  if(!comp) sb += `<span class="badge" style="background:#4a1b22;color:#ff8d99">не подходит</span>`;
+  if(!hasLicense(o.ctype)) sb += `<span class="badge" style="background:#4a1b22;color:#ff8d99">нужна лицензия</span>`;
+  if(!here && myCity) sb += `<span class="badge" style="background:#4a1b22;color:#ff8d99">не ваш город</span>`;
+  if(wouldOverload && !overkill) sb += `<span class="badge urgent">⚠️ Перегруз</span>`;
+  if(overkill) sb += `<span class="badge" style="background:#4a1b22;color:#ff8d99">не влезет (>150%)</span>`;
   let btns='';
-  if(!myCity)btns=`<span class="muted" style="font-size:10px">Выберите город</span>`;
-  else{
-   btns+=`<button data-take-cash="${o.id}" ${cashOk?'':'disabled'} style="${cashOk?(wouldOverload?'background:#8a4a14;border-color:#c87a00':'background:#15583a;border-color:#1f8a58'):''}">💵 ${fmt(o.totalCash)} ₽${wouldOverload?' ⚠️':''}</button>`;
-	  const overloadStyle=(wouldOverload&&cashOk)?'background:#8a4a14;border-color:#c87a00':'';
-    if(isIP())btns+=`<button data-take-bank="${o.id}" ${bankOk?'':'disabled'} style="margin-left:4px;${bankOk?(wouldOverload?'background:#8a4a14;border-color:#c87a00':'background:#1a5ba0;border-color:#2b7bd4'):''}">🏦 ${fmt(o.totalBank)} ₽${wouldOverload?' ⚠️':''}</button>`;
+  if(!myCity) btns=`<span class="muted" style="font-size:11px">Выберите город</span>`;
+  else {
+    btns += `<button data-take-cash="${o.id}" ${cashOk?'':'disabled'} style="${cashOk?(wouldOverload?'background:#8a4a14;border-color:#c87a00':'background:#15583a;border-color:#1f8a58'):''};flex:1;padding:7px 10px;font-size:12.5px;font-weight:600">💵 ${fmt(o.totalCash)} ₽${wouldOverload?' ⚠️':''}</button>`;
+    if(isIP()) btns += `<button data-take-bank="${o.id}" ${bankOk?'':'disabled'} style="${bankOk?(wouldOverload?'background:#8a4a14;border-color:#c87a00':'background:#1a5ba0;border-color:#2b7bd4'):''};flex:1;padding:7px 10px;font-size:12.5px;font-weight:600;margin-left:5px">🏦 ${fmt(o.totalBank)} ₽${wouldOverload?' ⚠️':''}</button>`;
   }
-  const quickRouteBtn=!o.local?`<button class="route-quick" data-quick-route="${o.id}">🔍 Только этот маршрут</button>`:'';
-  return `<div class="card ${here&&comp?'hl':''}" style="${comp?'':'opacity:.55'}" data-hl="${o.id}">
-    <div class="row">${route}<span class="rt ${ratingCls(o.rating)}">★ ${o.rating.toFixed(1)}</span></div>
-    <div class="row" style="margin-top:3px">${tB}</div>
-    <div class="row" style="margin-top:3px"><span class="muted" style="font-size:10.5px">${o.company}</span></div>
-    <div class="row" style="margin-top:5px"><span>
-      <span class="badge cash">💵 ${o.rateCash} ₽/км</span>
-      ${isIP()?`<span class="badge bank">🏦 ${o.rateBank} ₽/км</span>`:''}${sb}</span></div>
-    <div class="row" style="margin-top:6px;flex-wrap:wrap;gap:4px">${btns}</div>
-    ${quickRouteBtn}
-    <div class="bar"><i style="width:${ttlPct}%;background:${ttlPct<30?'#ff6b6b':'#4da3ff'}"></i></div>
+  return `<div class="card ${here&&comp?'hl':''}" style="${comp?'':'opacity:.55'};padding:9px 11px" data-hl="${o.id}">
+    <div class="row">
+      <span style="display:flex;gap:6px;align-items:center;flex:1;min-width:0">
+        ${typeBadge}
+        <span class="route" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${routeLbl}${localTag}</span>
+      </span>
+      <span class="rt ${ratingCls(o.rating)}">★ ${o.rating.toFixed(1)}</span>
+    </div>
+    <div class="row" style="margin-top:3px;font-size:11.5px;color:#8ba0bd;gap:6px">
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${o.company}</span>
+      <span style="flex-shrink:0">${ci.icon} ${ci.n} · ${r3(o.weight)} т · ${fmt(o.km)} км</span>
+    </div>
+    <div class="row" style="margin-top:4px;gap:5px;align-items:center">
+      <span style="display:flex;gap:5px;flex-wrap:wrap;flex:1;min-width:0">
+        <span class="badge cash">💵 ${o.rateCash} ₽/км</span>
+        ${isIP()?`<span class="badge bank">🏦 ${o.rateBank} ₽/км</span>`:''}
+        ${sb}
+      </span>
+      ${!o.local?`<button class="route-quick" data-quick-route="${o.id}" style="padding:3px 7px;font-size:10px;flex-shrink:0">🔍 Маршрут</button>`:''}
+    </div>
+    <div class="row" style="margin-top:6px;gap:5px">${btns}</div>
+    <div class="bar" style="margin-top:5px"><i style="width:${ttlPct}%;background:${ttlPct<30?'#ff6b6b':'#4da3ff'}"></i></div>
   </div>`;
 }
 function renderContractsContent(){
@@ -4787,14 +4799,34 @@ function renderWizardStep(){
   spot.style.height=(r.height+12)+'px';
   document.body.appendChild(spot);
 
-  const box=document.createElement('div');
+   const box=document.createElement('div');
   box.className='wiz-box';
-  const isAbove=r.top>window.innerHeight/2;
-  const isLeft=r.left<window.innerWidth/2;
-  if(isAbove){box.style.bottom=(window.innerHeight-r.top+16)+'px';}
-  else{box.style.top=(r.bottom+16)+'px';}
-  if(isLeft){box.style.left=Math.max(12,r.left-20)+'px';}
-  else{box.style.right=Math.max(12,window.innerWidth-r.right-20)+'px';}
+  // === Умное позиционирование визарда (не улетает за экран) ===
+  const PAD=12;
+  const BOX_W=Math.min(300, window.innerWidth-PAD*2);
+  const BOX_H=200; // примерная высота окошка визарда
+  const vw=window.innerWidth, vh=window.innerHeight;
+  let top, left;
+  // 1) Пробуем под целью
+  if(vh - r.bottom >= BOX_H + PAD){
+    top = r.bottom + PAD;
+  }
+  // 2) Если места под нет — над целью
+  else if(r.top >= BOX_H + PAD){
+    top = r.top - BOX_H - PAD;
+  }
+  // 3) Цель занимает весь экран (карта) — ставим по центру-низ
+  else {
+    top = Math.max(PAD, Math.min(vh - BOX_H - PAD, vh/2 - BOX_H/2 + 80));
+  }
+  // Горизонталь — центрируем по цели, но не вылезаем
+  left = r.left + r.width/2 - BOX_W/2;
+  if(left < PAD) left = PAD;
+  if(left + BOX_W > vw - PAD) left = vw - BOX_W - PAD;
+  box.style.top = top+'px';
+  box.style.left = left+'px';
+  box.style.bottom = '';
+  box.style.right = '';
   box.innerHTML=`
     <div class="wb-head"><span class="wb-icon">${step.icon}</span><span class="wb-title">${step.title}</span></div>
     <div class="wb-text">${step.text}</div>
