@@ -3725,13 +3725,29 @@ function firmGeneralContent(){
     <div class="adm-row"><input type="number" id="fAutoSrvInt" value="${S.autoServiceInterval}" min="5000" max="100000" step="5000">
     <button id="fAutoSrvBtn" class="primary">OK</button></div>
   </div>
-  <div class="card" style="margin-top:6px">
+   <div class="card" style="margin-top:6px">
     <label class="adm-check"><input type="checkbox" id="fAutoRep" ${S.autoRepair?'checked':''}> Авто-ремонт водителями</label>
     <div class="muted" style="font-size:10.5px;margin-top:3px">Водитель сам чинит машину при достижении порога износа</div>
     <div class="row" style="margin-top:8px"><span class="muted">Порог износа</span><b>${S.autoRepairThreshold}%</b></div>
     <div class="adm-row"><input type="number" id="fAutoRepThr" value="${S.autoRepairThreshold}" min="30" max="95" step="5">
     <button id="fAutoRepBtn" class="primary">OK</button></div>
-  </div>`;
+  </div>
+  ${!isOOO()?(()=>{
+    const req=[];let ok=true;
+    if(S.ownedVehicles.length<10){req.push(`🚗 10 машин (${S.ownedVehicles.length}/10)`);ok=false;}
+    if(S.bases.length<1){req.push('🏭 1 база');ok=false;}
+    if(S.reputation<50){req.push(`⭐ Репутация 50 (${Math.round(S.reputation)})`);ok=false;}
+    if(S.money<500000){req.push(`💰 500 000 ₽ (${fmt(S.money)} ₽)`);ok=false;}
+    return `<h3 style="margin-top:12px">🏢 Регистрация ООО</h3>
+      <div class="card ${ok?'ok':'warn'}">
+        <div class="row"><b>ООО — это юрлицо</b><b style="color:${ok?'#5ef0a0':'#ffb84d'}">${ok?'готово':'нужно ещё'}</b></div>
+        <div class="muted" style="font-size:11px;margin-top:4px">Даёт +30% к ставкам, +5 машин в каждом классе, международные филиалы.</div>
+        ${req.length?`<div class="muted" style="font-size:11px;margin-top:8px;color:#ff8d99">${req.join(' · ')}</div>`:''}
+        <button class="big primary" id="btnOpenOOO" style="margin-top:8px" ${ok?'':'disabled'}>
+          <span class="ic">🏢</span> Открыть ООО · 500 000 ₽
+        </button>
+      </div>`;
+  })():''}`;
 }
 function firmFinanceContent(){
   const obl=obligationsList();const totalObl=obl.reduce((s,o)=>s+o.sum,0);
@@ -3860,6 +3876,8 @@ function renderFirm(){
     if(v>=30&&v<=95){S.autoRepairThreshold=v;toast('🔧 Порог обновлён','ok');renderFirm();}
   };
   if(btn)btn.onclick=()=>{const v=inp.value.trim();if(v){S.firmName=v;toast('📝','ok');renderFirm();}};
+	  const oooBtn=$('btnOpenOOO');
+  if(oooBtn)oooBtn.onclick=()=>openOOO();
   p.querySelectorAll('[data-buy-lic]').forEach(b=>{b.onclick=()=>{
     const id=b.dataset.buyLic;const L=LICENSES[id];
     if(S.money<L.price){toast('Мало денег','bad');return;}
