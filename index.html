@@ -1794,8 +1794,8 @@ function payIncome(gameMin){
     for(const k of b.businesses)tph+=BUSINESSES[k].income*mult;
   }
   if(tph===0)return;
-  let inc=tph*(gameMin/60)*5;inc*=(1+S.achEffects.biz);inc*=(1+S.achEffects.income);
-  if(inc>0){S.money+=inc;S.finance.income+=inc;}
+    let inc=tph*(gameMin/1440);inc*=(1+S.achEffects.biz);inc*=(1+S.achEffects.income);
+  if(inc>0) moneyAdd(inc,'Бизнесы');
 }
 
 /* ============ БИРЖА ТРУДА ============ */
@@ -2079,9 +2079,9 @@ function advanceTime(gameMin){
   const h=gameMin/60;S.gameTime+=gameMin;
   payIncome(gameMin);
   let sal=0;for(const d of S.drivers)if(d.sick<=0)sal+=d.salary/720;
-  if(sal>0){const a=sal*h;S.money-=a;S.finance.expense+=a;}
+   if(sal>0) moneySpend(sal*h,'Зарплаты водителей');
   const ss=staffSalaryTotal();
-  if(ss>0){const a=ss/720*h;S.money-=a;S.finance.expense+=a;}
+    if(ss>0) moneySpend(ss/720*h,'Зарплаты офиса');
   if(S.bases.length)S.reputation=clamp(S.reputation+h*0.05,0,100);
   const house=HOUSES[S.houseLevel];
   if(house.repBonus>0&&S.houseCityIdx===S.truck.cityIndex)S.reputation=clamp(S.reputation+h*house.repBonus,0,100);
@@ -2205,7 +2205,7 @@ function checkQuests(){
     const info=S.activeQuests[q.id];let prog=0;
     if(q.type==='trips')prog=S.stats.totalTrips;
     else if(q.type==='ip')prog=isIP()?1:0;
-    else if(q.type==='tractor')prog=countVehiclesByClass('scania');
+    else if(q.type==='tractor')prog=S.ownedVehicles.filter(v=>vehCategory(v.model)==='tractor').length;
     else if(q.type==='base')prog=S.bases.length;
     else if(q.type==='vehicles')prog=S.ownedVehicles.length;
     else if(q.type==='ooo')prog=isOOO()?1:0;
