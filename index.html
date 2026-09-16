@@ -129,6 +129,15 @@ button.sm{font-size:10px;padding:3px 7px}
 .badge.grmp{background:#4a1a1a;color:#ff8d99}
 .badge.lazy{background:#4a3a1a;color:#ffd479}
 .badge.thief{background:#3a1a3a;color:#d08ae0}
+	.plate-badge{display:inline-block;background:#fff;color:#000;font-family:ui-monospace,monospace;font-weight:700;
+  font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid #000;letter-spacing:.5px;white-space:nowrap}
+.plate-badge.lvl-nice{background:#fffacd;border-color:#c8b400}
+.plate-badge.lvl-elite{background:#d4edff;border-color:#2b7bd4}
+.plate-badge.lvl-super{background:#ffe4b5;border-color:#c87a00}
+.plate-badge.lvl-legendary{background:linear-gradient(90deg,#ffe066,#ffd700,#ffe066);
+  border-color:#a07000;box-shadow:0 0 6px #ffd70099}
+.plate-badge.no-plate{background:#4a1b22;color:#ff8d99;border-color:#8a2f3e;font-style:italic}
+.plate-lvl-icon{margin-left:2px;font-size:11px}
 .bar{height:3px;background:#000;border-radius:2px;overflow:hidden;margin-top:5px}
 .bar i{display:block;height:100%;transition:width .3s}
 .modal{position:fixed;inset:0;background:#05080de6;display:none;align-items:center;
@@ -809,7 +818,7 @@ const LEASE_FINE_PCT = 0.15;
 /* ============ ГОСНОМЕРА (v18.2) ============ */
 const PLATE_LETTERS = 'АВЕКМНОРСТУХ';
 const CITY_REGION_CODE = [
-  39,78,51,29,77,52,36,61,23,23,34,16,63,02,59,66,74,72,86,55,54,24,38,75,27,25,14,
+  39,78,51,29,77,52,36,61,23,23,34,16,63,'02',59,66,74,72,86,55,54,24,38,75,27,25,14,
   'BY','KZ','FIN','CN'
 ];
 const PLATE_LEVELS = {
@@ -1279,12 +1288,14 @@ const EVENTS = {
     {id:'dog',w:5,fn:()=>{const v=curVehInst();if(v)v.wear=Math.min(100,v.wear+2);return{t:'🐕 <b>Собака бросилась под колёса</b><br>Успел затормозить, но не без последствий.',c:'warn'};}},
   ],
   mid:[
-    {id:'police',w:25,fn:()=>{
+      {id:'police',w:25,fn:()=>{
       const inst=curVehInst();const hasIns=hasOsago(inst);
       let fine=20000;if(hasIns)fine=5000;
+      const noPlate = !inst || !inst.plate;
+      if(noPlate) fine = Math.round(fine*1.5);
       if(S.money<fine)return{t:'🚔 <b>Тебя тормознули на посту</b><br>Начал «бодаться», а инспектор попался принципиальный. Денег на штраф нет — долг повиснет.',c:'warn'};
       moneySpend(fine,'Штраф ГИБДД');
-      return{t:`🚔 <b>Тебя тормознули на посту</b><br>Начал бычить, но инспектор быстро поставил на место. Штраф: <b>${fmt(fine)} ₽</b>${hasIns?' (ОСАГО спасло)':''}`,c:'bad'};
+      return{t:`🚔 <b>Тебя тормознули на посту</b><br>${noPlate?'<b style="color:#ff6b6b">Без номеров!</b> Инспектор разозлился. ':''}Начал бычить, но инспектор быстро поставил на место. Штраф: <b>${fmt(fine)} ₽</b>${hasIns?' (ОСАГО спасло)':''}`,c:'bad'};
     }},
     {id:'tire',w:15,fn:()=>{if(S.money<6000)return{t:'🛞 <b>Лопнуло колесо</b><br>Запаски нет, денег на новую тоже. Ждём.',c:'bad'};moneySpend(6000,'Колесо');advanceTime(60);return{t:'🛞 <b>Лопнуло колесо</b><br>Пришлось менять прямо на обочине. Резина и работа: <b>6 000 ₽</b>',c:'bad'};}},
     {id:'overheat',w:12,fn:()=>{const v=curVehInst();if(v)v.wear=Math.min(100,v.wear+10);return{t:'💨 <b>Двигатель закипел</b><br>Антифриз весь вышел, стрелка в красной зоне. Износ +10%.',c:'bad'};}},
@@ -1292,7 +1303,7 @@ const EVENTS = {
     {id:'roadwork',w:10,fn:()=>{advanceTime(60);const v=curVehInst();if(v)v.fuel=Math.max(0,v.fuel-5);return{t:'🚧 <b>Объезд по просёлку</b><br>Основную трассу перекрыли. Потерял час и лишних 5 литров.',c:'warn'};}},
     {id:'trailerAcc',w:8,fn:()=>{const t=curTrlInst();if(t)t.wear=(t.wear||0)+15;return{t:'🚨 <b>Царапнул прицеп</b><br>На развороте не вписался в габарит. Прицеп пострадал.',c:'bad'};}},
     {id:'straps',w:8,fn:()=>{if(S.money<3000)return null;moneySpend(3000,'Крепёж');advanceTime(30);return{t:'⚠️ <b>Ремни ослабли</b><br>Пришлось останавливаться и перетягивать. Купил новые ремни: <b>3 000 ₽</b>',c:'warn'};}},
-    {id:'documents',w:7,fn:()=>{const inst=curVehInst();const hasIns=hasOsago(inst);let fine=40000;if(hasIns)fine=8000;if(S.money<fine)return{t:'🚔 <b>Проверка документов</b><br>Накладные не в порядке, штраф есть, но денег нет. Долг.',c:'warn'};moneySpend(fine,'Проверка');return{t:`🚔 <b>Проверка документов на посту</b><br>К бумагам придрались. Штраф: <b>${fmt(fine)} ₽</b>${hasIns?' (ОСАГО прикрыло)':''}`,c:'bad'};}},
+    {id:'documents',w:7,fn:()=>{const inst=curVehInst();const hasIns=hasOsago(inst);const noPlate=!inst||!inst.plate;let fine=40000;if(hasIns)fine=8000;if(noPlate)fine=Math.round(fine*1.5);if(S.money<fine)return{t:'🚔 <b>Проверка документов</b><br>Накладные не в порядке, штраф есть, но денег нет. Долг.',c:'warn'};moneySpend(fine,'Проверка');return{t:`🚔 <b>Проверка документов на посту</b><br>${noPlate?'<b style="color:#ff6b6b">Без номеров!</b> ':''}К бумагам придрались. Штраф: <b>${fmt(fine)} ₽</b>${hasIns?' (ОСАГО прикрыло)':''}`,c:'bad'};}},
     {id:'conflict',w:5,fn:()=>{S.reputation=clamp(S.reputation-1,0,100);advanceTime(30);return{t:'🚫 <b>Скандал на стоянке</b><br>Поцапался с другим водителем. Осадок остался.',c:'warn'};}},
   ],
   sev:[
@@ -1314,11 +1325,12 @@ const EVENTS = {
     {id:'robbery',w:15,fn:()=>{const loss=Math.round(S.money*0.15);if(loss<1)return null;moneySpend(loss,'Ограбление');return{t:`🚨 <b>Напали на стоянке</b><br>Отобрали часть налички. Потеря: <b>${fmt(loss)} ₽</b>`,c:'bad'};}},
     {id:'fire',w:10,fn:()=>{const v=curVehInst();if(!v)return null;v.wear=Math.min(100,v.wear+50);moneySpend(100000,'Пожар');return{t:'🔥 <b>Загорелся моторный отсек</b><br>Огнетушителем потушил, но ремонт и эвакуация: <b>−100 000 ₽</b>',c:'bad'};}},
     {id:'vipCheck',w:10,fn:()=>{
-      const inst=curVehInst();const hasIns=hasOsago(inst);
+      const inst=curVehInst();const hasIns=hasOsago(inst);const noPlate=!inst||!inst.plate;
       let fine=80000;if(hasIns)fine=15000;
+      if(noPlate)fine=Math.round(fine*1.5);
       if(S.money<fine)return{t:'🚔 <b>VIP-проверка на трассе</b><br>Инспектор нашёл нарушения и выписал штраф. Но денег нет — долг повиснет.',c:'warn'};
       moneySpend(fine,'VIP-проверка');
-      return{t:`🚔 <b>VIP-проверка на трассе</b><br>Тебя остановили на посту. Начал бурогозить — тебя развели на бабки. Штраф: <b>${fmt(fine)} ₽</b>${hasIns?' (ОСАГО немного спасло)':''}`,c:'bad'};
+      return{t:`🚔 <b>VIP-проверка на трассе</b><br>${noPlate?'<b style="color:#ff6b6b">Без номеров!</b> ':''}Тебя остановили на посту. Начал бурогозить — тебя развели на бабки. Штраф: <b>${fmt(fine)} ₽</b>${hasIns?' (ОСАГО немного спасло)':''}`,c:'bad'};
     }},
     {id:'cargoTheft',w:8,fn:()=>{if(S.activeOrders.length){const o=S.activeOrders[0];S.activeOrders=S.activeOrders.filter(x=>x.id!==o.id);return{t:'🎯 <b>Пропал груз</b><br>Пока обедал — из кузова вынесли один заказ. Клиент в ярости.',c:'bad'};}return null;}},
     {id:'railway',w:5,fn:()=>{const v=curVehInst();if(v)v.wear=Math.min(100,v.wear+25);advanceTime(240);return{t:'🚂 <b>Авария на переезде</b><br>Поезд зацепил край фуры, чудом обошлось. Износ +25%, потерял 4 часа.',c:'bad'};}},
@@ -1331,9 +1343,17 @@ function tryRoadEvent(dt){
   roadCooldown-=dt;if(roadCooldown>0)return;
   if(Math.random()>0.12){roadCooldown=1;return;}
   roadCooldown=30;
-  const r=Math.random();let cls;
+   const r=Math.random();let cls;
   if(r<EVENT_CLASS.pos)cls='pos';else if(r<EVENT_CLASS.pos+EVENT_CLASS.minor)cls='minor';
   else if(r<EVENT_CLASS.pos+EVENT_CLASS.minor+EVENT_CLASS.mid)cls='mid';else cls='sev';
+  
+  // Госномер влияет на события ГИБДД (mid)
+  if(cls === 'mid'){
+    const mul = plateStopMultiplier(curVehInst());
+    if(mul <= 0) return;
+    if(mul < 1 && Math.random() > mul) return;
+  }
+  
   const list=EVENTS[cls];const total=list.reduce((s,e)=>s+e.w,0);
   let x=Math.random()*total;
   for(const e of list){x-=e.w;if(x<=0){const res=e.fn();if(res){toast(res.t,res.c);addNews(res.t,res.c);}return;}}
@@ -1422,6 +1442,70 @@ function kaskoCost(inst){return Math.round((VEHICLES[inst.model].price||50000)*I
 function hasOsago(inst){return inst&&inst.insurance&&inst.insurance.osago&&inst.insurance.osagoExpires>S.gameTime;}
 function hasKasko(inst){return inst&&inst.insurance&&inst.insurance.kasko&&inst.insurance.kaskoExpires>S.gameTime;}
 function ensureInsurance(inst){if(!inst.insurance)inst.insurance={osago:false,osagoExpires:0,osagoRenew:false,kasko:false,kaskoExpires:0,kaskoRenew:false};return inst.insurance;}
+	function openPlateModal(vehicleId, isReReg){
+  const inst = getVeh(vehicleId);
+  if(!inst){toast('Машина не найдена','bad');return;}
+  const cost = 15000;
+  if(S.money < cost){toast(`Нужно ${fmt(cost)} ₽`,'bad');return;}
+  if(S.truck.cityIndex === null){toast('Вы в пути','bad');return;}
+  const curPlate = inst.plate;
+  const chances = isReReg
+    ? [{n:'😐 Обычный',p:'84.5%'},{n:'😎 Красивый',p:'12.5%'},{n:'💎 Блатной',p:'2.5%'},
+       {n:'👑 Супер-блатной',p:'0.45%'},{n:'⭐ Легендарный',p:'0.05%'}]
+    : [{n:'😐 Обычный',p:'69%'},{n:'😎 Красивый',p:'25%'},{n:'💎 Блатной',p:'5%'},
+       {n:'👑 Супер-блатной',p:'0.9%'},{n:'⭐ Легендарный',p:'0.1%'}];
+  let html = `<h2>${isReReg?'🔄 Смена номера':'📋 Постановка на учёт'}</h2>
+    <p>${VEHICLES[inst.model].icon} <b>${VEHICLES[inst.model].n}</b> · регион ${CITY_REGION_CODE[S.truck.cityIndex]}</p>
+    <div class="card">
+      <div class="row"><span class="muted">Текущий номер</span>
+        <b>${curPlate ? curPlate.text : '— нет —'}</b></div>
+      <div class="row"><span class="muted">Стоимость</span><b style="color:#ff6b6b">${fmt(cost)} ₽</b></div>
+    </div>
+    <h3>Шансы</h3>
+    <div class="card" style="font-size:11px">`;
+  for(const c of chances){
+    html += `<div class="row" style="padding:2px 0"><span>${c.n}</span><b>${c.p}</b></div>`;
+  }
+  html += `</div>
+    <div class="card" style="font-size:11px;margin-top:6px">
+      <div class="muted" style="margin-bottom:4px">Влияние на остановки ГИБДД:</div>
+      <div class="row"><span>🚫 Без номера</span><b style="color:#ff8d99">×2.0</b></div>
+      <div class="row"><span>😐 Обычный</span><b>×1.0</b></div>
+      <div class="row"><span>😎 Красивый</span><b style="color:#5ef0a0">×0.8</b></div>
+      <div class="row"><span>💎 Блатной</span><b style="color:#5ef0a0">×0.5</b></div>
+      <div class="row"><span>👑 Супер-блатной</span><b style="color:#5ef0a0">×0.2</b></div>
+      <div class="row"><span>⭐ Легендарный</span><b style="color:#5ef0a0">×0.0 в своём регионе</b></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button id="plateYes" class="gold" style="flex:1">${isReReg?'Сменить':'Поставить'} · ${fmt(cost)} ₽</button>
+      <button id="plateNo" class="ok" style="flex:1">Отмена</button>
+    </div>`;
+  Modal._render(html);
+  $('plateNo').onclick = ()=>Modal.next();
+  $('plateYes').onclick = ()=>{
+    if(S.money < cost){toast('Мало денег','bad');return;}
+    moneySpend(cost, isReReg?'Смена номера':'Постановка на учёт');
+    const newPlate = generatePlate(S.truck.cityIndex, isReReg);
+    inst.plate = newPlate;
+    const lv = PLATE_LEVELS[newPlate.level];
+    addNews(`${lv.icon} ${VEHICLES[inst.model].n} · номер ${newPlate.text}`, 'info', 'activity');
+    Modal.next();
+    setTimeout(()=>{
+      const rHtml = `<h2>${lv.icon} ${lv.n} номер!</h2>
+        <p>Ваш новый номер:</p>
+        <div style="text-align:center;padding:16px 0">
+          <span class="plate-badge lvl-${newPlate.level}" style="font-size:20px;padding:8px 16px">${newPlate.text}</span>
+        </div>
+        <div class="card" style="font-size:12px">
+          <div class="muted">Шанс остановки ГИБДД: <b style="color:#5ef0a0">×${lv.stopMul.toFixed(1)}</b></div>
+        </div>
+        <button class="wide primary" id="plateOk">ОК</button>`;
+      Modal._render(rHtml);
+      $('plateOk').onclick = ()=>Modal.next();
+    }, 300);
+    updateUI();
+  };
+}
 function openInsuranceModal(){
   if(!S.ownedVehicles.length){toast('Нет машин','bad');return;}
   const list=S.ownedVehicles;let totO=0,totK=0;
@@ -1968,8 +2052,10 @@ function sellVehicle(id){
   if(isLast&&S.money+price<45000){toast('Нельзя продать последнюю','bad');return;}
   const depleted=odo>=maxKm;
   const remainColor=remainPct>0.6?'#5ef0a0':remainPct>0.4?'#ffd479':remainPct>0.2?'#ffb84d':'#ff8d99';
+  const _pstr = inst.plate ? `${inst.plate.text} ${PLATE_LEVELS[inst.plate.level].icon}` : 'без номера';
   $('modalBox').innerHTML=`<h2>💸 Продать ${v.icon} ${v.n}?</h2>
     <div class="card">
+      <div class="row"><span class="muted">Номер</span><b>${_pstr}</b></div>
       <div class="row"><span class="muted">🚗 Ресурс</span><b style="color:${remainColor}">${fmt(odo)} / ${fmt(maxKm)} км</b></div>
       <div class="row"><span class="muted">Осталось</span><b style="color:${remainColor}">${Math.round(remainPct*100)}% · ${resLabel}</b></div>
       <div class="row"><span class="muted">Множитель ресурса</span><b>×${resK.toFixed(2)}</b></div>
@@ -2900,14 +2986,18 @@ function renderAuto(){
     const r4b=$('btnRefuelAll');if(r4b)r4b.onclick=refuelAllFleet;
     const rs=$('btnSell');if(rs)rs.onclick=()=>sellVehicle(S.currentVehicleId);
     const bo=$('btnBuyout');if(bo)bo.onclick=()=>buyoutLease(S.currentVehicleId);
-    const pd=$('btnPayDebt');if(pd)pd.onclick=()=>payLeaseDebt(S.currentVehicleId);
+     const pd=$('btnPayDebt');if(pd)pd.onclick=()=>payLeaseDebt(S.currentVehicleId);
+    const rp=$('btnRegPlate');if(rp)rp.onclick=()=>openPlateModal(S.currentVehicleId, false);
+    const rr=$('btnReplate');if(rr)rr.onclick=()=>openPlateModal(S.currentVehicleId, true);
     p.querySelectorAll('[data-up]').forEach(b=>{b.onclick=()=>buyUpgrade(b.dataset.up);});
   }
-   if(sub==='garage'){
+     if(sub==='garage'){
     p.querySelectorAll('[data-select-vehicle]').forEach(b=>{b.onclick=()=>selectVehicle(b.dataset.selectVehicle);});
     p.querySelectorAll('[data-select-trailer]').forEach(b=>{b.onclick=()=>selectTrailer(b.dataset.selectTrailer);});
     p.querySelectorAll('[data-buyout-fleet]').forEach(b=>{b.onclick=()=>buyoutLease(b.dataset.buyoutFleet);});
     p.querySelectorAll('[data-paydebt-fleet]').forEach(b=>{b.onclick=()=>payLeaseDebt(b.dataset.paydebtFleet);});
+    p.querySelectorAll('[data-regplate]').forEach(b=>{b.onclick=()=>openPlateModal(b.dataset.regplate, false);});
+    p.querySelectorAll('[data-replate]').forEach(b=>{b.onclick=()=>openPlateModal(b.dataset.replate, true);});
   }
   if(sub==='shop'){
     p.querySelectorAll('[data-buy-vehicle]').forEach(b=>{b.onclick=()=>buyVehicle(b.dataset.buyVehicle);});
@@ -2930,6 +3020,9 @@ function autoCurrentContent(){
   <div class="card hl">
     <div class="row"><b>${v.icon} ${v.n}</b>
       <span class="veh-cat">${catName(vehCategory(inst.model))}</span></div>
+    <div class="row" style="margin-top:4px">
+      ${inst.plate?`<span class="plate-badge lvl-${inst.plate.level}">${inst.plate.text}</span><span class="plate-lvl-icon">${PLATE_LEVELS[inst.plate.level].icon}</span>`:`<span class="plate-badge no-plate">без номера</span>`}
+    </div>
     <div class="row"><span class="muted">Радиус</span><b>${curRadius()} км</b></div>
     <div class="row"><span class="muted">Грузоподъёмность</span><b>${curCap()} т</b></div>
     <div class="row"><span class="muted">Скорость</span><b>${Math.round(vehSpeed(inst)*SEASONS[S.season].speedMul)} км/ч</b></div>
@@ -2998,6 +3091,9 @@ function autoCurrentContent(){
     <button class="warn" id="btnRepairAll" style="flex:1;height:40px;font-size:12px">🔧 Весь парк</button>
     <button class="warn" id="btnRefuelAll" style="flex:1;height:40px;font-size:12px">⛽ Весь парк</button>
   </div>
+   ${inst.plate
+    ? `<button class="big gold" id="btnReplate" ${S.truck.traveling?'disabled':''}><span class="ic">🔄</span> Сменить номер · 15 000 ₽</button>`
+    : `<button class="big ok" id="btnRegPlate" ${S.truck.traveling?'disabled':''}><span class="ic">📋</span> Поставить на учёт · 15 000 ₽</button>`}
   <button class="big bad" id="btnSell" ${S.truck.traveling?'disabled':''}>
     <span class="ic">💸</span> Продать машину</button>
   ${inst.lease?`<button class="big gold" id="btnBuyout"><span class="ic">🏦</span> Досрочно выкупить</button>`:''}
@@ -3033,7 +3129,8 @@ function autoGarageContent(){
       const sCol3=od3>0?'#ff6b6b':sPct3>80?'#ffb84d':'#39d98a';
           html+=`<div class="card ${isCur?'hl':''}">
         <div class="row">
-          <span class="route">${ov.icon} ${ov.n} <span class="veh-cat">${catName(vehCategory(i.model))}</span>
+                   <span class="route">${ov.icon} ${ov.n} <span class="veh-cat">${catName(vehCategory(i.model))}</span>
+            ${i.plate?`<span class="plate-badge lvl-${i.plate.level}">${i.plate.text}</span><span class="plate-lvl-icon">${PLATE_LEVELS[i.plate.level].icon}</span>`:`<span class="plate-badge no-plate">без номера</span>`}
             <small>${ov.radius} км · ${ov.cap} т · износ ${w}%${isB?' · 👷':''}${i.lease?' · 🏦':''}</small></span>
           ${isCur?'<span class="badge ok">текущая</span>':`<button class="primary" data-select-vehicle="${i.id}" ${truckLoad()>0||isB||w>=95?'disabled':''}>Сесть</button>`}
         </div>
@@ -3042,10 +3139,15 @@ function autoGarageContent(){
           <div class="ln"><span>🛠 ТО</span><b style="color:${sCol3}">${fmt(sinceS3)} / ${fmt(interval3)} км</b></div>
           <div class="ln"><span>🔧 Износ</span><b style="color:${w>=80?'#ff8d99':w>=50?'#ffb84d':'#5ef0a0'}">${w}%</b></div>
         </div>
-        ${i.lease?`<div class="row" style="margin-top:6px;gap:5px">
+               ${i.lease?`<div class="row" style="margin-top:6px;gap:5px">
           <button class="gold" data-buyout-fleet="${i.id}" style="flex:1">🏦 Досрочно выкупить</button>
           ${i.lease.debt>0?`<button class="bad" data-paydebt-fleet="${i.id}" style="flex:1">💳 Долг ${fmt(i.lease.debt)} ₽</button>`:''}
         </div>`:''}
+        <div class="row" style="margin-top:6px;gap:5px">
+          ${i.plate
+            ? `<button class="gold" data-replate="${i.id}" style="flex:1">🔄 Сменить номер · 15 000 ₽</button>`
+            : `<button class="ok" data-regplate="${i.id}" style="flex:1">📋 Поставить на учёт · 15 000 ₽</button>`}
+        </div>
       </div>`;
     }
   }
@@ -4162,6 +4264,15 @@ function loadGame(){
     if(v.lastServiceOdometer===undefined)v.lastServiceOdometer=0;
   }
 }
+        // Миграция: генерируем номера всем машинам без plate
+    if(S.ownedVehicles){
+      const migCity = (S.startCity !== null && S.startCity !== undefined) ? S.startCity : 4;
+      for(const v of S.ownedVehicles){
+        if(!v.plate){
+          v.plate = generatePlate(migCity, false);
+        }
+      }
+    }
     return true;
   }catch(e){console.warn('loadGame fail:',e);return false;}
 }
