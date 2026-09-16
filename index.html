@@ -2333,9 +2333,11 @@ function updateUI(){
     }
     renderTopbar();
     renderSubtabsBar();
-    /* Не перерисовываем панель, если в ней стоит фокус (пользователь печатает) */
+    /* Не перерисовываем панель ТОЛЬКО если в ней активен input/textarea/select
+       (пользователь печатает). Клик по кнопке — не блокирует обновление. */
     const ae=document.activeElement;
-    const busy=(id)=>ae&&$(id).contains(ae);
+    const editing=ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'||ae.tagName==='SELECT');
+    const busy=(id)=>editing&&$(id).contains(ae);
     if(!busy('pane-orders')) renderOrders();
     if(!busy('pane-trips')) renderTrips();
     if(!busy('pane-auto')) renderAuto();
