@@ -2449,7 +2449,7 @@ function advanceTime(gameMin){
     let tr=0;if(S.firmLevel==='self')tr=0.06;else if(S.firmLevel==='ip')tr=0.06;else if(S.firmLevel==='ooo')tr=0.08;
     if(tr>0){
       // === Налог считается от дохода ЗА ПОСЛЕДНИЕ 30 ДНЕЙ, а не за всю игру ===
-      let tax=Math.round(S.finance.monthIncome*tr*);
+      let tax=Math.round(S.finance.monthIncome*tr);
       if(hasStaff('accountant'))tax=Math.round(tax*0.7);
       if(tax>0){moneySpend(tax,'Налог');addNews(`📄 Налог: ${fmt(tax)} ₽ (доход за месяц: ${fmt(S.finance.monthIncome)} ₽)`,'warn','finance');}
       else{addNews(`📄 Налог: 0 ₽ (доход за месяц: ${fmt(S.finance.monthIncome)} ₽)`,'info','finance');}
