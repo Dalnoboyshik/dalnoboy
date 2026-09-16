@@ -1120,46 +1120,71 @@ function weeklyProfit(){
 const EVENT_CLASS={pos:0.25,minor:0.35,mid:0.30,sev:0.10};
 const EVENTS = {
   pos:[
-    {id:'hiker',w:25,fn:()=>{moneyAdd(3000,'Попутчик');return{t:'🎁 Попутчик +3 000 ₽',c:'ok'};}},
-    {id:'tip',w:20,fn:()=>{const v=curVehInst();if(v)v.wear=Math.max(0,v.wear-5);return{t:'💡 Износ −5%',c:'ok'};}},
-    {id:'freeLunch',w:15,fn:()=>({t:'🍔 Бесплатный обед',c:'ok'})},
-    {id:'foundMoney',w:10,fn:()=>{const m=ri(2,8)*1000;moneyAdd(m,'Находка');return{t:`💰 ${fmt(m)} ₽`,c:'ok'};}},
-    {id:'fuelDiscount',w:10,fn:()=>{S.fuelDiscount=0.8;return{t:'🎉 Скидка 20% на заправку',c:'ok'};}},
-    {id:'clientBonus',w:10,fn:()=>{if(S.activeOrders.length){const o=S.activeOrders[0];o.totalCash=Math.round(o.totalCash*1.15);o.totalBank=Math.round(o.totalBank*1.15);return{t:'📞 +15% к заказу',c:'ok'};}moneyAdd(5000,'Бонус');return{t:'📞 Бонус +5 000 ₽',c:'ok'};}},
-    {id:'goodFuel',w:5,fn:()=>{const v=curVehInst();if(v){const mx=vehTank(v);v.fuel=Math.min(mx,v.fuel+10);}return{t:'⛽ +10 л',c:'ok'};}},
-    {id:'goodRoad',w:5,fn:()=>{S.truck.duration*=0.9;return{t:'🚗 Рейс −10%',c:'ok'};}},
+    {id:'hiker',w:25,fn:()=>{moneyAdd(3000,'Попутчик');return{t:'🎁 <b>Подвёз попутчика</b><br>Он оказался разговорчивым мужиком и на прощание сунул трешку в карман.',c:'ok'};}},
+    {id:'tip',w:20,fn:()=>{const v=curVehInst();if(v)v.wear=Math.max(0,v.wear-5);return{t:'💡 <b>Остановился под мостом</b><br>Подкрутил пару гаек, смазал что надо. Износ немного спал.',c:'ok'};}},
+    {id:'freeLunch',w:15,fn:()=>({t:'🍔 <b>Заглянул в придорожную кафешку</b><br>Хозяйка налила борщ и дала пирожок — бесплатно, «для дальнобоев».',c:'ok'})},
+    {id:'foundMoney',w:10,fn:()=>{const m=ri(2,8)*1000;moneyAdd(m,'Находка');return{t:`💰 <b>Нашёл деньги на дороге</b><br>Подобрал заначку, оброненную каким-то растяпой. <b>+${fmt(m)} ₽</b>`,c:'ok'};}},
+    {id:'fuelDiscount',w:10,fn:()=>{S.fuelDiscount=0.8;return{t:'🎉 <b>Заправщик оказался земляком</b><br>Налил по своей карте со скидкой. Следующая заправка −20%.',c:'ok'};}},
+    {id:'clientBonus',w:10,fn:()=>{if(S.activeOrders.length){const o=S.activeOrders[0];o.totalCash=Math.round(o.totalCash*1.15);o.totalBank=Math.round(o.totalBank*1.15);return{t:'📞 <b>Клиент позвонил и повысил ставку</b><br>«Срочно нужно, доплачу». Заказ стал на 15% дороже.',c:'ok'};}moneyAdd(5000,'Бонус');return{t:'📞 <b>Старый клиент подкинул бонус</b><br>«За то, что не подвёл». <b>+5 000 ₽</b>',c:'ok'};}},
+    {id:'goodFuel',w:5,fn:()=>{const v=curVehInst();if(v){const mx=vehTank(v);v.fuel=Math.min(mx,v.fuel+10);}return{t:'⛽ <b>Нашёл канистру на обочине</b><br>10 литров — в бак. Спасибо, добрый человек.',c:'ok'};}},
+    {id:'goodRoad',w:5,fn:()=>{S.truck.duration*=0.9;return{t:'🚗 <b>Дорога — сказка</b><br>Пустой асфальт, ни одной фуры на обгон. Долетим быстрее.',c:'ok'};}},
   ],
   minor:[
-    {id:'traffic',w:20,fn:()=>{advanceTime(150);return{t:'🚧 Пробка — 2.5 ч',c:'warn'};}},
-    {id:'rain',w:15,fn:()=>{const v=curVehInst();if(v)v.fuel=Math.max(0,v.fuel-3);return{t:'🌧️ Ливень +3 л',c:'warn'};}},
-    {id:'fog',w:12,fn:()=>{advanceTime(60);return{t:'🌫️ Туман +1 ч',c:'warn'};}},
-    {id:'pothole',w:12,fn:()=>{const v=curVehInst();if(v)v.wear=Math.min(100,v.wear+2);return{t:'🛞 Яма +2%',c:'warn'};}},
-    {id:'leak',w:10,fn:()=>{const v=curVehInst();if(v)v.fuel=Math.max(0,v.fuel-3);return{t:'🛢️ Утечка −3 л',c:'warn'};}},
-    {id:'smallAcc',w:10,fn:()=>{const v=curVehInst();if(v)v.wear=Math.min(100,v.wear+5);advanceTime(30);return{t:'🚗 Мелкое ДТП +5%',c:'warn'};}},
-    {id:'truckPass',w:8,fn:()=>{advanceTime(30);return{t:'🚙 Обгон +30 мин',c:'warn'};}},
-    {id:'lights',w:8,fn:()=>{const v=curVehInst();if(v)v.fuel=Math.max(0,v.fuel-1);advanceTime(20);return{t:'🚦 Светофоры',c:'warn'};}},
-    {id:'dog',w:5,fn:()=>{const v=curVehInst();if(v)v.wear=Math.min(100,v.wear+2);return{t:'🐕 Собака',c:'warn'};}},
+    {id:'traffic',w:20,fn:()=>{advanceTime(150);return{t:'🚧 <b>Встал в пробку</b><br>Ремонт дороги, три полосы схлопнулись в одну. Потерял 2.5 часа.',c:'warn'};}},
+    {id:'rain',w:15,fn:()=>{const v=curVehInst();if(v)v.fuel=Math.max(0,v.fuel-3);return{t:'🌧️ <b>Попал под ливень</b><br>Дворники не справлялись, пришлось ехать медленнее. Лишних 3 литра сжёг.',c:'warn'};}},
+    {id:'fog',w:12,fn:()=>{advanceTime(60);return{t:'🌫️ <b>Густой туман</b><br>Видно на десять метров, ползёшь как черепаха. Потерял час.',c:'warn'};}},
+    {id:'pothole',w:12,fn:()=>{const v=curVehInst();if(v)v.wear=Math.min(100,v.wear+2);return{t:'🛞 <b>Поймал яму</b><br>Кажется, подвеска этого не забудет. Износ +2%.',c:'warn'};}},
+    {id:'leak',w:10,fn:()=>{const v=curVehInst();if(v)v.fuel=Math.max(0,v.fuel-3);return{t:'🛢️ <b>Где-то течёт бак</b><br>На стоянке заметил лужу под машиной. Минус 3 литра.',c:'warn'};}},
+    {id:'smallAcc',w:10,fn:()=>{const v=curVehInst();if(v)v.wear=Math.min(100,v.wear+5);advanceTime(30);return{t:'🚗 <b>Притёрся на парковке</b><br>Никто не видел, но бампер теперь другого цвета. Износ +5%.',c:'warn'};}},
+    {id:'truckPass',w:8,fn:()=>{advanceTime(30);return{t:'🚙 <b>Долго обгонял фуру</b><br>Она шла 60, ты не мог разогнаться. Потерял полчаса.',c:'warn'};}},
+    {id:'lights',w:8,fn:()=>{const v=curVehInst();if(v)v.fuel=Math.max(0,v.fuel-1);advanceTime(20);return{t:'🚦 <b>Встрял на светофоры</b><br>В городе каждый светофор — красный. Сжёг лишний литр.',c:'warn'};}},
+    {id:'dog',w:5,fn:()=>{const v=curVehInst();if(v)v.wear=Math.min(100,v.wear+2);return{t:'🐕 <b>Собака бросилась под колёса</b><br>Успел затормозить, но не без последствий.',c:'warn'};}},
   ],
   mid:[
-    {id:'police',w:25,fn:()=>{const inst=curVehInst();let fine=20000;if(hasOsago(inst))fine=5000;if(S.money<fine)return{t:'🚔 ГИБДД',c:'warn'};moneySpend(fine,'Штраф ГИБДД');return{t:`🚔 ГИБДД: ${fmt(fine)} ₽`,c:'bad'};}},
-    {id:'tire',w:15,fn:()=>{if(S.money<6000)return{t:'🛞 Колесо',c:'bad'};moneySpend(6000,'Колесо');advanceTime(60);return{t:'🛞 Колесо 6 000 ₽',c:'bad'};}},
-    {id:'overheat',w:12,fn:()=>{const v=curVehInst();if(v)v.wear=Math.min(100,v.wear+10);return{t:'💨 Перегрев +10%',c:'bad'};}},
-    {id:'cargoDmg',w:10,fn:()=>{if(S.activeOrders.length){const o=S.activeOrders[0];o.totalCash=Math.round(o.totalCash*0.95);o.totalBank=Math.round(o.totalBank*0.95);return{t:'📦 Порча −5%',c:'bad'};}return null;}},
-    {id:'roadwork',w:10,fn:()=>{advanceTime(60);const v=curVehInst();if(v)v.fuel=Math.max(0,v.fuel-5);return{t:'🚧 Объезд +1 ч',c:'warn'};}},
-    {id:'trailerAcc',w:8,fn:()=>{const t=curTrlInst();if(t)t.wear=(t.wear||0)+15;return{t:'🚨 ДТП с прицепом',c:'bad'};}},
-    {id:'straps',w:8,fn:()=>{if(S.money<3000)return null;moneySpend(3000,'Крепёж');advanceTime(30);return{t:'⚠️ Крепёж',c:'warn'};}},
-    {id:'documents',w:7,fn:()=>{const inst=curVehInst();let fine=40000;if(hasOsago(inst))fine=8000;if(S.money<fine)return{t:'🚔 Проверка',c:'warn'};moneySpend(fine,'Проверка');return{t:`🚔 Проверка: ${fmt(fine)} ₽`,c:'bad'};}},
-    {id:'conflict',w:5,fn:()=>{S.reputation=clamp(S.reputation-1,0,100);advanceTime(30);return{t:'🚫 Конфликт',c:'warn'};}},
+    {id:'police',w:25,fn:()=>{
+      const inst=curVehInst();const hasIns=hasOsago(inst);
+      let fine=20000;if(hasIns)fine=5000;
+      if(S.money<fine)return{t:'🚔 <b>Тебя тормознули на посту</b><br>Начал «бодаться», а инспектор попался принципиальный. Денег на штраф нет — долг повиснет.',c:'warn'};
+      moneySpend(fine,'Штраф ГИБДД');
+      return{t:`🚔 <b>Тебя тормознули на посту</b><br>Начал бычить, но инспектор быстро поставил на место. Штраф: <b>${fmt(fine)} ₽</b>${hasIns?' (ОСАГО спасло)':''}`,c:'bad'};
+    }},
+    {id:'tire',w:15,fn:()=>{if(S.money<6000)return{t:'🛞 <b>Лопнуло колесо</b><br>Запаски нет, денег на новую тоже. Ждём.',c:'bad'};moneySpend(6000,'Колесо');advanceTime(60);return{t:'🛞 <b>Лопнуло колесо</b><br>Пришлось менять прямо на обочине. Резина и работа: <b>6 000 ₽</b>',c:'bad'};}},
+    {id:'overheat',w:12,fn:()=>{const v=curVehInst();if(v)v.wear=Math.min(100,v.wear+10);return{t:'💨 <b>Двигатель закипел</b><br>Антифриз весь вышел, стрелка в красной зоне. Износ +10%.',c:'bad'};}},
+    {id:'cargoDmg',w:10,fn:()=>{if(S.activeOrders.length){const o=S.activeOrders[0];o.totalCash=Math.round(o.totalCash*0.95);o.totalBank=Math.round(o.totalBank*0.95);return{t:'📦 <b>Груз пострадал</b><br>Коробки помялись при перевозке. Клиент снимет 5% с оплаты.',c:'bad'};}return null;}},
+    {id:'roadwork',w:10,fn:()=>{advanceTime(60);const v=curVehInst();if(v)v.fuel=Math.max(0,v.fuel-5);return{t:'🚧 <b>Объезд по просёлку</b><br>Основную трассу перекрыли. Потерял час и лишних 5 литров.',c:'warn'};}},
+    {id:'trailerAcc',w:8,fn:()=>{const t=curTrlInst();if(t)t.wear=(t.wear||0)+15;return{t:'🚨 <b>Царапнул прицеп</b><br>На развороте не вписался в габарит. Прицеп пострадал.',c:'bad'};}},
+    {id:'straps',w:8,fn:()=>{if(S.money<3000)return null;moneySpend(3000,'Крепёж');advanceTime(30);return{t:'⚠️ <b>Ремни ослабли</b><br>Пришлось останавливаться и перетягивать. Купил новые ремни: <b>3 000 ₽</b>',c:'warn'};}},
+    {id:'documents',w:7,fn:()=>{const inst=curVehInst();const hasIns=hasOsago(inst);let fine=40000;if(hasIns)fine=8000;if(S.money<fine)return{t:'🚔 <b>Проверка документов</b><br>Накладные не в порядке, штраф есть, но денег нет. Долг.',c:'warn'};moneySpend(fine,'Проверка');return{t:`🚔 <b>Проверка документов на посту</b><br>К бумагам придрались. Штраф: <b>${fmt(fine)} ₽</b>${hasIns?' (ОСАГО прикрыло)':''}`,c:'bad'};}},
+    {id:'conflict',w:5,fn:()=>{S.reputation=clamp(S.reputation-1,0,100);advanceTime(30);return{t:'🚫 <b>Скандал на стоянке</b><br>Поцапался с другим водителем. Осадок остался.',c:'warn'};}},
   ],
   sev:[
-    {id:'bigAcc',w:30,fn:()=>{const v=curVehInst();if(!v)return null;const cost=Math.round(rnd(300000,600000));const ins=hasKasko(v);const comp=ins?Math.round(cost*0.75):0;const real=cost-comp;if(S.money<real){v.wear=100;S.reputation=clamp(S.reputation-10,0,100);return{t:'💥 ДТП! В утиль',c:'bad'};}moneySpend(real,'ДТП');v.wear=0;return{t:`💥 ДТП! ${fmt(cost)} ₽`,c:'bad'};}},
-    {id:'theft',w:20,fn:()=>{const v=curVehInst();if(!v)return null;const b=v.fuel;v.fuel=0;return{t:`🛢️ Слили бак −${Math.round(b)} л`,c:'bad'};}},
-    {id:'robbery',w:15,fn:()=>{const loss=Math.round(S.money*0.15);if(loss<1)return null;moneySpend(loss,'Ограбление');return{t:`🚨 Ограбление −${fmt(loss)} ₽`,c:'bad'};}},
-    {id:'fire',w:10,fn:()=>{const v=curVehInst();if(!v)return null;v.wear=Math.min(100,v.wear+50);moneySpend(100000,'Пожар');return{t:'🔥 Пожар −100 000 ₽',c:'bad'};}},
-    {id:'vipCheck',w:10,fn:()=>{const inst=curVehInst();let fine=80000;if(hasOsago(inst))fine=15000;if(S.money<fine)return{t:'🚔 VIP',c:'warn'};moneySpend(fine,'VIP');return{t:`🚔 VIP: ${fmt(fine)} ₽`,c:'bad'};}},
-    {id:'cargoTheft',w:8,fn:()=>{if(S.activeOrders.length){const o=S.activeOrders[0];S.activeOrders=S.activeOrders.filter(x=>x.id!==o.id);return{t:'🎯 Кража груза!',c:'bad'};}return null;}},
-    {id:'railway',w:5,fn:()=>{const v=curVehInst();if(v)v.wear=Math.min(100,v.wear+25);advanceTime(240);return{t:'🚂 Авария',c:'bad'};}},
-    {id:'hijack',w:2,fn:()=>{const cand=S.ownedVehicles.filter(v=>v.id!==S.currentVehicleId&&!v.lease);if(!cand.length)return null;const st=pick(cand);S.ownedVehicles=S.ownedVehicles.filter(x=>x.id!==st.id);return{t:`🏴 Угнали ${VEHICLES[st.model].n}!`,c:'bad'};}},
+    {id:'bigAcc',w:30,fn:()=>{
+      const v=curVehInst();if(!v)return null;
+      const cost=Math.round(rnd(300000,600000));
+      const ins=hasKasko(v);
+      const comp=ins?Math.round(cost*0.75):0;
+      const real=cost-comp;
+      if(S.money<real){
+        v.wear=100;S.reputation=clamp(S.reputation-10,0,100);
+        return{t:'💥 <b>Серьёзное ДТП</b><br>Восстановлению не подлежит. Машину в утиль, репутация под удар.',c:'bad'};
+      }
+      moneySpend(real,'ДТП');
+      v.wear=0;
+      return{t:`💥 <b>Серьёзное ДТП</b><br>Ремонт обошёлся в <b>${fmt(real)} ₽</b>${ins?' (КАСКО прикрыло 75%)':' (КАСКО нет, платил из своего)'}`,c:'bad'};
+    }},
+    {id:'theft',w:20,fn:()=>{const v=curVehInst();if(!v)return null;const b=v.fuel;v.fuel=0;return{t:`🛢️ <b>Слили бак на стоянке</b><br>Пока спал, кто-то поработал шлангом. Минус ${Math.round(b)} литров.`,c:'bad'};}},
+    {id:'robbery',w:15,fn:()=>{const loss=Math.round(S.money*0.15);if(loss<1)return null;moneySpend(loss,'Ограбление');return{t:`🚨 <b>Напали на стоянке</b><br>Отобрали часть налички. Потеря: <b>${fmt(loss)} ₽</b>`,c:'bad'};}},
+    {id:'fire',w:10,fn:()=>{const v=curVehInst();if(!v)return null;v.wear=Math.min(100,v.wear+50);moneySpend(100000,'Пожар');return{t:'🔥 <b>Загорелся моторный отсек</b><br>Огнетушителем потушил, но ремонт и эвакуация: <b>−100 000 ₽</b>',c:'bad'};}},
+    {id:'vipCheck',w:10,fn:()=>{
+      const inst=curVehInst();const hasIns=hasOsago(inst);
+      let fine=80000;if(hasIns)fine=15000;
+      if(S.money<fine)return{t:'🚔 <b>VIP-проверка на трассе</b><br>Инспектор нашёл нарушения и выписал штраф. Но денег нет — долг повиснет.',c:'warn'};
+      moneySpend(fine,'VIP-проверка');
+      return{t:`🚔 <b>VIP-проверка на трассе</b><br>Тебя остановили на посту. Начал бурогозить — тебя развели на бабки. Штраф: <b>${fmt(fine)} ₽</b>${hasIns?' (ОСАГО немного спасло)':''}`,c:'bad'};
+    }},
+    {id:'cargoTheft',w:8,fn:()=>{if(S.activeOrders.length){const o=S.activeOrders[0];S.activeOrders=S.activeOrders.filter(x=>x.id!==o.id);return{t:'🎯 <b>Пропал груз</b><br>Пока обедал — из кузова вынесли один заказ. Клиент в ярости.',c:'bad'};}return null;}},
+    {id:'railway',w:5,fn:()=>{const v=curVehInst();if(v)v.wear=Math.min(100,v.wear+25);advanceTime(240);return{t:'🚂 <b>Авария на переезде</b><br>Поезд зацепил край фуры, чудом обошлось. Износ +25%, потерял 4 часа.',c:'bad'};}},
+    {id:'hijack',w:2,fn:()=>{const cand=S.ownedVehicles.filter(v=>v.id!==S.currentVehicleId&&!v.lease);if(!cand.length)return null;const st=pick(cand);S.ownedVehicles=S.ownedVehicles.filter(x=>x.id!==st.id);return{t:`🏴 <b>Угнали машину!</b><br>Со стоянки пропала <b>${VEHICLES[st.model].n}</b>. В полицию заявлять бессмысленно.`,c:'bad'};}},
   ],
 };
 let roadCooldown=0;
