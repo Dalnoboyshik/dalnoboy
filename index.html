@@ -2151,6 +2151,13 @@ function freeTrailers(){const busy=busyTrailerIds();return S.ownedTrailers.filte
 function vehiclesForHire(){return freeVehicles().filter(id=>(getVeh(id).wear||0)<90);}
 function newDriverStats(){return {trips:0,km:0,earned:0,spentFuel:0,spentRepair:0,spentService:0,spentSalary:0,spentOther:0,hours:0,courses:[]};}
 function driverProfit(d){const s=d.stats||newDriverStats();return s.earned-(s.spentFuel+s.spentRepair+(s.spentService||0)+s.spentSalary+s.spentOther);}
+	function driverProfitPerDay(d){
+  const days=Math.max(1,(S.gameTime-(d.hiredAt||0))/1440);
+  return Math.round(driverProfit(d)/days);
+}
+function driverProfitPerMonth(d){
+  return Math.round(driverProfitPerDay(d)*30);
+}
 function hasTrait(d,t){return d.traits&&d.traits.includes(t);}
 function openDriverHireModal(c){
   if(!isIP()){toast('Нужно ИП','bad');return;}
@@ -3459,7 +3466,9 @@ function laborStaffContent(){
         <div class="ln"><span>ТО (${s.serviceCount||0}×)</span><b style="color:#ff8d99">−${fmt(s.spentService||0)} ₽</b></div>
         <div class="ln"><span>Ремонт</span><b style="color:#ff8d99">−${fmt(s.spentRepair)} ₽</b></div>
         <div class="ln"><span>Оклад</span><b style="color:#ff8d99">−${fmt(s.spentSalary)} ₽</b></div>
-        <div class="ln"><span><b>Прибыль</b></span><b style="color:${profit>=0?'#5ef0a0':'#ff8d99'}">${fmt(profit)} ₽</b></div>
+              <div class="ln"><span><b>Прибыль всего</b></span><b style="color:${profit>=0?'#5ef0a0':'#ff8d99'}">${fmt(profit)} ₽</b></div>
+        <div class="ln"><span>Прибыль / день</span><b style="color:${driverProfitPerDay(d)>=0?'#5ef0a0':'#ff8d99'}">${fmt(driverProfitPerDay(d))} ₽</b></div>
+        <div class="ln"><span>Прибыль / мес</span><b style="color:${driverProfitPerMonth(d)>=0?'#5ef0a0':'#ff8d99'}">${fmt(driverProfitPerMonth(d))} ₽</b></div>
       </div>
       <div class="row" style="margin-top:5px;gap:4px;flex-wrap:wrap">
         <button class="warn sm" data-service="${d.id}" ${d.status==='trip'?'disabled':''}>🛠 ТО сейчас</button>
