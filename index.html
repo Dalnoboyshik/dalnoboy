@@ -37,6 +37,21 @@
   font-size:11.5px;line-height:1.5;position:relative;
   animation:hintIn .25s ease;
 }
+	#paneHintLayer{
+  position:absolute;
+  top:0;left:0;right:0;
+  padding:8px;
+  pointer-events:none;
+  z-index:15;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+#paneHintLayer .pane-hint{
+  pointer-events:auto;
+  margin:0;
+  box-shadow:0 8px 24px rgba(0,0,0,.55);
+}
 @keyframes hintIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 .pane-hint .ph-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
 .pane-hint .ph-title{font-weight:700;font-size:13px;color:#fff}
@@ -700,8 +715,9 @@ button.sm{font-size:10px;padding:3px 7px}
         <button class="tab" data-tab="firm"><span class="tab-ic">📊</span>Фирма<span class="dot"></span></button>
       </div>
       <div id="subtabsBar" class="hidden"></div>
-      <div class="panes">
-        <div class="pane active" id="pane-orders"></div>
+     <div class="panes">
+  <div id="paneHintLayer"></div>
+  <div class="pane active" id="pane-orders"></div>
         <div class="pane" id="pane-trips"></div>
         <div class="pane" id="pane-auto"></div>
         <div class="pane" id="pane-bases"></div>
@@ -4791,10 +4807,12 @@ try{SEEN=JSON.parse(localStorage.getItem(SEEN_KEY)||'{}');}catch(_){SEEN={};}
 function hasSeen(id){return !!SEEN[id];}
 function markSeen(id){SEEN[id]=true;try{localStorage.setItem(SEEN_KEY,JSON.stringify(SEEN));}catch(_){}}
 function showPaneHint(tabId){
+  const layer=$('paneHintLayer');
+  if(!layer)return;
+  // Сначала очищаем слой — чтобы не копились старые подсказки
+  layer.innerHTML='';
   if(hasSeen('pane_'+tabId))return;
-  const pane=$('pane-'+tabId);if(!pane)return;
   const tip=TAB_TIPS[tabId];if(!tip)return;
-  if(pane.querySelector('.pane-hint'))return;
   const card=document.createElement('div');
   card.className='pane-hint';
   card.innerHTML=`
@@ -4802,7 +4820,7 @@ function showPaneHint(tabId){
     <div class="ph-desc">${tip.desc}</div>
     <ul>${tip.points.map(p=>`<li>${p}</li>`).join('')}</ul>
     <div class="ph-foot">Понятно, поехали 🚛</div>`;
-  pane.insertBefore(card,pane.firstChild);
+  layer.appendChild(card);
   const close=()=>{card.remove();markSeen('pane_'+tabId);};
   card.querySelector('.ph-close').onclick=close;
   card.querySelector('.ph-foot').onclick=close;
