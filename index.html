@@ -60,7 +60,7 @@ html,body{height:100%;height:100dvh;overflow:hidden;overscroll-behavior:none;bac
 .tb-obl-progress i{display:block;height:100%;background:linear-gradient(90deg,var(--acc),var(--ok))}
 .tb-obl-more{padding:3px 10px;font-size:11px;color:var(--acc);cursor:pointer;text-align:center}
 .tb-obl-more:hover{color:#7ad6ff}
-#mapWrap{grid-column:1;grid-row:3;position:relative;min-width:0;min-height:0}
+#mapWrap{grid-column:1;grid-row:2 / 4;position:relative;min-width:0;min-height:0;z-index:1}
 canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
 canvas:active{cursor:grabbing}
 #panel{grid-column:2;grid-row:2 / -1;
@@ -183,7 +183,7 @@ button.sm{font-size:10px;padding:3px 7px}
 .citypick{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
 .citypick button{padding:8px;text-align:left;font-size:11.5px}
 .citypick button b{display:block;font-size:12.5px;margin-bottom:2px}
-#zoomCtrl{position:absolute;top:10px;left:10px;display:flex;flex-direction:column;gap:4px;z-index:5}
+#zoomCtrl{position:absolute;bottom:10px;left:10px;display:flex;flex-direction:column;gap:4px;z-index:5}
 #zoomCtrl button{width:32px;height:32px;font-size:16px;padding:0;background:#0f1722cc;
   border:1px solid #2f4a75;backdrop-filter:blur(6px);color:#cfe0f5}
 #zoomCtrl button:hover{background:#1f2d42}
@@ -372,6 +372,7 @@ button.sm{font-size:10px;padding:3px 7px}
   .tb-obl-row .sum{font-size:11.5px}
   .tb-obl-row .txt{font-size:11px}
   .tb-obl-row .bar-lbl{font-size:9.5px}
+	#ticker{margin:4px 8px 6px;align-self:stretch;min-width:0;max-width:none;position:static;}
   .tabs{overflow-x:auto;scrollbar-width:none}
   .tab{padding:8px 2px;min-width:52px;font-size:9.5px;gap:2px}
   .tab .tab-ic{font-size:17px}
@@ -405,7 +406,7 @@ button.sm{font-size:10px;padding:3px 7px}
   .vpick .s{font-size:10.5px}
   #toasts{top:auto;bottom:8px;bottom:calc(8px + env(safe-area-inset-bottom));right:8px;left:8px;max-width:none;align-items:stretch}
   .toast{padding:9px 11px;font-size:11.5px;text-align:left}
-  #zoomCtrl{top:6px;top:calc(6px + env(safe-area-inset-top));left:6px}
+    #zoomCtrl{top:auto;bottom:6px;bottom:calc(6px + env(safe-area-inset-bottom));left:6px}
   #zoomCtrl button{width:38px;height:38px;font-size:17px}
   #adminBtn{width:38px;height:38px;top:6px;top:calc(6px + env(safe-area-inset-top));right:6px;font-size:17px}
   #adminIndicator{right:50px;top:6px;top:calc(6px + env(safe-area-inset-top));font-size:9.5px;padding:5px 8px}
@@ -481,14 +482,14 @@ button.sm{font-size:10px;padding:3px 7px}
   .tb-obl-more:hover{color:#7ad6ff}
 }
 #ticker{
+#ticker{
   grid-column:1;grid-row:2;
-  justify-self:end;align-self:start;
-  margin:6px 8px 8px;
+  justify-self:stretch;align-self:start;
+  margin:6px 8px 8px calc(min(max(25%,260px),420px) + 16px);
   padding:6px 10px;background:#0f1722ee;
   border:1px solid #2f4a75;border-radius:6px;font-size:11px;color:#a9bdd8;cursor:pointer;
-  backdrop-filter:blur(6px);display:flex;align-items:center;gap:8px;z-index:4;overflow:hidden;
-  transition:.15s;user-select:none;
-  min-width:260px;max-width:min(560px,50%);
+  backdrop-filter:blur(6px);display:flex;align-items:center;gap:8px;z-index:10;overflow:hidden;
+  transition:.15s;user-select:none;position:relative;
 }
 #ticker:hover{background:#1f2d42;border-color:#4da3ff}
 #ticker .dot-unread{width:8px;height:8px;background:#ff6b6b;border-radius:50%;
