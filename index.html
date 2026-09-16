@@ -2815,8 +2815,28 @@ function obligationsList(){
       sum:v.lease.monthly,days:daysTo,danger:v.lease.debt>0,vehicleId:v.id,progress:pct,
       note:v.lease.debt>0?`Просрочка (${v.lease.missedPayments}/2) · долг ${fmt(v.lease.debt)} ₽`:`Выплачено ${fmt(v.lease.paid)} ₽`});
   }
-  if(isIP()){const daysToTax=S.taxMonth*30-Math.floor(S.gameTime/1440);
-    if(daysToTax>0)list.push({ic:'📄',txt:'Налоги и взносы',sum:13000,days:daysToTax,progress:0});}
+ if(isIP()){
+  const daysToTax = Math.max(0, S.taxMonth*30 - Math.floor(S.gameTime/1440));
+  const fix = (S.firmLevel==='ooo') ? 13000 : 10000;
+  let tr = 0;
+  if(S.firmLevel==='self') tr = 0.06;
+  else if(S.firmLevel==='ip') tr = 0.06;
+  else if(S.firmLevel==='ooo') tr = 0.08;
+  const rate = hasStaff('accountant') ? tr*0.7 : tr;
+  const taxIncome = Math.round(S.finance.monthIncome * rate);
+  const total = fix + taxIncome;
+  const pctLabel = Math.round(rate*100);
+  list.push({
+    ic:'📄',
+    txt:`Налоги · фикс ${fmt(fix)} + ${pctLabel}% с дохода`,
+    sum: total,
+    days: daysToTax,
+    progress: 0,
+    note: taxIncome > 0
+      ? `Доход месяца: ${fmt(S.finance.monthIncome)} ₽ → налог ${fmt(taxIncome)} ₽`
+      : `Дохода в месяце пока нет — только фикс ${fmt(fix)} ₽`
+  });
+}
   const sal=S.drivers.reduce((s,d)=>s+d.salary,0);
   if(sal>0)list.push({ic:'💼',txt:`Зарплаты · ${S.drivers.length} вод.`,sum:sal,days:15,progress:0});
   return list.sort((a,b)=>a.days-b.days);
