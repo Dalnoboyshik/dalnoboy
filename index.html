@@ -5,6 +5,115 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Дальнобойщик: Путь к успеху v18.2</title>
 <style>
+/* ============ ТУЛТИПЫ НА ВКЛАДКИ ============ */
+.tab-tip{
+  position:absolute;bottom:calc(100% + 10px);left:50%;
+  transform:translateX(-50%) translateY(4px);
+  background:#0f1722;border:1px solid #2f4a75;border-radius:10px;
+  padding:10px 12px;width:260px;text-align:left;
+  font-size:11.5px;color:#cfe0f5;line-height:1.45;font-weight:400;
+  text-transform:none;letter-spacing:0;
+  box-shadow:0 10px 30px rgba(0,0,0,.7);
+  opacity:0;pointer-events:none;
+  transition:opacity .15s ease, transform .15s ease;
+  z-index:200;
+}
+.tab-tip::after{
+  content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);
+  border:7px solid transparent;border-top-color:#2f4a75;
+}
+.tab-tip b{display:block;color:#fff;font-size:13px;margin-bottom:5px;font-weight:700}
+.tab-tip .desc{color:#8ba0bd;font-size:11px;margin-bottom:6px;line-height:1.4}
+.tab-tip ul{list-style:none;padding:0;margin:0;font-size:11px}
+.tab-tip li{padding:2px 0;color:#cfe0f5}
+@media(hover:hover){.tab:hover .tab-tip{opacity:1;transform:translateX(-50%) translateY(0)}}
+.tab.tip-show .tab-tip{opacity:1;transform:translateX(-50%) translateY(0)}
+@media(max-width:880px){.tab-tip{width:min(84vw,300px);bottom:calc(100% + 12px)}}
+/* ============ ПОДСКАЗКИ НА ПАНЕЛЯХ ============ */
+.pane-hint{
+  background:linear-gradient(135deg,#101c2f,#0c141e);
+  border:1px solid #2f4a75;border-left:3px solid #4da3ff;
+  border-radius:8px;padding:10px 12px;margin-bottom:8px;
+  font-size:11.5px;line-height:1.5;position:relative;
+  animation:hintIn .25s ease;
+}
+@keyframes hintIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.pane-hint .ph-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+.pane-hint .ph-title{font-weight:700;font-size:13px;color:#fff}
+.pane-hint .ph-close{cursor:pointer;color:#8ba0bd;font-size:18px;line-height:1;padding:0 4px}
+.pane-hint .ph-close:hover{color:#ff8d99}
+.pane-hint .ph-desc{color:#8ba0bd;margin-bottom:7px}
+.pane-hint ul{list-style:none;padding:0;margin:0}
+.pane-hint li{padding:2px 0;color:#cfe0f5;font-size:11px}
+.pane-hint .ph-foot{
+  margin-top:8px;padding:6px;text-align:center;border-radius:6px;
+  background:#16202f;border:1px solid var(--line);cursor:pointer;
+  color:#cfe0f5;font-size:11.5px;font-weight:600;
+}
+.pane-hint .ph-foot:hover{background:#1f2d42;border-color:#34496a}
+/* ============ КОДЕКС ============ */
+.codex-card{
+  position:fixed;bottom:16px;right:16px;width:340px;max-width:calc(100vw - 32px);
+  background:linear-gradient(135deg,#101c2f,#0c141e);
+  border:1px solid #2f4a75;border-left:3px solid #4da3ff;
+  border-radius:10px;padding:12px 14px;
+  box-shadow:0 16px 40px rgba(0,0,0,.7);
+  z-index:80;transform:translateY(20px);opacity:0;
+  transition:transform .3s ease,opacity .3s ease;
+  font-size:12px;line-height:1.5;color:#cfe0f5;
+}
+.codex-card.show{transform:translateY(0);opacity:1}
+.cc-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.cc-icon{font-size:22px;line-height:1}
+.cc-title{font-weight:700;font-size:13.5px;color:#fff;flex:1}
+.cc-close{cursor:pointer;color:#8ba0bd;font-size:20px;line-height:1;padding:0 4px}
+.cc-close:hover{color:#ff8d99}
+.cc-text{color:#cfe0f5;font-size:11.5px;line-height:1.55}
+.cc-foot{
+  margin-top:10px;padding:7px;text-align:center;border-radius:6px;
+  background:#1a5ba0;border:1px solid #2b7bd4;color:#fff;
+  cursor:pointer;font-size:12px;font-weight:600;transition:.15s;
+}
+.cc-foot:hover{background:#256ec0}
+@media(max-width:880px){
+  .codex-card{left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom));width:auto}
+}
+/* ===== СТАРТОВЫЙ ВИЗАРД ===== */
+/* ===== СТАРТОВЫЙ ВИЗАРД ===== */
+.wiz-spot{
+  position:fixed;border-radius:10px;
+  box-shadow:0 0 0 9999px rgba(5,8,13,.82);
+  pointer-events:none;z-index:88;
+  border:2px solid #4da3ff;
+  animation:wizPulse 1.8s infinite;
+  transition:top .25s, left .25s, width .25s, height .25s;
+}
+@keyframes wizPulse{0%,100%{border-color:#4da3ff}50%{border-color:#7ad6ff}}
+.wiz-box{
+  position:fixed;
+  background:linear-gradient(135deg,#101c2f,#0c141e);
+  border:1px solid #2f4a75;border-radius:12px;
+  padding:14px 16px;width:300px;max-width:calc(100vw - 24px);
+  box-shadow:0 20px 50px rgba(0,0,0,.8);
+  z-index:90;transform:translateY(10px);opacity:0;
+  transition:.25s ease;color:#cfe0f5;
+}
+.wiz-box.show{transform:translateY(0);opacity:1}
+.wb-head{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.wb-icon{font-size:22px}
+.wb-title{font-weight:700;font-size:14px;color:#fff}
+.wb-text{font-size:12px;line-height:1.5;color:#cfe0f5}
+.wb-btns{display:flex;gap:6px;margin-top:12px}
+.wb-btns button{
+  flex:1;padding:8px 10px;border-radius:7px;font-size:12px;font-weight:600;
+  font-family:inherit;cursor:pointer;transition:.15s;
+  border:1px solid var(--line);background:#16202f;color:var(--txt);
+}
+.wb-btns .wb-skip{flex:0 0 auto;background:transparent;color:#8ba0bd}
+.wb-btns .wb-skip:hover{color:#ff8d99}
+.wb-btns .wb-next{background:#1a5ba0;border-color:#2b7bd4;color:#fff}
+.wb-btns .wb-next:hover{background:#256ec0}
+.wb-step{margin-top:8px;text-align:center;font-size:10px;color:#4d6080;letter-spacing:.05em}
 :root{--bg:#0a1018;--panel:#0f1722;--line:#1e2c3f;--txt:#e8eef7;--dim:#8ba0bd;
   --acc:#4da3ff;--ok:#39d98a;--warn:#ffb84d;--bad:#ff6b6b}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -2755,6 +2864,7 @@ document.querySelectorAll('.tab').forEach(t=>{
     t.classList.add('active');
     $('pane-'+t.dataset.tab).classList.add('active');
     updateUI();
+	  showPaneHint(t.dataset.tab);
   };
 });
 function renderSubtabsBar(){
@@ -4494,8 +4604,213 @@ function loadGame(){
     return true;
   }catch(e){console.warn('loadGame fail:',e);return false;}
 }
-function clearSave(){try{localStorage.removeItem(SAVE_KEY);}catch(e){}}
+/* ============ ТУЛТИПЫ НА ВКЛАДКИ ============ */
+const TAB_TIPS = {
+  orders:{icon:'📋',title:'Биржа заказов',desc:'Здесь ты берёшь работу — грузы со всей страны.',
+    points:['📍 Из твоего города — сверху','💵 Наличные — сразу','🏦 Безнал — дороже, нужен ИП','🔍 Фильтр «откуда → куда»','📝 Долгосрочные контракты']},
+  trips:{icon:'🚚',title:'Активные рейсы',desc:'Что везёшь сейчас и куда едешь.',
+    points:['📦 Грузы в кузове','⏸ Привал прямо в пути','🔄 Развернуться — если передумал','🎯 Задачи дня']},
+  auto:{icon:'🚗',title:'Автопарк',desc:'Машина, гараж, салон, страховка.',
+    points:['🔧 Заправка, ремонт, ТО','🏢 Гараж — пересадка','🏬 Салон — покупка и лизинг','🛡️ ОСАГО и КАСКО','📋 Госномер — на учёт']},
+  bases:{icon:'🏭',title:'Базы',desc:'Твои стоянки и бизнесы. Одна база на город.',
+    points:['🅿️ Слоты — расширяют лимит машин','💼 Бизнесы — пассивный доход','🏗️ Апгрейды базы','⬆️ Стоянка → терминал → хаб → федеральный']},
+  labor:{icon:'👥',title:'Персонал',desc:'Водители и офисные сотрудники.',
+    points:['👷 Водители — возят грузы за долю','💼 Офис — диспетчер, механик, бухгалтер','🎓 Курсы — прокачка','📋 Найм — после открытия ИП']},
+  world:{icon:'🌍',title:'Мир вокруг',desc:'Новости, конкуренты, тендеры, филиалы.',
+    points:['📰 Новости игры','🏢 Конкуренты — можно поглощать','📢 Тендеры — крупные разовые заказы','🌍 Филиалы за границей (после ООО)']},
+  firm:{icon:'📊',title:'Фирма',desc:'Статус, финансы, развитие.',
+    points:['📋 Общее — звание, штат, парк','💰 Финансы — обязательства и история','📜 Лицензии — доступ к опасным грузам','🏠 Дом — пассивная репутация','⚔️ Квесты и 🏅 достижения']},
+};
+document.querySelectorAll('.tab').forEach(t=>{
+  const tip=TAB_TIPS[t.dataset.tab];
+  if(!tip)return;
+  const el=document.createElement('div');
+  el.className='tab-tip';
+  el.innerHTML=`<b>${tip.icon} ${tip.title}</b>
+    <div class="desc">${tip.desc}</div>
+    <ul>${tip.points.map(p=>`<li>${p}</li>`).join('')}</ul>`;
+  t.appendChild(el);
+  let lpTimer=null;
+  t.addEventListener('touchstart',()=>{lpTimer=setTimeout(()=>t.classList.add('tip-show'),450);},{passive:true});
+  t.addEventListener('touchend',()=>{clearTimeout(lpTimer);setTimeout(()=>t.classList.remove('tip-show'),1200);});
+  t.addEventListener('touchmove',()=>{clearTimeout(lpTimer);t.classList.remove('tip-show');});
+});
+/* ============ ПОДСКАЗКИ НА ПАНЕЛЯХ ============ */
+const SEEN_KEY='dalnoboy_seen_v1';
+let SEEN={};
+try{SEEN=JSON.parse(localStorage.getItem(SEEN_KEY)||'{}');}catch(_){SEEN={};}
+function hasSeen(id){return !!SEEN[id];}
+function markSeen(id){SEEN[id]=true;try{localStorage.setItem(SEEN_KEY,JSON.stringify(SEEN));}catch(_){}}
+function showPaneHint(tabId){
+  if(hasSeen('pane_'+tabId))return;
+  const pane=$('pane-'+tabId);if(!pane)return;
+  const tip=TAB_TIPS[tabId];if(!tip)return;
+  if(pane.querySelector('.pane-hint'))return;
+  const card=document.createElement('div');
+  card.className='pane-hint';
+  card.innerHTML=`
+    <div class="ph-head"><span class="ph-title">${tip.icon} ${tip.title}</span><span class="ph-close">×</span></div>
+    <div class="ph-desc">${tip.desc}</div>
+    <ul>${tip.points.map(p=>`<li>${p}</li>`).join('')}</ul>
+    <div class="ph-foot">Понятно, поехали 🚛</div>`;
+  pane.insertBefore(card,pane.firstChild);
+  const close=()=>{card.remove();markSeen('pane_'+tabId);};
+  card.querySelector('.ph-close').onclick=close;
+  card.querySelector('.ph-foot').onclick=close;
+}
+/* ============ КОДЕКС (контекстные подсказки) ============ */
+const CODEX_KEY='dalnoboy_codex_v1';
+let _codexSeen={};
+try{_codexSeen=JSON.parse(localStorage.getItem(CODEX_KEY)||'{}');}catch(_){_codexSeen={};}
+function codexSeen(id){return !!_codexSeen[id];}
+function markCodex(id){_codexSeen[id]=true;try{localStorage.setItem(CODEX_KEY,JSON.stringify(_codexSeen));}catch(_){}}
 
+const CODEX=[
+  {id:'firstTrip',icon:'🛣️',title:'Ты в пути',
+   text:'Машина едет по карте. Прогресс — внизу экрана. Можно сделать привал или развернуться.',
+   when:s=>s.truck.traveling},
+  {id:'overload',icon:'⚠️',title:'Перегруз',
+   text:'Грузов больше 100% нормы. Расход растёт, ГИБДД злее, скорость падает. Выше 150% — не поедешь вообще.',
+   when:s=>hasVehicle()&&truckLoad()/Math.max(0.1,curCap())>1.001},
+  {id:'overloadHard',icon:'🚫',title:'Почти лимит',
+   text:'Суммарный вес подходит к 150%. Следующий заказ может не взяться — следи за счётчиком тонн.',
+   when:s=>hasVehicle()&&truckLoad()/Math.max(0.1,curCap())>1.35},
+  {id:'wear80',icon:'🔧',title:'Износ 80%',
+   text:'Машина скоро попросит ремонта. Загляни в «Авто» → «Ремонт».',
+   when:s=>hasVehicle()&&curWear()>=80},
+  {id:'serviceOverdue',icon:'🛠',title:'ТО просрочено',
+   text:'Ресурс и ТО — разные вещи. Просрочил ТО — износ идёт быстрее. Сделай ТО в «Авто».',
+   when:s=>{const v=curVehInst();return v&&serviceOverdue(v)>0;}},
+  {id:'fuelLow',icon:'⛽',title:'Мало топлива',
+   text:'Бак почти пустой. Заправься в «Авто» — иначе можно встрять в пути.',
+   when:s=>hasVehicle()&&!s.truck.traveling&&curFuel()<curFuelMax()*0.15},
+  {id:'kidok',icon:'😡',title:'Тебя кинули',
+   text:'Клиент с низким ★ не заплатил. Смотри на рейтинг клиента перед тем, как брать заказ. Ниже 3.5 — рискованно.',
+   when:s=>s.stats.kicked>0},
+  {id:'firstBase',icon:'🏭',title:'Своя база',
+   text:'База даёт слоты для машин и место под бизнесы. Одна база на город. Растёт от «Стоянки» до «Федерального узла».',
+   when:s=>s.bases.length===1},
+  {id:'firstLease',icon:'🏦',title:'Лизинг',
+   text:'Платёж каждые 15 дней. Одна просрочка — штраф, две подряд — конфискация без возврата аванса.',
+   when:s=>s.ownedVehicles.some(v=>v.lease)},
+  {id:'firstDriver',icon:'👷',title:'Наёмный водитель',
+   text:'Водитель сам ищет грузы, но берёт долю и оклад. Следи за прибылью в «Персонал».',
+   when:s=>s.drivers.length===1},
+  {id:'firstStolen',icon:'🚨',title:'Угнали машину',
+   text:'Открытые стоянки уязвимы. Построй «Крытую» базу или найми охранника — кражи прекратятся.',
+   when:s=>s.stolenQuests.length>0},
+  {id:'rep70',icon:'🌟',title:'Репутация 70',
+   text:'Хорошая репутация открывает лучшие заказы и тендеры. Держи её в тонусе — не бери кидков.',
+   when:s=>s.reputation>=70},
+  {id:'firstTender',icon:'📢',title:'Тендер',
+   text:'Разовый крупный заказ. Шанс зависит от репутации и числа баз. Участие бесплатное.',
+   when:s=>TENDERS.length>0},
+  {id:'firstIntl',icon:'🌍',title:'Филиал за границей',
+   text:'Международные филиалы дают +3 к лимиту машин каждого класса. Международные заказы дороже.',
+   when:s=>s.intlBranches.length===1},
+  {id:'firstOOO',icon:'🏢',title:'ООО',
+   text:'ООО расширяет лимиты на +5 машин каждого класса, открывает филиалы и тендеры.',
+   when:s=>isOOO()},
+];
+
+let _codexTick=0;
+function tryCodex(){
+  if(adminOpen||breakdownActive||currentCityEvent)return;
+  if($('modal').classList.contains('show'))return;
+  if(document.querySelector('.codex-card'))return;
+  if(document.querySelector('.wiz-box'))return;
+  for(const c of CODEX){
+    if(codexSeen(c.id))continue;
+    let ok=false;
+    try{ok=c.when(S);}catch(e){ok=false;}
+    if(ok){
+      markCodex(c.id);
+      showCodexCard(c);
+      return;
+    }
+  }
+}
+function showCodexCard(c){
+  const el=document.createElement('div');
+  el.className='codex-card';
+  el.innerHTML=`
+    <div class="cc-head">
+      <span class="cc-icon">${c.icon}</span>
+      <span class="cc-title">${c.title}</span>
+      <span class="cc-close">×</span>
+    </div>
+    <div class="cc-text">${c.text}</div>
+    <div class="cc-foot">Понятно</div>`;
+  document.body.appendChild(el);
+  requestAnimationFrame(()=>el.classList.add('show'));
+  const close=()=>{el.classList.remove('show');setTimeout(()=>el.remove(),300);};
+  el.querySelector('.cc-close').onclick=close;
+  el.querySelector('.cc-foot').onclick=close;
+  setTimeout(()=>{if(el.parentNode)close();},14000);
+}
+	/* ============ СТАРТОВЫЙ ВИЗАРД ============ */
+const WIZ_KEY='dalnoboy_wizard_v1';
+function wizardDone(){try{return localStorage.getItem(WIZ_KEY)==='1';}catch(_){return false;}}
+function markWizardDone(){try{localStorage.setItem(WIZ_KEY,'1');}catch(_){}}
+
+const WIZ_STEPS=[
+  {sel:'#mapWrap',icon:'🗺️',title:'Это карта',
+   text:'Здесь твоя машина. Точки — города. Синие — доступные, зелёные — куда везёшь, оранжевые — откуда забираешь.'},
+  {sel:'.tab[data-tab="orders"]',icon:'📋',title:'Биржа заказов',
+   text:'Тут ты берёшь работу. Чем выше ★ у клиента — тем надёжнее оплата. Заказы из твоего города — сверху.'},
+  {sel:'.tb-money',icon:'💰',title:'Деньги',
+   text:'Баланс всегда сверху. Ремонт, топливо, штрафы, лизинг списываются автоматически.'},
+  {sel:'.tab[data-tab="firm"]',icon:'📊',title:'Фирма',
+   text:'Здесь твой статус: звание, репутация, статистика, квесты. Развивайся — от «Оборванца» до «Империи».'},
+];
+
+let _wizIdx=0;
+function startWizard(){_wizIdx=0;renderWizardStep();}
+function renderWizardStep(){
+  document.querySelectorAll('.wiz-spot,.wiz-box').forEach(e=>e.remove());
+  if(_wizIdx>=WIZ_STEPS.length){markWizardDone();return;}
+  const step=WIZ_STEPS[_wizIdx];
+  const target=document.querySelector(step.sel);
+  if(!target){_wizIdx++;renderWizardStep();return;}
+  const r=target.getBoundingClientRect();
+
+  const spot=document.createElement('div');
+  spot.className='wiz-spot';
+  spot.style.top=(r.top-6)+'px';
+  spot.style.left=(r.left-6)+'px';
+  spot.style.width=(r.width+12)+'px';
+  spot.style.height=(r.height+12)+'px';
+  document.body.appendChild(spot);
+
+  const box=document.createElement('div');
+  box.className='wiz-box';
+  const isAbove=r.top>window.innerHeight/2;
+  const isLeft=r.left<window.innerWidth/2;
+  if(isAbove){box.style.bottom=(window.innerHeight-r.top+16)+'px';}
+  else{box.style.top=(r.bottom+16)+'px';}
+  if(isLeft){box.style.left=Math.max(12,r.left-20)+'px';}
+  else{box.style.right=Math.max(12,window.innerWidth-r.right-20)+'px';}
+  box.innerHTML=`
+    <div class="wb-head"><span class="wb-icon">${step.icon}</span><span class="wb-title">${step.title}</span></div>
+    <div class="wb-text">${step.text}</div>
+    <div class="wb-btns">
+      <button class="wb-skip">Пропустить</button>
+      <button class="wb-next">${_wizIdx===WIZ_STEPS.length-1?'Готово':'Дальше →'}</button>
+    </div>
+    <div class="wb-step">Шаг ${_wizIdx+1} из ${WIZ_STEPS.length}</div>`;
+  document.body.appendChild(box);
+  requestAnimationFrame(()=>box.classList.add('show'));
+
+  box.querySelector('.wb-next').onclick=()=>{_wizIdx++;renderWizardStep();};
+  box.querySelector('.wb-skip').onclick=()=>{
+    document.querySelectorAll('.wiz-spot,.wiz-box').forEach(e=>e.remove());
+    markWizardDone();
+    if(!hasSeen('pane_orders'))setTimeout(()=>showPaneHint('orders'),400);
+  };
+}
+window.addEventListener('resize',()=>{
+  if(document.querySelector('.wiz-box'))renderWizardStep();
+});
 /* ============ СТАРТ ============ */
 const introEl=$('introOverlay');
 let _introDismissed=false;
@@ -4592,13 +4907,16 @@ S.ownedVehicles.push({id:'v'+(++vehIdCounter),model:'vaz2106',fuel:VEHICLES.vaz2
       toast(`📍 ${CITIES[S.startCity].n}`,'ok');updateUI();
       document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
       document.querySelectorAll('.pane').forEach(x=>x.classList.remove('active'));
-      document.querySelector('.tab[data-tab="orders"]').classList.add('active');
+     document.querySelector('.tab[data-tab="orders"]').classList.add('active');
       $('pane-orders').classList.add('active');
       renderOrders();
+      setTimeout(()=>{
+        if(!wizardDone()) startWizard();
+        else if(!hasSeen('pane_orders')) showPaneHint('orders');
+      },500);
     };
   });
 }
-
 /* ============ ЦИКЛ ============ */
 let last=performance.now();
 let uiT=0,atiT=0,saveT=0,eventT=0,compT=0;
@@ -4635,9 +4953,11 @@ advanceTime(dt*TIME_SCALE);
     }
   }
   driverTick(dt);
-  eventT+=dt;
-  if(eventT>8){eventT=0;
-    if(!S.truck.traveling&&!breakdownActive&&!currentCityEvent&&!adminOpen)tryCityEvent();}
+ eventT+=dt;
+if(eventT>8){eventT=0;
+  if(!S.truck.traveling&&!breakdownActive&&!currentCityEvent&&!adminOpen)tryCityEvent();}
+_codexTick+=dt;
+if(_codexTick>2){_codexTick=0;tryCodex();}
   if(!S.truck.traveling&&S.truck.cityIndex!==null){
     const list=basesHere();let maxRisk=0;
     for(const b of list){const r=BASE_TYPES[b.type].riskSteal;if(r>maxRisk)maxRisk=r;if(b.upgrades&&b.upgrades.cameras)maxRisk=0;}
