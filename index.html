@@ -1351,13 +1351,13 @@ function moneyAdd(amt,desc){
   if(amt<=0)return;
   S.money+=amt;S.finance.income+=amt;S.finance.monthIncome+=amt;
   S.finance.history.push({t:S.gameTime,delta:amt,desc});
-  if(S.finance.history.length>200)S.finance.history.shift();
+  if(S.finance.history.length>500)S.finance.history.shift();
 }
 function moneySpend(amt,desc){
   if(amt<=0)return;
   S.money-=amt;S.finance.expense+=amt;S.finance.monthExpense+=amt;
   S.finance.history.push({t:S.gameTime,delta:-amt,desc});
-  if(S.finance.history.length>200)S.finance.history.shift();
+  if(S.finance.history.length>500)S.finance.history.shift();
 }
 function addNews(txt,cls,cat){
   S.news.items.unshift({t:S.gameTime,txt,cls:cls||'info',cat:cat||'activity'});
@@ -4136,28 +4136,72 @@ function firmGeneralContent(){
 function firmFinanceContent(){
   const obl=obligationsList();const totalObl=obl.reduce((s,o)=>s+o.sum,0);
   const passive=calcPassivePerWeek();
-  let html=`<h3>📊 Обязательства</h3>
+
+  // Категории расходов за 30 дней
+  function catOf(desc){
+    if(!desc) return '❓ Прочее';
+    if(/Аванс зарплаты|Зарплата ·|Зарплаты/i.test(desc)) return '💼 Зарплаты';
+    if(/^Заправка/i.test(desc))                          return '⛽ Топливо';
+    if(/^Ремонт|ДТП|Колесо|Пожар/i.test(desc))           return '🔧 Ремонт и ДТП';
+    if(/^ТО /i.test(desc))                               return '🛠 ТО';
+    if(/^Лизинг/i.test(desc))                            return '🏦 Лизинг';
+    if(/^Налог|ПФР|ФФОМС/i.test(desc))                   return '📄 Налоги';
+    if(/Штраф|Проверка|Подкуп/i.test(desc))              return '🚔 Штрафы';
+    if(/^Страхование|ОСАГО|КАСКО/i.test(desc))           return '🛡 Страховка';
+    if(/Покупка|Куплен|База|Апгрейд|Поглощение/i.test(desc)) return '🏗 Покупки';
+    return '💥 Прочее';
+  }
+
+  const cutoff = S.gameTime - 30*1440;
+  const expMap = {};
+  let incTotal30 = 0, expTotal30 = 0;
+  for(const tx of S.finance.history){
+    if(tx.t < cutoff) continue;
+    if(tx.delta > 0) incTotal30 += tx.delta;
+    else {
+      expTotal30 += Math.abs(tx.delta);
+      const c = catOf(tx.desc);
+      expMap[c] = (expMap[c]||0) + Math.abs(tx.delta);
+    }
+  }
+  const profit30 = incTotal30 - expTotal30;
+  const sortedExp = Object.entries(expMap).sort((a,b)=>b[1]-a[1]).slice(0,6);
+
+  let html = `<h3>📊 Обязательства</h3>
   <div class="card">
     <div class="row"><span class="muted">Всего (30 дн.)</span><b style="color:#ffb84d">−${fmt(totalObl)} ₽</b></div>
     <div class="row"><span class="muted">Пассив в неделю</span><b style="color:#39d98a">+${fmt(passive)} ₽</b></div>
     ${obl.map(o=>`<div class="row" style="margin-top:6px;padding-top:6px;border-top:1px solid #1e2c3f">
-      <span>${o.ic} ${o.txt}<br><span class="muted" style="font-size:10px">через ${o.days} дн.</span></span>
+      <span>${o.ic} ${o.txt}<br><span class="muted" style="font-size:10px">${o.note||''} · через ${o.days} дн.</span></span>
       <b>${fmt(o.sum)} ₽</b></div>`).join('')||'<div class="muted" style="margin-top:6px">Нет обязательств</div>'}
   </div>
-  <h3>История</h3>
+
+  <h3>📈 За 30 дней</h3>
   <div class="fin-grid">
-    <div class="fin-cell inc"><div class="l">Доход</div><div class="v">${fmt(S.finance.income)} ₽</div></div>
-    <div class="fin-cell exp"><div class="l">Расход</div><div class="v">${fmt(S.finance.expense)} ₽</div></div>
-    <div class="fin-cell inc"><div class="l">Баланс</div><div class="v">${fmt(S.money)} ₽</div></div>
-    <div class="fin-cell ${S.finance.income-S.finance.expense>=0?'inc':'exp'}">
-      <div class="l">Прибыль</div><div class="v">${fmt(S.finance.income-S.finance.expense)} ₽</div></div>
+    <div class="fin-cell inc"><div class="l">Доход</div><div class="v">${fmt(incTotal30)} ₽</div></div>
+    <div class="fin-cell exp"><div class="l">Расход</div><div class="v">${fmt(expTotal30)} ₽</div></div>
+    <div class="fin-cell ${profit30>=0?'inc':'exp'}"><div class="l">Прибыль</div><div class="v">${fmt(profit30)} ₽</div></div>
+    <div class="fin-cell ${profit30>=0?'inc':'exp'}"><div class="l">В день</div><div class="v">${fmt(Math.round(profit30/30))} ₽</div></div>
   </div>
+
+  <h3>💸 Куда уходят деньги</h3>
   <div class="card" style="padding:6px 10px">
-  ${S.finance.history.slice(-15).reverse().map(tx=>{
-    const dy=Math.floor(tx.t/1440)+1;const cls=tx.delta>0?'inc':'exp';const sign=tx.delta>0?'+':'−';
-    return `<div class="tx ${cls}"><span>Д${dy} · ${tx.desc}</span><span class="amt">${sign}${fmt(Math.abs(tx.delta))} ₽</span></div>`;
-  }).join('')||'<div class="empty">Пусто</div>'}
+    ${sortedExp.length
+      ? sortedExp.map(([cat,sum])=>{
+          const pct = expTotal30>0 ? (sum/expTotal30*100).toFixed(0) : 0;
+          return `<div style="margin:5px 0">
+            <div class="row" style="margin:0">
+              <span style="font-size:11px">${cat}</span>
+              <span style="color:#ff8d99;font-weight:700;font-size:11px">−${fmt(sum)} ₽ <span class="muted">(${pct}%)</span></span>
+            </div>
+            <div style="height:3px;background:#000;border-radius:2px;overflow:hidden;margin-top:2px">
+              <i style="display:block;height:100%;background:#ff6b6b;width:${pct}%"></i>
+            </div>
+          </div>`;
+        }).join('')
+      : '<div class="empty">Нет расходов</div>'}
   </div>`;
+
   return html;
 }
 function firmLicensesContent(){
