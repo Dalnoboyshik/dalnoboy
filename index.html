@@ -1461,7 +1461,11 @@ function refillATI(){
   }
   let s=0;while(atiOrders.length<60&&s<300){s++;const o=makeOrder();if(o)atiOrders.push(o);else break;}
 }
-function addCityOrders(idx){for(let i=0;i<5;i++){const o=makeOrder(idx,true);if(o)atiOrders.push(o);}for(let i=0;i<5;i++){const o=makeOrder(idx,false);if(o)atiOrders.push(o);}}
+function addCityOrders(idx){
+  const n=ri(12,20);   // ← тот же рандом при приезде
+  for(let i=0;i<n;i++){const o=makeOrder(idx,true);if(o)atiOrders.push(o);}
+  for(let i=0;i<Math.round(n*0.5);i++){const o=makeOrder(idx,false);if(o)atiOrders.push(o);}
+}
 function compatibleWith(o){return curCargoTypes().includes(o.ctype);}
 function rollPayment(rating){
   const rep=S.reputation/200;const r=Math.random()+rep;
