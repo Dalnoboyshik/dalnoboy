@@ -4460,7 +4460,38 @@ function showStartCityPicker(){
         toast('💾 Загружено','ok');updateUI();
         if(S.dailyTaskDay!==S.day)generateDailyTasks(S.day);}
       else toast('Ошибка','bad');};
-    $('btnNewGame').onclick=()=>{clearSave();showCityPicker();};return;
+       $('btnNewGame').onclick=()=>{
+      // Первое окно
+      Modal._render(`<h2>⚠️ Начать новую игру?</h2>
+        <p>Все текущие сохранения будут <b style="color:#ff6b6b">безвозвратно удалены</b>. Это действие нельзя отменить.</p>
+        <div style="display:flex;flex-direction:column;gap:12px;margin-top:16px">
+          <button class="wide bad" id="confirmNewYes" style="font-size:22px;padding:20px;min-height:70px;font-weight:700;line-height:1.2">🗑️ Да, удалить и начать заново</button>
+          <button class="wide ok" id="confirmNewNo" style="font-size:22px;padding:20px;min-height:70px;font-weight:700;line-height:1.2">↩️ Нет, вернуться</button>
+        </div>`);
+      $('confirmNewNo').onclick=()=>{
+        Modal.next();
+        setTimeout(()=>showStartCityPicker(),300);
+      };
+      $('confirmNewYes').onclick=()=>{
+        // Второе окно — финальное подтверждение
+        Modal._render(`<h2 style="color:#ff6b6b">🚨 ВЫ УВЕРЕНЫ?</h2>
+          <p style="font-size:14px;color:#ffb3bd;line-height:1.5">Вы <b>реально</b> хотите начать заново?<br>Весь прогресс — деньги, машины, базы, водители, звания — <b style="color:#ff6b6b">исчезнет навсегда</b>. Отменить это будет невозможно.</p>
+          <div style="display:flex;flex-direction:column;gap:12px;margin-top:16px">
+            <button class="wide bad" id="confirmNewYes2" style="font-size:22px;padding:20px;min-height:70px;font-weight:700;line-height:1.2;background:#5c1a24;border-color:#8a2f3e;color:#ffb3bd">💀 Да, я точно уверен</button>
+            <button class="wide ok" id="confirmNewNo2" style="font-size:22px;padding:20px;min-height:70px;font-weight:700;line-height:1.2">🛟 Нет, я передумал</button>
+          </div>`);
+        $('confirmNewNo2').onclick=()=>{
+          Modal.next();
+          setTimeout(()=>showStartCityPicker(),300);
+        };
+        $('confirmNewYes2').onclick=()=>{
+          clearSave();
+          Modal.next();
+          setTimeout(()=>showCityPicker(),300);
+        };
+      };
+    };
+    return;
   }
   showCityPicker();
 }
