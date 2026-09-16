@@ -853,14 +853,11 @@ const Modal = {
   busy: false,
   show(html, priority){
     priority = priority || 0;
-    // если модалка свободна — показываем сразу
     if(!this.busy && !$('modal').classList.contains('show')){
       this._render(html);
       return;
     }
-    // иначе ставим в очередь
     if(priority > 0){
-      // высокий приоритет — в начало
       this.queue.unshift(html);
     } else {
       this.queue.push(html);
@@ -872,8 +869,7 @@ const Modal = {
     $('modal').classList.add('show');
   },
   next(){
-    Modal.next();
-    // небольшая задержка, чтобы DOM успел «отдохнуть»
+    $('modal').classList.remove('show');
     setTimeout(()=>{
       this.busy = false;
       if(this.queue.length){
@@ -885,7 +881,7 @@ const Modal = {
   clear(){
     this.queue = [];
     this.busy = false;
-    Modal.next();
+    $('modal').classList.remove('show');
   }
 };
 let sortBy={field:'total',dir:-1};
@@ -1363,31 +1359,31 @@ function openLeaseModal(model){
       <div style="display:flex;gap:8px;margin-top:8px">
         <button id="lsYes" class="gold" style="flex:1">Взять за ${fmt(advance+monthly)} ₽</button>
         <button id="lsNo" class="ok" style="flex:1">Отмена</button></div>`;
-    $('modalBox').innerHTML=html;
+    Modal._render(html);
     $('modalBox').querySelectorAll('[data-term]').forEach(el=>{el.onclick=()=>{selectedTerm=+el.dataset.term;render();};});
     $('lsNo').onclick=()=>Modal.next();
     $('lsYes').onclick=()=>{
       const total=advance+monthly;
       if(S.money<total){toast(`Нужно ${fmt(total)} ₽ на входе`,'bad');return;}
       const id='v'+(++vehIdCounter);
-    const baseMax=v.maxKm||500000;
-const rolledMax=Math.round(baseMax*rnd(0.85,1.15));
-const newVeh={id,model,fuel:v.tank,wear:0,odometer:0,upgrades:{},
-  baseMaxKm:baseMax,maxKm:rolledMax,lastServiceOdometer:0,
-  insurance:{osago:false,osagoExpires:0,osagoRenew:false,kasko:false,kaskoExpires:0,kaskoRenew:false},
-  lease:{monthly,monthsLeft:t.months,monthsTotal:t.months,
-         nextPaymentAt:S.gameTime+LEASE_PERIOD_DAYS*1440,
-         missedPayments:0,debt:0,advance,basePrice,paid:advance+monthly}};
+      const baseMax=v.maxKm||500000;
+      const rolledMax=Math.round(baseMax*rnd(0.85,1.15));
+      const newVeh={id,model,fuel:v.tank,wear:0,odometer:0,upgrades:{},
+        baseMaxKm:baseMax,maxKm:rolledMax,lastServiceOdometer:0,
+        insurance:{osago:false,osagoExpires:0,osagoRenew:false,kasko:false,kaskoExpires:0,kaskoRenew:false},
+        lease:{monthly,monthsLeft:t.months,monthsTotal:t.months,
+               nextPaymentAt:S.gameTime+LEASE_PERIOD_DAYS*1440,
+               missedPayments:0,debt:0,advance,basePrice,paid:advance+monthly}};
       S.ownedVehicles.push(newVeh);S.leasesCount++;
       moneySpend(total,`Лизинг ${v.n} (аванс+платёж)`);
       if(truckLoad()===0){S.currentVehicleId=id;
         if(v.cls==='tractor'&&!S.currentTrailerId&&S.ownedTrailers.length)S.currentTrailerId=S.ownedTrailers[0].id;}
       Modal.next();
       toast(`🏦 ${v.n} в лизинге (${fmt(total)} ₽ на входе)`,'ok');
-     addNews(`🏦 В лизинг: ${v.n} · −${fmt(total)} ₽`,'warn','finance');updateUI();
+      addNews(`🏦 В лизинг: ${v.n} · −${fmt(total)} ₽`,'warn','finance');updateUI();
     };
   }
-  $('modal').classList.add('show');render();
+  render();
 }
 function leasePaymentTick(){
   for(const v of S.ownedVehicles.slice()){
