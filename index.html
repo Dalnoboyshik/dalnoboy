@@ -1471,9 +1471,9 @@ function rollPayment(rating){
   const rep=S.reputation/200;const r=Math.random()+rep;
   if(rating>=4.4)return{mult:1.00,text:'оплатил полностью',cls:'ok'};
   if(rating>=3.8)return r<0.94?{mult:1.00,text:'оплатил полностью',cls:'ok'}:{mult:0.85,text:'задержал 15%',cls:'warn'};
-  if(rating>=3.2)return r<0.82?{mult:1.00,text:'оплатил полностью',cls:'ok'}:r<0.94?{mult:0.70,text:'срезал 30%',cls:'warn'}:{mult:0.00,text:'исчез!',cls:'bad'};
-  if(rating>=2.5)return r<0.62?{mult:1.00,text:'оплатил полностью',cls:'ok'}:r<0.84?{mult:0.55,text:'половину',cls:'warn'}:{mult:0.00,text:'кинул!',cls:'bad'};
-  return r<0.35?{mult:1.25,text:'+25%!',cls:'ok'}:r<0.58?{mult:0.70,text:'70%',cls:'warn'}:r<0.72?{mult:0.30,text:'30%',cls:'warn'}:{mult:0.00,text:'КИДОК!',cls:'bad'};
+  if(rating>=3.2)return r<0.90?{mult:1.00,text:'оплатил полностью',cls:'ok'}:r<0.94?{mult:0.70,text:'срезал 30%',cls:'warn'}:{mult:0.00,text:'исчез!',cls:'bad'};
+  if(rating>=2.5)return r<0.75?{mult:1.00,text:'оплатил полностью',cls:'ok'}:r<0.92?{mult:0.55,text:'половину',cls:'warn'}:{mult:0.00,text:'кинул!',cls:'bad'};
+  return r<0.55?{mult:1.25,text:'+25%!',cls:'ok'}:r<0.58?{mult:0.70,text:'70%',cls:'warn'}:r<0.72?{mult:0.30,text:'30%',cls:'warn'}:{mult:0.00,text:'КИДОК!',cls:'bad'};
 }
 function toast(msg,type){
   const d=document.createElement('div');d.className='toast '+(type||'');d.innerHTML=msg;
