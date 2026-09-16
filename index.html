@@ -808,6 +808,44 @@ const ACHIEVEMENTS = [
   {id:'international',n:'Международный',cond:s=>s.intlBranches.length>0,eff:'Открыть филиал за границей'},
   {id:'billionaire',n:'Миллиардер',cond:s=>s.money>=1000000000,eff:'Заработать 1 млрд ₽'},
 ];
+	/* ============ ЗВАНИЯ / РАНГИ ============ */
+const RANKS = [
+  {id:'rag',    n:'Оборванец',           icon:'🪣', desc:'Пустой карман, ржавая машина и упрямство. С чего-то надо начинать.',
+    cond:s=>true},
+  {id:'novice', n:'Начинающий водитель', icon:'🚗', desc:'Первые рейсы позади. Дорога начала кормить — уже не зря сел за руль.',
+    cond:s=>s.stats.totalTrips>=5},
+  {id:'salaga', n:'Салага',              icon:'📦', desc:'Уже не новичок, но и не профи. Опыт копится, деньги откладываются.',
+    cond:s=>s.stats.totalTrips>=25&&s.money>=100000},
+  {id:'staj',   n:'Дальнобой со стажем', icon:'🛣️', desc:'Тысячи километров за спиной. Постоянные клиенты узнают по голосу.',
+    cond:s=>s.stats.totalTrips>=100&&s.stats.totalKm>=20000},
+  {id:'base',   n:'Хозяин базы',         icon:'🏭', desc:'Своя стоянка, свой угол. Машины под присмотром, планы — на годы.',
+    cond:s=>s.bases.length>=1},
+  {id:'local',  n:'Местный бизнесмен',   icon:'💼', desc:'ИП, свой парк, узнаваемое имя в родном регионе.',
+    cond:s=>isIP()&&s.ownedVehicles.length>=5},
+  {id:'firm',   n:'Владелец фирмы',      icon:'🏢', desc:'Водители работают на вас, базы растут, деньги капают без вашего присутствия.',
+    cond:s=>s.drivers.length>=3&&s.bases.length>=2},
+  {id:'magnat', n:'Логистический магнат',icon:'🚛', desc:'ООО, десятки машин, международные маршруты. О вас пишут в отраслевых журналах.',
+    cond:s=>isOOO()&&s.ownedVehicles.length>=15},
+  {id:'king',   n:'Транспортный король', icon:'👑', desc:'Репутация за 80, полстраны под вами. Конкуренты сворачивают дела.',
+    cond:s=>s.reputation>=80&&s.bases.length>=5},
+  {id:'empire', n:'Империя',             icon:'🌍', desc:'Миллиард на счету, филиалы за границей. О вас снимают документалки.',
+    cond:s=>s.money>=1000000000||(COMPETITORS.every(c=>c.dead)&&s.intlBranches.length>0)},
+];
+function getRankIndex(){
+  for(let i=RANKS.length-1;i>=0;i--) if(RANKS[i].cond(S)) return i;
+  return 0;
+}
+function getRank(){return RANKS[getRankIndex()];}
+function checkRankUp(){
+  const idx=getRankIndex();
+  if(S.rank===undefined)S.rank=0;
+  if(idx>S.rank){
+    S.rank=idx;
+    const r=RANKS[idx];
+    toast(`🎖️ <b>Новое звание: ${r.n}</b><br><span style="font-size:11px;opacity:.85">${r.desc}</span>`,'ok');
+    addNews(`🎖️ Звание: ${r.n}`,'ok','activity');
+  }
+}
 const FUEL_PRICE_BASE=58,ROAD_FACTOR=1.18,TIME_SCALE=12,START_MONEY=100000;
 const WEAR_MULT=0.05;
 const IP_COST=30000,SELF_COST=30000,OOO_COST=500000,BASE_FREE_VEH=2;
@@ -984,7 +1022,7 @@ const S = {
   newsTimer: 0, lastSave: 0,
   stolenQuests: [],
   leasesCount: 0,
-  houseLevel: 0, houseCityIdx: null,
+    houseLevel: 0, houseCityIdx: null, rank: 0,
   routeFilter:{from:null,to:null},
   intlBranches:[],
     autoService:true, autoServiceInterval:30000,
@@ -2535,6 +2573,7 @@ function checkDailyTaskComplete(){
 function checkAchievements(){
   for(const a of ACHIEVEMENTS){if(S.achievements[a.id])continue;
     if(a.cond(S)){S.achievements[a.id]=true;if(a.apply)a.apply(S);toast(`🏅 <b>${a.n}</b> — ${a.eff}`,'ok');}}
+  checkRankUp();
 }
 function refillContracts(){
   if(S.contracts.length>=3)return;
@@ -3701,9 +3740,13 @@ function firmGeneralContent(){
   const hq=S.bases.length?CITIES[S.bases[0].cityIdx].n:(S.startCity!==null?CITIES[S.startCity].n:'—');
   const rep=S.reputation;
   const quote=firmStatusQuote();
+   const rk=getRank();
   return `<div class="firm-head">
     <h2>${S.firmName||'—'}</h2>
-    <div class="sub">${firmLevelName()} · основана в день ${S.firmFounded||1}</div>
+    <div class="sub" style="margin-top:4px">
+      <span class="badge gold" style="font-size:11.5px;padding:3px 9px">${rk.icon} ${rk.n}</span>
+    </div>
+    <div class="sub" style="margin-top:6px">${firmLevelName()} · основана в день ${S.firmFounded||1}</div>
     <div class="rep-bar" style="margin-top:8px"><i style="width:${rep}%"></i></div>
     <div class="sub" style="margin-top:4px">Репутация: ${Math.round(rep)} / 100</div>
   </div>
@@ -3711,6 +3754,17 @@ function firmGeneralContent(){
     <div class="row"><b>${quote.title}</b></div>
     <div class="muted" style="font-size:11.5px;line-height:1.5;margin-top:4px">${quote.text}</div>
   </div>`:''}
+    <h3>🎖️ Звание</h3>
+  <div class="card hl">
+    <div class="row"><b>${rk.icon} ${rk.n}</b><span class="muted">${getRankIndex()+1}/${RANKS.length}</span></div>
+    <div class="muted" style="font-size:11.5px;line-height:1.5;margin-top:4px">${rk.desc}</div>
+    ${(()=>{
+      const next=RANKS[getRankIndex()+1];
+      if(!next) return `<div class="muted" style="color:#ffd479;margin-top:6px;font-size:11px">🌟 Максимальное звание</div>`;
+      return `<div class="muted" style="margin-top:8px;font-size:11px;padding-top:6px;border-top:1px solid #1e2c3f">
+        Следующее: <b>${next.icon} ${next.n}</b></div>`;
+    })()}
+  </div>
   <h3>Информация</h3><div class="card">
     <div class="row"><span class="muted">Статус</span><b>${firmLevelName()}</b></div>
     <div class="row"><span class="muted">Штаб</span><b>${hq}</b></div>
@@ -4296,7 +4350,8 @@ function loadGame(){
     if(S.finance.monthExpense===undefined)S.finance.monthExpense=0;
     if(!S.news)S.news={items:[]};
     if(!S.routeFilter)S.routeFilter={from:null,to:null};
-    if(S.houseLevel===undefined)S.houseLevel=0;
+       if(S.houseLevel===undefined)S.houseLevel=0;
+    if(S.rank===undefined)S.rank=getRankIndex();
     if(!S.intlBranches)S.intlBranches=[];
     if(S.bases)for(const b of S.bases)if(!b.id)b.id='b'+(++baseIdCounter);
     if(S.drivers)for(const dr of S.drivers){
