@@ -2765,9 +2765,11 @@ function renderAuto(){
     const pd=$('btnPayDebt');if(pd)pd.onclick=()=>payLeaseDebt(S.currentVehicleId);
     p.querySelectorAll('[data-up]').forEach(b=>{b.onclick=()=>buyUpgrade(b.dataset.up);});
   }
-  if(sub==='garage'){
+   if(sub==='garage'){
     p.querySelectorAll('[data-select-vehicle]').forEach(b=>{b.onclick=()=>selectVehicle(b.dataset.selectVehicle);});
     p.querySelectorAll('[data-select-trailer]').forEach(b=>{b.onclick=()=>selectTrailer(b.dataset.selectTrailer);});
+    p.querySelectorAll('[data-buyout-fleet]').forEach(b=>{b.onclick=()=>buyoutLease(b.dataset.buyoutFleet);});
+    p.querySelectorAll('[data-paydebt-fleet]').forEach(b=>{b.onclick=()=>payLeaseDebt(b.dataset.paydebtFleet);});
   }
   if(sub==='shop'){
     p.querySelectorAll('[data-buy-vehicle]').forEach(b=>{b.onclick=()=>buyVehicle(b.dataset.buyVehicle);});
@@ -2891,7 +2893,7 @@ function autoGarageContent(){
       const sPct3=Math.min(100,(sinceS3/interval3)*100);
       const odoCol3=odoPct3>80?'#ff6b6b':odoPct3>60?'#ffb84d':'#39d98a';
       const sCol3=od3>0?'#ff6b6b':sPct3>80?'#ffb84d':'#39d98a';
-      html+=`<div class="card ${isCur?'hl':''}">
+          html+=`<div class="card ${isCur?'hl':''}">
         <div class="row">
           <span class="route">${ov.icon} ${ov.n} <span class="veh-cat">${catName(vehCategory(i.model))}</span>
             <small>${ov.radius} км · ${ov.cap} т · износ ${w}%${isB?' · 👷':''}${i.lease?' · 🏦':''}</small></span>
@@ -2902,6 +2904,10 @@ function autoGarageContent(){
           <div class="ln"><span>🛠 ТО</span><b style="color:${sCol3}">${fmt(sinceS3)} / ${fmt(interval3)} км</b></div>
           <div class="ln"><span>🔧 Износ</span><b style="color:${w>=80?'#ff8d99':w>=50?'#ffb84d':'#5ef0a0'}">${w}%</b></div>
         </div>
+        ${i.lease?`<div class="row" style="margin-top:6px;gap:5px">
+          <button class="gold" data-buyout-fleet="${i.id}" style="flex:1">🏦 Досрочно выкупить</button>
+          ${i.lease.debt>0?`<button class="bad" data-paydebt-fleet="${i.id}" style="flex:1">💳 Долг ${fmt(i.lease.debt)} ₽</button>`:''}
+        </div>`:''}
       </div>`;
     }
   }
