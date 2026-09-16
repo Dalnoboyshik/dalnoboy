@@ -847,6 +847,47 @@ let COMPETITORS = [
 let TENDERS = [];
 let atiOrders=[],orderId=0,hoverCity=-1,highlightedOrderId=null;
 let breakdownActive=false,currentCityEvent=null;
+	/* ====== ОЧЕРЕДЬ МОДАЛОК ====== */
+const Modal = {
+  queue: [],
+  busy: false,
+  show(html, priority){
+    priority = priority || 0;
+    // если модалка свободна — показываем сразу
+    if(!this.busy && !$('modal').classList.contains('show')){
+      this._render(html);
+      return;
+    }
+    // иначе ставим в очередь
+    if(priority > 0){
+      // высокий приоритет — в начало
+      this.queue.unshift(html);
+    } else {
+      this.queue.push(html);
+    }
+  },
+  _render(html){
+    this.busy = true;
+    $('modalBox').innerHTML = html;
+    $('modal').classList.add('show');
+  },
+  next(){
+    Modal.next();
+    // небольшая задержка, чтобы DOM успел «отдохнуть»
+    setTimeout(()=>{
+      this.busy = false;
+      if(this.queue.length){
+        const nextHtml = this.queue.shift();
+        this._render(nextHtml);
+      }
+    }, 250);
+  },
+  clear(){
+    this.queue = [];
+    this.busy = false;
+    Modal.next();
+  }
+};
 let sortBy={field:'total',dir:-1};
 let oblExpanded=false;
 let uiSubTab={orders:'ati', auto:'current', world:'news', labor:'staff'};
@@ -1165,42 +1206,55 @@ function triggerTheft(cityIdx){
   const cand=S.ownedVehicles.filter(v=>v.id!==S.currentVehicleId&&!S.drivers.some(d=>d.vehicleId===v.id)&&!v.lease);
   if(!cand.length){toast('🚨 Попытка угона','warn');return;}
   const st=pick(cand);const v=VEHICLES[st.model];
-  $('modalBox').innerHTML=`<h2>🚨 Угнали машину</h2>
+  const theftHtml=`<h2>🚨 Угнали машину</h2>
     <div class="big-event danger"><h3>С открытой стоянки</h3>
       <p>В ${CITIES[cityIdx].n} похищена <b>${v.icon} ${v.n}</b>.</p></div>
     <button class="wide primary" data-theft="bandits">🕵️ К бандитам · 50 000 ₽</button>
     <button class="wide ok" data-theft="police" style="margin-top:6px">👮 В полицию</button>
     <button class="wide warn" data-theft="bribe" style="margin-top:6px">💰 Подкупить полицию · 30 000 ₽</button>`;
-  $('modal').classList.add('show');
-  $('modalBox').querySelectorAll('[data-theft]').forEach(b=>{
-    b.onclick=()=>{
-      const m=b.dataset.theft;
-      S.ownedVehicles=S.ownedVehicles.filter(x=>x.id!==st.id);
-      if(S.currentVehicleId===st.id)S.currentVehicleId=S.ownedVehicles.length?S.ownedVehicles[0].id:null;
-      if(m==='bandits'){if(S.money<50000){toast('Мало денег','bad');return;}moneySpend(50000,'Бандиты');}
-      if(m==='bribe'){if(S.money<30000){toast('Мало денег','bad');return;}moneySpend(30000,'Подкуп');}
-      S.stolenQuests.push({vehicleId:st.id,model:st.model,method:m,resolveAt:S.gameTime+1440*rnd(1.5,3),cityIdx});
-      $('modal').classList.remove('show');toast('Ждите новостей…','warn');updateUI();
-    };
-  });
+  Modal.show(theftHtml, 1);
+  setTimeout(()=>{
+    $('modalBox').querySelectorAll('[data-theft]').forEach(b=>{
+      b.onclick=()=>{
+        const m=b.dataset.theft;
+        S.ownedVehicles=S.ownedVehicles.filter(x=>x.id!==st.id);
+        if(S.currentVehicleId===st.id)S.currentVehicleId=S.ownedVehicles.length?S.ownedVehicles[0].id:null;
+        if(m==='bandits'){if(S.money<50000){toast('Мало денег','bad');return;}moneySpend(50000,'Бандиты');}
+        if(m==='bribe'){if(S.money<30000){toast('Мало денег','bad');return;}moneySpend(30000,'Подкуп');}
+        S.stolenQuests.push({vehicleId:st.id,model:st.model,method:m,resolveAt:S.gameTime+1440*rnd(1.5,3),cityIdx});
+        Modal.next();
+        toast('Ждите новостей…','warn');
+        updateUI();
+      };
+    });
+  }, 0);
 }
 function processStolenQuests(){
   for(let i=S.stolenQuests.length-1;i>=0;i--){const q=S.stolenQuests[i];if(S.gameTime>=q.resolveAt){S.stolenQuests.splice(i,1);scammerCall(q);}}
 }
 function scammerCall(q){
   const v=VEHICLES[q.model];const r=Math.round(rnd(100000,180000)/10000)*10000;
-  $('modalBox').innerHTML=`<h2>📞 Анонимный звонок</h2>
+  const scamHtml=`<h2>📞 Анонимный звонок</h2>
     <div class="big-event scam"><h3>Голос искажён</h3>
       <p>«Ваша ${v.icon} ${v.n} у меня. <b>${fmt(r)} ₽</b> — и она вернётся.»</p></div>
     <button class="wide primary" data-ransom="pay">💸 Заплатить ${fmt(r)} ₽</button>
     <button class="wide bad" data-ransom="refuse" style="margin-top:6px">🚫 Отказать</button>`;
-  $('modal').classList.add('show');
-  $('modalBox').querySelectorAll('[data-ransom]').forEach(b=>{
-    b.onclick=()=>{const a=b.dataset.ransom;$('modal').classList.remove('show');
-      if(a==='pay'){if(S.money<r){toast('Мало денег','bad');return;}moneySpend(r,'Выкуп');setTimeout(()=>toast('📵 Мошенник пропал','bad'),2500);}
-      else setTimeout(()=>toast('📵 Бросил трубку','warn'),1500);
-    };
-  });
+  Modal.show(scamHtml, 1);
+  setTimeout(()=>{
+    $('modalBox').querySelectorAll('[data-ransom]').forEach(b=>{
+      b.onclick=()=>{
+        const a=b.dataset.ransom;
+        Modal.next();
+        if(a==='pay'){
+          if(S.money<r){toast('Мало денег','bad');return;}
+          moneySpend(r,'Выкуп');
+          setTimeout(()=>toast('📵 Мошенник пропал','bad'),2500);
+        } else {
+          setTimeout(()=>toast('📵 Бросил трубку','warn'),1500);
+        }
+      };
+    });
+  }, 0);
 }
 
 /* ============ СТРАХОВАНИЕ ============ */
@@ -1229,7 +1283,7 @@ function openInsuranceModal(){
       <button id="insApply" class="primary" style="flex:1">Применить</button>
       <button id="insCancel" class="ok" style="flex:1">Отмена</button></div>`;
   $('modal').classList.add('show');
-  $('insCancel').onclick=()=>$('modal').classList.remove('show');
+  $('insCancel').onclick=()=>Modal.next();
   $('insApply').onclick=()=>{
     const doO=$('insOsago').checked,doK=$('insKasko').checked;
     const renew=$('insRenew').checked,all=$('insAll').checked;
@@ -1244,7 +1298,7 @@ function openInsuranceModal(){
     if(total===0){toast('Нечего менять','warn');return;}
     if(S.money<total){toast(`Нужно ${fmt(total)} ₽`,'bad');return;}
     moneySpend(total,'Страхование');
-    $('modal').classList.remove('show');
+    Modal.next();
     toast(`🛡️ Застраховано ${targets.length} за ${fmt(total)} ₽`,'ok');updateUI();
   };
 }
@@ -1311,7 +1365,7 @@ function openLeaseModal(model){
         <button id="lsNo" class="ok" style="flex:1">Отмена</button></div>`;
     $('modalBox').innerHTML=html;
     $('modalBox').querySelectorAll('[data-term]').forEach(el=>{el.onclick=()=>{selectedTerm=+el.dataset.term;render();};});
-    $('lsNo').onclick=()=>$('modal').classList.remove('show');
+    $('lsNo').onclick=()=>Modal.next();
     $('lsYes').onclick=()=>{
       const total=advance+monthly;
       if(S.money<total){toast(`Нужно ${fmt(total)} ₽ на входе`,'bad');return;}
@@ -1328,7 +1382,7 @@ const newVeh={id,model,fuel:v.tank,wear:0,odometer:0,upgrades:{},
       moneySpend(total,`Лизинг ${v.n} (аванс+платёж)`);
       if(truckLoad()===0){S.currentVehicleId=id;
         if(v.cls==='tractor'&&!S.currentTrailerId&&S.ownedTrailers.length)S.currentTrailerId=S.ownedTrailers[0].id;}
-      $('modal').classList.remove('show');
+      Modal.next();
       toast(`🏦 ${v.n} в лизинге (${fmt(total)} ₽ на входе)`,'ok');
      addNews(`🏦 В лизинг: ${v.n} · −${fmt(total)} ₽`,'warn','finance');updateUI();
     };
@@ -1388,11 +1442,11 @@ function buyoutLease(vehicleId){
       <button id="boYes" class="gold" style="flex:1">Выкупить</button>
       <button id="boNo" class="ok" style="flex:1">Отмена</button></div>`;
   $('modal').classList.add('show');
-  $('boNo').onclick=()=>$('modal').classList.remove('show');
+  $('boNo').onclick=()=>Modal.next();
   $('boYes').onclick=()=>{
     if(S.money<disc){toast('Мало денег','bad');return;}
     moneySpend(disc,'Выкуп');delete v.lease;S.leasesCount--;
-    $('modal').classList.remove('show');toast(`✅ ${VEHICLES[v.model].n} выкуплен`,'ok');updateUI();
+    Modal.next();toast(`✅ ${VEHICLES[v.model].n} выкуплен`,'ok');updateUI();
   };
 }
 
@@ -1507,10 +1561,20 @@ function renderCityEvent(ev){
     <div style="display:flex;flex-direction:column;gap:6px">`;
   ev.opts.forEach((o,i)=>{html+=`<button class="wide ${i===0?'primary':'ok'}" data-evopt="${i}">${o.t}</button>`;});
   html+=`</div>`;
-  $('modalBox').innerHTML=html;$('modal').classList.add('show');
-  $('modalBox').querySelectorAll('[data-evopt]').forEach(b=>{
-    b.onclick=()=>{const i=+b.dataset.evopt;ev.opts[i].fn();currentCityEvent=null;$('modal').classList.remove('show');updateUI();};
-  });
+  Modal.show(html);
+  // ждём, когда Modal отрисует и навесим обработчики
+  setTimeout(()=>{
+    const box=$('modalBox');
+    box.querySelectorAll('[data-evopt]').forEach(b=>{
+      b.onclick=()=>{
+        const i=+b.dataset.evopt;
+        ev.opts[i].fn();
+        currentCityEvent=null;
+        Modal.next();
+        updateUI();
+      };
+    });
+  }, 0);
 }
 
 /* ============ ПУТЕШЕСТВИЕ ============ */
@@ -1561,31 +1625,40 @@ function triggerBreakdown(){
   const p=S.truck.progress;const kf=p*kt,kto=(1-p)*kt;
   const ni=kf<=kto?fi:ti;const nk=Math.max(5,Math.round(Math.min(kf,kto)));
   const tc=3500+Math.round(nk*25);S.truck.traveling=false;S.truck.paused=false;
-  $('modalBox').innerHTML=`<h2>💥 Машина сломалась</h2>
+   const bdHtml=`<h2>💥 Машина сломалась</h2>
     <div class="big-event danger"><h3>Износ 100%</h3>
       <div class="row" style="margin-top:8px"><span class="muted">Позиция</span><b>${Math.round(p*100)}%</b></div>
       <div class="row"><span class="muted">Ближайший город</span><b>${CITIES[ni].n} · ${nk} км</b></div>
     </div>
     <button class="wide primary" id="btnTow" ${S.money>=tc?'':'disabled'}>🚛 Эвакуатор · ${fmt(tc)} ₽</button>
     <button class="wide ok" id="btnHitch" ${S.money>=2000?'':'disabled'} style="margin-top:6px">👍 Голосовать · 2 000 ₽</button>`;
-  $('modal').classList.add('show');
-  $('btnTow').onclick=()=>{
-    if(S.money<tc){toast('Мало денег','bad');return;}
-    moneySpend(tc,'Эвакуатор');
-    S.truck.cityIndex=ni;S.truck.local=false;S.truck.progress=0;breakdownActive=false;
-    $('modal').classList.remove('show');deliverAt(ni);addCityOrders(ni);refillATI();
-    toast(`🚛 Эвакуирован в ${CITIES[ni].n}`,'warn');updateUI();
-  };
-  $('btnHitch').onclick=()=>{
-    if(S.money<2000){toast('Мало денег','bad');return;}
-    if(Math.random()<0.6){
-      moneySpend(2000,'Благодарность');
-      const v=curVehInst();v.wear=Math.max(0,v.wear-15);
-      breakdownActive=false;S.truck.traveling=true;
-      S.truck.wearStart=v.wear-S.truck.wearDelta*S.truck.progress;
-      $('modal').classList.remove('show');toast('👍 Износ −15%','ok');updateUI();
-    }else{advanceTime(360);toast('😞 Никто','bad');}
-  };
+  Modal.show(bdHtml, 1);
+  setTimeout(()=>{
+    const btnTow=$('btnTow');
+    if(btnTow)btnTow.onclick=()=>{
+      if(S.money<tc){toast('Мало денег','bad');return;}
+      moneySpend(tc,'Эвакуатор');
+      S.truck.cityIndex=ni;S.truck.local=false;S.truck.progress=0;breakdownActive=false;
+      Modal.next();
+      deliverAt(ni);addCityOrders(ni);refillATI();
+      toast(`🚛 Эвакуирован в ${CITIES[ni].n}`,'warn');updateUI();
+    };
+    const btnHitch=$('btnHitch');
+    if(btnHitch)btnHitch.onclick=()=>{
+      if(S.money<2000){toast('Мало денег','bad');return;}
+      if(Math.random()<0.6){
+        moneySpend(2000,'Благодарность');
+        const v=curVehInst();v.wear=Math.max(0,v.wear-15);
+        breakdownActive=false;S.truck.traveling=true;
+        S.truck.wearStart=v.wear-S.truck.wearDelta*S.truck.progress;
+        Modal.next();
+        toast('👍 Износ −15%','ok');updateUI();
+      } else {
+        advanceTime(360);
+        toast('😞 Никто','bad');
+      }
+    };
+  }, 0);
 }
 function takeOrder(id,payType){
   const o=atiOrders.find(x=>x.id===id);
@@ -1751,13 +1824,13 @@ function sellVehicle(id){
       <button id="sellYes" class="ok" style="flex:1">Продать за ${fmt(price)} ₽</button>
       <button id="sellNo" class="primary" style="flex:1">Отмена</button></div>`;
   $('modal').classList.add('show');
-  $('sellNo').onclick=()=>{$('modal').classList.remove('show');updateUI();};
+  $('sellNo').onclick=()=>{Modal.next();updateUI();};
   $('sellYes').onclick=()=>{
     moneyAdd(price,`Продажа ${v.n}`);
    addNews(`💸 Продажа: ${v.n} · +${fmt(price)} ₽`,'info','finance');
     S.ownedVehicles=S.ownedVehicles.filter(x=>x.id!==id);
     if(S.currentVehicleId===id)S.currentVehicleId=S.ownedVehicles.length?S.ownedVehicles[0].id:null;
-    $('modal').classList.remove('show');toast(`💸 ${fmt(price)} ₽`,'ok');updateUI();
+    Modal.next();toast(`💸 ${fmt(price)} ₽`,'ok');updateUI();
   };
 }
 
@@ -1872,9 +1945,9 @@ function openDriverHireModal(c){
   serviceIntervalOverride:null, repairThresholdOverride:null,
   stats:newDriverStats()});
       S.laborMarket=S.laborMarket.filter(x=>x.id!==c.id);refillLaborMarket();
-      $('modal').classList.remove('show');toast(`👷 ${c.name} нанят`,'ok');updateUI();
+      Modal.next();toast(`👷 ${c.name} нанят`,'ok');updateUI();
     };
-    const cc=$('drvCancel');if(cc)cc.onclick=()=>$('modal').classList.remove('show');
+    const cc=$('drvCancel');if(cc)cc.onclick=()=>Modal.next();
   }
   $('modal').classList.add('show');render();
 }
@@ -3043,12 +3116,12 @@ function sellBase(baseId){
       <button id="sbYes" class="bad" style="flex:1">Продать</button>
       <button id="sbNo" class="primary" style="flex:1">Отмена</button></div>`;
   $('modal').classList.add('show');
-  $('sbNo').onclick=()=>{$('modal').classList.remove('show');updateUI();};
+  $('sbNo').onclick=()=>{Modal.next();updateUI();};
   $('sbYes').onclick=()=>{
     moneyAdd(sellPrice,`Продажа базы ${bt.n}`);
     S.staff=S.staff.filter(s=>s.baseId!==baseId);
     S.bases=S.bases.filter(b=>b.id!==baseId);
-    $('modal').classList.remove('show');toast(`💸 ${fmt(sellPrice)} ₽`,'ok');updateUI();
+    Modal.next();toast(`💸 ${fmt(sellPrice)} ₽`,'ok');updateUI();
   };
 }
 function buyBaseUpgrade(baseId,key){
@@ -3201,9 +3274,9 @@ function openTrainModal(driverId){
   }
   html+=`<button class="wide primary" id="trainClose">Закрыть</button>`;
   $('modalBox').innerHTML=html;$('modal').classList.add('show');
-  $('trainClose').onclick=()=>$('modal').classList.remove('show');
+  $('trainClose').onclick=()=>Modal.next();
   $('modalBox').querySelectorAll('[data-course]').forEach(b=>{
-    b.onclick=()=>{trainDriver(driverId,b.dataset.course);$('modal').classList.remove('show');};});
+    b.onclick=()=>{trainDriver(driverId,b.dataset.course);Modal.next();};});
 }
 
 /* ============ МИР ============ */
@@ -3747,7 +3820,7 @@ function drawMap(){
 let adminOpen=false;
 function toggleAdmin(){
   adminOpen=!adminOpen;$('adminIndicator').style.display=adminOpen?'block':'none';
-  if(adminOpen)showAdminPanel();else $('modal').classList.remove('show');
+  if(adminOpen)showAdminPanel();else Modal.next();
 }
 let _adminArmUntil=0,_adminClickCount=0;
 $('adminBtn').onclick=()=>{
@@ -3912,9 +3985,9 @@ function loadGame(){
     if(S.autoRepairThreshold===undefined)S.autoRepairThreshold=70;
    if(S.ownedVehicles)for(const v of S.ownedVehicles){
   if(!v.insurance)v.insurance={osago:false,osagoExpires:0,osagoRenew:false,kasko:false,kaskoExpires:0,kaskoRenew:false};
-  if(v.lease&&v.lease.paid===undefined)v.lease.paid=v.lease.advance;
-  if(v.lease&&v.lease.missedPayments===undefined)v.lease.missedPayments=v.lease.debt||0;
+   if(v.lease&&v.lease.paid===undefined)v.lease.paid=v.lease.advance;
   if(v.lease&&v.lease.debt===undefined)v.lease.debt=0;
+  if(v.lease&&v.lease.missedPayments===undefined)v.lease.missedPayments=(v.lease.debt>0?1:0);
   /* === обратная совместимость ТО === */
   const mdl=VEHICLES[v.model];
   if(mdl){
@@ -3955,7 +4028,7 @@ function showStartCityPicker(){
       <button class="wide bad" id="btnNewGame" style="margin-top:6px">🆕 Новая игра</button>`;
     $('modal').classList.add('show');
     $('btnContinue').onclick=()=>{
-      if(loadGame()){$('modal').classList.remove('show');
+      if(loadGame()){Modal.next();
         if(S.truck.cityIndex===null&&!S.truck.traveling)S.truck.cityIndex=0;
         refillATI();refillLaborMarket();refillContracts();
         toast('💾 Загружено','ok');updateUI();
@@ -3980,7 +4053,7 @@ function showCityPicker(){
   $('modalBox').querySelectorAll('[data-city]').forEach(b=>{
     b.onclick=()=>{
       S.startCity=+b.dataset.city;S.truck.cityIndex=S.startCity;S.firmFounded=1;
-      S.season='summer';S.seasonDay=0;$('modal').classList.remove('show');
+      S.season='summer';S.seasonDay=0;Modal.next();
       const baseMax=VEHICLES.vaz2106.maxKm||100000;
 const rolledMax=Math.round(baseMax*rnd(0.85,1.15));
 S.ownedVehicles.push({id:'v'+(++vehIdCounter),model:'vaz2106',fuel:VEHICLES.vaz2106.tank,wear:0,odometer:0,upgrades:{},
@@ -4006,7 +4079,7 @@ let last=performance.now();
 let uiT=0,atiT=0,saveT=0,eventT=0,compT=0;
 function loop(now){
   let dt=(now-last)/1000;last=now;if(dt>0.15)dt=0.15;
-  advanceTime(dt*TIME_SCALE*(S.truck.traveling?1:0.4));
+advanceTime(dt*TIME_SCALE);
   if(S.truck.traveling&&!breakdownActive&&!S.truck.paused){
     S.truck.progress+=dt/S.truck.duration;
     const veh=curVehInst();
