@@ -1453,9 +1453,13 @@ w=Math.max(0.01, w); w=r3(w);
 }
 function refillATI(){
   atiOrders=atiOrders.filter(o=>o.expires>S.gameTime);const here=S.truck.cityIndex;
-  if(here!==null){const mine=atiOrders.filter(o=>o.from===here&&compatibleWith(o));const need=8-mine.length;
-    for(let i=0;i<need;i++){const o=makeOrder(here,true);if(o)atiOrders.push(o);}}
-  let s=0;while(atiOrders.length<30&&s<200){s++;const o=makeOrder();if(o)atiOrders.push(o);else break;}
+  if(here!==null){
+    const mine=atiOrders.filter(o=>o.from===here&&compatibleWith(o));
+    const target=ri(12,20);           // ← рандом 12-20 из твоего города
+    const need=target-mine.length;
+    for(let i=0;i<need;i++){const o=makeOrder(here,true);if(o)atiOrders.push(o);}
+  }
+  let s=0;while(atiOrders.length<60&&s<300){s++;const o=makeOrder();if(o)atiOrders.push(o);else break;}
 }
 function addCityOrders(idx){for(let i=0;i<5;i++){const o=makeOrder(idx,true);if(o)atiOrders.push(o);}for(let i=0;i<5;i++){const o=makeOrder(idx,false);if(o)atiOrders.push(o);}}
 function compatibleWith(o){return curCargoTypes().includes(o.ctype);}
