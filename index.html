@@ -806,7 +806,145 @@ const LEASE_TERMS = [
 ];
 const LEASE_PERIOD_DAYS = 15;
 const LEASE_FINE_PCT = 0.15;
+/* ============ ГОСНОМЕРА (v18.2) ============ */
+const PLATE_LETTERS = 'АВЕКМНОРСТУХ';
+const CITY_REGION_CODE = [
+  39,78,51,29,77,52,36,61,23,23,34,16,63,02,59,66,74,72,86,55,54,24,38,75,27,25,14,
+  'BY','KZ','FIN','CN'
+];
+const PLATE_LEVELS = {
+  normal:    {n:'Обычный',       icon:'😐', stopMul:1.0},
+  nice:      {n:'Красивый',      icon:'😎', stopMul:0.8},
+  elite:     {n:'Блатной',       icon:'💎', stopMul:0.5},
+  super:     {n:'Супер-блатной', icon:'👑', stopMul:0.2},
+  legendary: {n:'Легендарный',   icon:'⭐', stopMul:0.0},
+};
 
+function plateRndLetter(){return PLATE_LETTERS[Math.floor(Math.random()*PLATE_LETTERS.length)];}
+function plateRndDigit(){return String(Math.floor(Math.random()*10));}
+
+function rollPlateLevel(isReReg, isIntl){
+  // Международные: без super/legendary
+  if(isIntl){
+    const r = Math.random()*100;
+    if(r < 5) return 'elite';
+    if(r < 30) return 'nice';
+    return 'normal';
+  }
+  const r = Math.random()*100;
+  if(isReReg){
+    if(r < 0.05) return 'legendary';
+    if(r < 0.50) return 'super';
+    if(r < 3.00) return 'elite';
+    if(r < 15.50) return 'nice';
+    return 'normal';
+  } else {
+    if(r < 0.10) return 'legendary';
+    if(r < 1.00) return 'super';
+    if(r < 6.00) return 'elite';
+    if(r < 31.00) return 'nice';
+    return 'normal';
+  }
+}
+
+function makeNiceDigits(){
+  const seq = ['123','234','345','456','567','678','789',
+               '987','876','765','654','543','432','321',
+               '002','003','004','005','006','007','008','009',
+               '100','200','300','400','500','600','700','800','900',
+               '101','202','303','404','505','606','707','808','909'];
+  return seq[Math.floor(Math.random()*seq.length)];
+}
+function makeEliteDigits(){
+  return String(Math.floor(Math.random()*10)).repeat(3);
+}
+function makeEliteLetters(){
+  return PLATE_LETTERS[Math.floor(Math.random()*PLATE_LETTERS.length)].repeat(3);
+}
+
+function genPlateText(level, cityIdx){
+  const code = CITY_REGION_CODE[cityIdx];
+  const isIntl = typeof code === 'string';
+  if(isIntl){
+    if(code === 'BY'){
+      const d = String(Math.floor(Math.random()*9000)+1000);
+      const l = plateRndLetter()+plateRndLetter();
+      const last = Math.floor(Math.random()*10);
+      return `${d} ${l}-${last}`;
+    }
+    if(code === 'KZ'){
+      const d = String(Math.floor(Math.random()*1000)).padStart(3,'0');
+      const l = plateRndLetter()+plateRndLetter()+plateRndLetter();
+      const rg = String(Math.floor(Math.random()*20)).padStart(2,'0');
+      return `${d} ${l} ${rg}`;
+    }
+    if(code === 'FIN'){
+      const l = plateRndLetter()+plateRndLetter()+plateRndLetter();
+      const d = String(Math.floor(Math.random()*1000)).padStart(3,'0');
+      return `${l}-${d}`;
+    }
+    if(code === 'CN'){
+      const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+      const l = letters[Math.floor(Math.random()*letters.length)];
+      const d = String(Math.floor(Math.random()*100000)).padStart(5,'0');
+      return `京${l}·${d}`;
+    }
+    return '—';
+  }
+  let digits, letters;
+  if(level === 'nice'){
+    digits = makeNiceDigits();
+    letters = plateRndLetter()+plateRndLetter();
+  } else if(level === 'elite'){
+    if(Math.random() < 0.5){
+      digits = makeEliteDigits();
+      letters = plateRndLetter()+plateRndLetter();
+    } else {
+      digits = String(Math.floor(Math.random()*1000)).padStart(3,'0');
+      letters = makeEliteLetters();
+    }
+  } else if(level === 'super' || level === 'legendary'){
+    digits = makeEliteDigits();
+    letters = makeEliteLetters();
+  } else {
+    digits = String(Math.floor(Math.random()*1000)).padStart(3,'0');
+    letters = plateRndLetter()+plateRndLetter();
+  }
+  const b1 = plateRndLetter();
+  return `${b1}${digits}${letters} ${code}`;
+}
+
+function generatePlate(cityIdx, isReReg){
+  const code = CITY_REGION_CODE[cityIdx];
+  const isIntl = typeof code === 'string';
+  let level = rollPlateLevel(isReReg, isIntl);
+  let text = genPlateText(level, cityIdx);
+  const taken = new Set();
+  for(const v of S.ownedVehicles){
+    if(v.plate && v.plate.text) taken.add(v.plate.text);
+  }
+  let attempts = 0;
+  while(taken.has(text) && attempts < 10){
+    attempts++;
+    level = rollPlateLevel(isReReg, isIntl);
+    text = genPlateText(level, cityIdx);
+  }
+  return {text, level, regionCode: code, registeredAt: S.gameTime};
+}
+
+function plateStopMultiplier(inst){
+  if(!inst || !inst.plate) return 2.0;
+  const p = inst.plate;
+  if(p.level === 'legendary'){
+    const here = S.truck.cityIndex;
+    if(here === null) return 0.2;
+    const hereCode = CITY_REGION_CODE[here];
+    if(hereCode !== p.regionCode) return 0.2;
+    return 0.0;
+  }
+  const lv = PLATE_LEVELS[p.level];
+  return lv ? lv.stopMul : 1.0;
+}
 let vehIdCounter=1,trlIdCounter=1,drvIdCounter=1,contractId=1,baseIdCounter=1,questId=1,tenderId=1;
 const S = {
   money: START_MONEY,
