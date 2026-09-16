@@ -480,10 +480,16 @@ button.sm{font-size:10px;padding:3px 7px}
   .tb-obl-row:hover{background:#16243a}
   .tb-obl-more:hover{color:#7ad6ff}
 }
-#ticker{position:absolute;top:10px;left:70px;right:70px;padding:6px 10px;background:#0f1722ee;
+#ticker{
+  grid-column:1;grid-row:2;
+  justify-self:end;align-self:start;
+  margin:6px 8px 8px;
+  padding:6px 10px;background:#0f1722ee;
   border:1px solid #2f4a75;border-radius:6px;font-size:11px;color:#a9bdd8;cursor:pointer;
   backdrop-filter:blur(6px);display:flex;align-items:center;gap:8px;z-index:4;overflow:hidden;
-  transition:.15s;user-select:none}
+  transition:.15s;user-select:none;
+  min-width:260px;max-width:min(560px,50%);
+}
 #ticker:hover{background:#1f2d42;border-color:#4da3ff}
 #ticker .dot-unread{width:8px;height:8px;background:#ff6b6b;border-radius:50%;
   box-shadow:0 0 8px #ff6b6b;flex-shrink:0;display:none}
@@ -516,10 +522,8 @@ button.sm{font-size:10px;padding:3px 7px}
 .j-ln:last-child{border-bottom:0}
 .j-ln .t{color:#4d6080;font-size:10px;flex-shrink:0}
 @media(max-width:880px){
-  #ticker{top:6px;top:calc(6px + env(safe-area-inset-top));left:54px;right:54px;
-    padding:8px 10px;font-size:11.5px;min-height:36px}
   #journalOverlay{padding:0;padding-top:env(safe-area-inset-top);
-    padding-bottom:env(safe-area-inset-bottom)}
+    padding-bottom:env(safe-area-inset-bottom);}
   #journalBox{max-width:none;height:100%;max-height:none;border-radius:0;
     border-left:0;border-right:0}
 }
@@ -556,16 +560,16 @@ button.sm{font-size:10px;padding:3px 7px}
       </div>
     </div>
     <div class="tb-obl hidden" id="uiObligations"></div>
+    <div id="ticker" title="Открыть журнал событий">
+      <span class="dot-unread"></span>
+      <span class="content">Пока нет событий</span>
+    </div>
   </div>
 
   <div id="body">
     <div id="mapWrap">
-      <canvas id="map"></canvas>
-	        <div id="ticker" title="Открыть журнал событий">
-        <span class="dot-unread"></span>
-        <span class="content">Пока нет событий</span>
-      </div>
-      <div id="zoomCtrl"><button id="zoomIn">+</button><button id="zoomOut">−</button><button id="zoomReset" style="font-size:12px">⌂</button></div>
+  <canvas id="map"></canvas>
+  <div id="zoomCtrl"><button id="zoomIn">+</button><button id="zoomOut">−</button><button id="zoomReset" style="font-size:12px">⌂</button></div>
       <button id="adminBtn" title="F9">⚙</button>
       <div id="adminIndicator">ADMIN</div>
       <div id="toasts"></div>
@@ -614,6 +618,7 @@ button.sm{font-size:10px;padding:3px 7px}
 <script>
 /* ============ ГЛОБАЛЬНЫЙ ПЕРЕХВАТ ОШИБОК ============ */
 window.addEventListener('error',function(e){
+  if(e.message && String(e.message).indexOf('ResizeObserver loop') !== -1) return;
   try{
     var el=document.getElementById('__errOverlay');
     if(!el){
