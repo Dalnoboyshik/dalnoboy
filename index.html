@@ -4769,6 +4769,7 @@ function loadGame(){
     return true;
   }catch(e){console.warn('loadGame fail:',e);return false;}
 }
+	function clearSave(){try{localStorage.removeItem(SAVE_KEY);}catch(e){}}
 /* ============ ТУЛТИПЫ НА ВКЛАДКИ ============ */
 const TAB_TIPS = {
   orders:{icon:'📋',title:'Биржа заказов',desc:'Здесь ты берёшь работу — грузы со всей страны.',
