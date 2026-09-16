@@ -653,7 +653,6 @@ const CITIES = [
   {n:'Туапсе',lat:44.10,lon:39.08,pop:4,type:'port'},
   {n:'Ейск',lat:46.71,lon:38.27,pop:4,type:'port'},
 ];
-];
 const LON_MIN=18,LON_MAX=140,LAT_MIN=35,LAT_MAX=72;
 CITIES.forEach(c=>{c.px=(c.lon-LON_MIN)/(LON_MAX-LON_MIN);c.py=(LAT_MAX-c.lat)/(LAT_MAX-LAT_MIN);});
 function regionOf(i){for(const k in REGIONS)if(REGIONS[k].cities.includes(i))return k;return null;}
