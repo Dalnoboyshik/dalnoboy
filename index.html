@@ -3063,8 +3063,8 @@ function orderCard(o){
     : o.orderType==='urgent'
     ? `<span class="badge urgent">🟡 Срочный ×1.3</span>`
     : `<span class="badge">🟢 Обычный</span>`;
-  const localTag = o.local ? ` <span style="color:#7ad6ff;font-size:11px">🏙️ (лок)</span>` : '';
-  const routeLbl = `${CITIES[o.from].n} → ${CITIES[o.to].n}`;
+ const routeLbl = o.local ? CITIES[o.from].n : `${CITIES[o.from].n} → ${CITIES[o.to].n}`;
+const localTag = o.local ? ` <span style="color:#7ad6ff;font-size:11px">🏙️ (по городу)</span>` : '';
   let sb='';
   if(!comp) sb += `<span class="badge" style="background:#4a1b22;color:#ff8d99">не подходит</span>`;
   if(!hasLicense(o.ctype)) sb += `<span class="badge" style="background:#4a1b22;color:#ff8d99">нужна лицензия</span>`;
