@@ -1103,11 +1103,16 @@ function upLevel(inst,k){return inst&&inst.upgrades?(inst.upgrades[k]||0):0;}
 function vehSpeed(inst){return Math.round(VEHICLES[inst.model].speed*(1+upLevel(inst,'chip')*0.05));}
 function vehCons(inst){const season=SEASONS[S.season];const base=VEHICLES[inst.model].cons*(1-upLevel(inst,'aero')*0.07);return base*season.fuelMul*(1+S.achEffects.fuel);}
 function vehTank(inst){return Math.round(VEHICLES[inst.model].tank*(1+upLevel(inst,'tank')*0.25));}
-function serviceOverdue(inst){
+function serviceIntervalOf(inst){
   const v=VEHICLES[inst.model];
-  if(!v.serviceInterval)return 0;
+  const base=v?v.serviceInterval:0;
+  return inst.serviceIntervalOverride || S.autoServiceInterval || base || 0;
+}
+function serviceOverdue(inst){
+  const interval=serviceIntervalOf(inst);
+  if(!interval)return 0;
   const since=(inst.odometer||0)-(inst.lastServiceOdometer||0);
-  return Math.max(0, since-v.serviceInterval);
+  return Math.max(0, since-interval);
 }
 function servicePenalty(inst){
   const od=serviceOverdue(inst);
@@ -1131,10 +1136,11 @@ function applyServiceEffect(inst, overdue){
   const base=VEHICLES[inst.model].maxKm||500000;
   const cap=base*2;
   const floor=base*0.3;
+  const interval=serviceIntervalOf(inst)||10000;
   if(overdue<=0){
     inst.maxKm=Math.min(cap, Math.round((inst.maxKm||base)+base*0.03));
   } else {
-    const tier=Math.min(3, Math.floor(overdue/(VEHICLES[inst.model].serviceInterval||10000))+1);
+    const tier=Math.min(3, Math.floor(overdue/interval)+1);
     inst.maxKm=Math.max(floor, Math.round((inst.maxKm||base)-base*0.05*tier));
   }
   inst.lastServiceOdometer=inst.odometer||0;
@@ -1150,7 +1156,7 @@ function resourceDepleted(inst){
 function serviceCost(inst){
   const v=VEHICLES[inst.model];
   const od=serviceOverdue(inst);
-  const interval=v.serviceInterval||10000;
+  const interval=serviceIntervalOf(inst)||10000;
   return Math.round(v.repairFull*0.05*(1+od/interval));
 }
 function vehRadius(inst){let r=VEHICLES[inst.model].radius;if(upLevel(inst,'gps')>0)r=Math.round(r*1.11);return r;}
@@ -2296,7 +2302,7 @@ function driverAutoService(d,inst){
   if(!d.stats)d.stats=newDriverStats();
   const v=driverVehModel(d);if(!v)return;
   // === Авто-ТО (всегда включено) ===
-  const interval=d.serviceIntervalOverride||S.autoServiceInterval||v.serviceInterval||30000;
+  const interval=serviceIntervalOf(inst)||30000;
   const sinceS=(inst.odometer||0)-(inst.lastServiceOdometer||0);
   if(sinceS>=interval){
     const od=serviceOverdue(inst);
@@ -3068,13 +3074,28 @@ function renderAuto(){
     const rr=$('btnReplate');if(rr)rr.onclick=()=>openPlateModal(S.currentVehicleId, true);
     p.querySelectorAll('[data-up]').forEach(b=>{b.onclick=()=>buyUpgrade(b.dataset.up);});
   }
-     if(sub==='garage'){
+       if(sub==='garage'){
     p.querySelectorAll('[data-select-vehicle]').forEach(b=>{b.onclick=()=>selectVehicle(b.dataset.selectVehicle);});
     p.querySelectorAll('[data-select-trailer]').forEach(b=>{b.onclick=()=>selectTrailer(b.dataset.selectTrailer);});
     p.querySelectorAll('[data-buyout-fleet]').forEach(b=>{b.onclick=()=>buyoutLease(b.dataset.buyoutFleet);});
     p.querySelectorAll('[data-paydebt-fleet]').forEach(b=>{b.onclick=()=>payLeaseDebt(b.dataset.paydebtFleet);});
     p.querySelectorAll('[data-regplate]').forEach(b=>{b.onclick=()=>openPlateModal(b.dataset.regplate, false);});
     p.querySelectorAll('[data-replate]').forEach(b=>{b.onclick=()=>openPlateModal(b.dataset.replate, true);});
+    p.querySelectorAll('[data-saveint]').forEach(b=>{b.onclick=()=>{
+      const id=b.dataset.saveint;
+      const inp=p.querySelector(`[data-serviceint="${id}"]`);
+      const inst=getVeh(id);if(!inst||!inp)return;
+      const v=parseInt(inp.value,10);
+      if(!v||v<5000||v>100000){inst.serviceIntervalOverride=null;toast('🛠 Сброшено к общему','ok');}
+      else{inst.serviceIntervalOverride=v;toast(`🛠 ${VEHICLES[inst.model].n}: ТО каждые ${fmt(v)} км`,'ok');}
+      updateUI();
+    };});
+    p.querySelectorAll('[data-resetint]').forEach(b=>{b.onclick=()=>{
+      const inst=getVeh(b.dataset.resetint);if(!inst)return;
+      inst.serviceIntervalOverride=null;
+      toast('🛠 Сброшено к общему','ok');
+      updateUI();
+    };});
   }
   if(sub==='shop'){
     p.querySelectorAll('[data-buy-vehicle]').forEach(b=>{b.onclick=()=>buyVehicle(b.dataset.buyVehicle);});
@@ -3117,14 +3138,15 @@ function autoCurrentContent(){
     ${inst.lease.debt>0?`<div class="row"><span class="muted">Долг (${inst.lease.missedPayments}/2)</span><b style="color:#ff6b6b">${fmt(inst.lease.debt)} ₽</b></div>`:''}
   </div>`:''}
    <h3>Ресурс и ТО</h3>
-  ${(()=>{
+ 
+     ${(()=>{
     const vv=VEHICLES[inst.model];
-    if(!vv.serviceInterval) return `<div class="card"><div class="muted">Для этой машины ТО не предусмотрено</div></div>`;
+    const interval=serviceIntervalOf(inst);
+    if(!interval) return `<div class="card"><div class="muted">Для этой машины ТО не предусмотрено</div></div>`;
     const maxKm=getInstMaxKm(inst);
     const odoPct=Math.min(100,(odo/maxKm)*100);
     const sinceS=(inst.odometer||0)-(inst.lastServiceOdometer||0);
     const od=serviceOverdue(inst);
-    const interval=vv.serviceInterval;
     const servicePct=Math.min(100,(sinceS/interval)*100);
     const odoColor = odoPct>80?'#ff6b6b':odoPct>60?'#ffb84d':'#39d98a';
     const sColor = od>0?'#ff6b6b':servicePct>80?'#ffb84d':'#39d98a';
@@ -3150,11 +3172,12 @@ function autoCurrentContent(){
   <button class="big ok" id="btnRepair" ${S.truck.traveling?'disabled':''}>
     <span class="ic">🔧</span> Ремонт ${wear>1?`<span class="sub">${fmt(rc)} ₽</span>`:`<span class="sub">не нужен</span>`}</button>
   ${(()=>{
+   
     const vv=VEHICLES[inst.model];
-    if(!vv.serviceInterval) return '';
+    const interval=serviceIntervalOf(inst);
+    if(!interval) return '';
     const sinceS=(inst.odometer||0)-(inst.lastServiceOdometer||0);
     const od=serviceOverdue(inst);
-    const interval=vv.serviceInterval;
     const needRed = od>0 || wear>=80;
     const needYellow = sinceS>=interval*0.7 || wear>=50;
     if(!needRed && !needYellow) return '';
@@ -3197,8 +3220,8 @@ function autoGarageContent(){
       const isCur=i.id===S.currentVehicleId;const w=Math.round(i.wear);
       const odo3=i.odometer||0;
       const maxK3=getInstMaxKm(i);
-      const sinceS3=(i.odometer||0)-(i.lastServiceOdometer||0);
-      const interval3=ov.serviceInterval||30000;
+            const sinceS3=(i.odometer||0)-(i.lastServiceOdometer||0);
+      const interval3=serviceIntervalOf(i)||30000;
       const od3=serviceOverdue(i);
       const odoPct3=Math.min(100,(odo3/maxK3)*100);
       const sPct3=Math.min(100,(sinceS3/interval3)*100);
@@ -3220,10 +3243,18 @@ function autoGarageContent(){
           <button class="gold" data-buyout-fleet="${i.id}" style="flex:1">🏦 Досрочно выкупить</button>
           ${i.lease.debt>0?`<button class="bad" data-paydebt-fleet="${i.id}" style="flex:1">💳 Долг ${fmt(i.lease.debt)} ₽</button>`:''}
         </div>`:''}
-        <div class="row" style="margin-top:6px;gap:5px">
+             <div class="row" style="margin-top:6px;gap:5px">
           ${i.plate
             ? `<button class="gold" data-replate="${i.id}" style="flex:1">🔄 Сменить номер · 15 000 ₽</button>`
             : `<button class="ok" data-regplate="${i.id}" style="flex:1">📋 Поставить на учёт · 15 000 ₽</button>`}
+        </div>
+        <div class="row" style="margin-top:6px;gap:5px;align-items:center">
+          <span class="muted" style="font-size:10.5px;flex:0 0 auto">🛠 ТО каждые</span>
+          <input type="number" data-serviceint="${i.id}" value="${i.serviceIntervalOverride||''}" placeholder="${S.autoServiceInterval||''}" min="5000" max="100000" step="1000"
+            style="width:80px;background:#0a1119;border:1px solid #1e2c3f;border-radius:5px;color:#e8eef7;padding:4px 6px;font-size:11px;font-family:inherit">
+          <span class="muted" style="font-size:10.5px;flex:0 0 auto">км</span>
+          <button class="sm ok" data-saveint="${i.id}">OK</button>
+          ${i.serviceIntervalOverride?`<button class="sm warn" data-resetint="${i.id}">Сброс</button>`:''}
         </div>
       </div>`;
     }
@@ -3504,7 +3535,7 @@ function laborStaffContent(){
     const traitsHtml=(d.traits||[]).map(t=>`<span class="badge ${DRIVER_TRAITS[t].cls}">${DRIVER_TRAITS[t].icon}</span>`).join('');
     const odo2=v?(v.odometer||0):0;const maxK=v?getInstMaxKm(v):0;
     const sinceS2=v?((v.odometer||0)-(v.lastServiceOdometer||0)):0;
-    const interval2=v?(VEHICLES[v.model].serviceInterval||30000):30000;
+        const interval2=v?(serviceIntervalOf(v)||30000):30000;
     const od2=v?serviceOverdue(v):0;
     const w2=v?Math.round(v.wear):0;
     const sickBadge=d.sick>0?'🤒':(d.needsReplacement?'⚠️ ресурс':(d.unpaidService?'⚠️ ТО':(d.status==='trip'?'🚚':'🅿️')));
@@ -4370,6 +4401,7 @@ function loadGame(){
     if(S.autoRepairThreshold===undefined)S.autoRepairThreshold=70;
    if(S.ownedVehicles)for(const v of S.ownedVehicles){
   if(!v.insurance)v.insurance={osago:false,osagoExpires:0,osagoRenew:false,kasko:false,kaskoExpires:0,kaskoRenew:false};
+	     if(v.serviceIntervalOverride===undefined)v.serviceIntervalOverride=null;
    if(v.lease&&v.lease.paid===undefined)v.lease.paid=v.lease.advance;
   if(v.lease&&v.lease.debt===undefined)v.lease.debt=0;
   if(v.lease&&v.lease.missedPayments===undefined)v.lease.missedPayments=(v.lease.debt>0?1:0);
