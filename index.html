@@ -1309,11 +1309,14 @@ function servicePenalty(inst){
   if(od<=30000)return 2.5;
   return 4;
 }
-function vehWearRate(inst){
-  const base=(VEHICLES[inst.model].wearRate||0.05)*WEAR_MULT*(1-upLevel(inst,'tires')*0.20);
-  const overload=truckLoad()/Math.max(0.1,curCap());
-  const overloadPenalty=overload>1?1+(overload-1)*2.5:1;
-  return base*servicePenalty(inst)*overloadPenalty;
+function vehWearRate(inst, forDriver){
+  const base = (VEHICLES[inst.model].wearRate||0.05)*WEAR_MULT*(1-upLevel(inst,'tires')*0.20);
+  let overloadPenalty = 1;
+  if(!forDriver){
+    const overload = truckLoad()/Math.max(0.1, curCap());
+    overloadPenalty = overload>1 ? 1+(overload-1)*2.5 : 1;
+  }
+  return base * servicePenalty(inst) * overloadPenalty;
 }
 	/* ===== ТО и ресурс ===== */
 function getInstMaxKm(inst){
@@ -3247,7 +3250,7 @@ const pay=Math.round(rate*target.km*loadMul*ratingMul*expMul);
         if(!driverAutoRefuel(d,inst,target.km)){d.status='idle';d.waitingFunding=true;continue;}
         d.waitingFunding=false;
         const nf=target.km*driverVehModel(d).cons/100*SEASONS[S.season].fuelMul;
-        inst.fuel-=nf;const wr=vehWearRate(inst);
+        inst.fuel-=nf;const wr=vehWearRate(inst, true);
         inst.wear=Math.min(100,inst.wear+target.km*wr);
         inst.odometer=(inst.odometer||0)+target.km;
       // Скорость берём от машины + сезон + черта лени
