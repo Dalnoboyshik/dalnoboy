@@ -1309,15 +1309,25 @@ function getInstMaxKm(inst){
   return inst.maxKm;
 }
 function applyServiceEffect(inst, overdue){
-  const base=VEHICLES[inst.model].maxKm||500000;
+  const v=VEHICLES[inst.model];
+  const base=v.maxKm||500000;
   const cap=base*2;
   const floor=base*0.3;
   const interval=serviceIntervalOf(inst)||10000;
+  const baseInterval=v.serviceInterval||10000;
+  // Отклонение от регламента: 1.0 = заводской, 0.5 = вдвое чаще, 1.5 = вдвое реже
+  const mult=clamp(interval/baseInterval, 0.5, 1.5);
+
   if(overdue<=0){
-    inst.maxKm=Math.min(cap, Math.round((inst.maxKm||base)+base*0.03));
+    // Бонус за дисциплину: 0.5× → +6.5%, 1.0× → +2%, 1.5× → −2.5%
+    const bonusPct = 0.02 - (mult - 1.0) * 0.09;
+    const delta = Math.round(base * bonusPct);
+    inst.maxKm = clamp(inst.maxKm + delta, floor, cap);
+    inst.lastServiceTier = bonusPct >= 0 ? 'good' : 'warn';
   } else {
     const tier=Math.min(3, Math.floor(overdue/interval)+1);
     inst.maxKm=Math.max(floor, Math.round((inst.maxKm||base)-base*0.05*tier));
+    inst.lastServiceTier = 'bad';
   }
   inst.lastServiceOdometer=inst.odometer||0;
 }
@@ -3416,15 +3426,27 @@ function renderAuto(){
     p.querySelectorAll('[data-paydebt-fleet]').forEach(b=>{b.onclick=()=>payLeaseDebt(b.dataset.paydebtFleet);});
     p.querySelectorAll('[data-regplate]').forEach(b=>{b.onclick=()=>openPlateModal(b.dataset.regplate, false);});
     p.querySelectorAll('[data-replate]').forEach(b=>{b.onclick=()=>openPlateModal(b.dataset.replate, true);});
-    p.querySelectorAll('[data-saveint]').forEach(b=>{b.onclick=()=>{
-      const id=b.dataset.saveint;
-      const inp=p.querySelector(`[data-serviceint="${id}"]`);
-      const inst=getVeh(id);if(!inst||!inp)return;
-      const v=parseInt(inp.value,10);
-      if(!v||v<5000||v>100000){inst.serviceIntervalOverride=null;toast('🛠 Сброшено к общему','ok');}
-      else{inst.serviceIntervalOverride=v;toast(`🛠 ${VEHICLES[inst.model].n}: ТО каждые ${fmt(v)} км`,'ok');}
-      updateUI();
-    };});
+   p.querySelectorAll('[data-saveint]').forEach(b=>{b.onclick=()=>{
+  const id=b.dataset.saveint;
+  const inp=p.querySelector(`[data-serviceint="${id}"]`);
+  const inst=getVeh(id);if(!inst||!inp)return;
+  const vBase=VEHICLES[inst.model].serviceInterval||10000;
+  const minInt=Math.round(vBase*0.5);
+  const maxInt=Math.round(vBase*1.5);
+  const v=parseInt(inp.value,10);
+  if(!v||v<minInt||v>maxInt){
+    inst.serviceIntervalOverride=null;
+    toast(`🛠 Допустимо ${fmt(minInt)}–${fmt(maxInt)} км. Сброшено к регламенту`,'warn');
+  } else if(v===vBase){
+    inst.serviceIntervalOverride=null;
+    toast(`🛠 ${VEHICLES[inst.model].n}: регламент ${fmt(vBase)} км`,'ok');
+  } else {
+    inst.serviceIntervalOverride=v;
+    const mult=(v/vBase).toFixed(2);
+    toast(`🛠 ${VEHICLES[inst.model].n}: ТО каждые ${fmt(v)} км (×${mult} от регламента)`,'ok');
+  }
+  updateUI();
+};});
     p.querySelectorAll('[data-resetint]').forEach(b=>{b.onclick=()=>{
       const inst=getVeh(b.dataset.resetint);if(!inst)return;
       inst.serviceIntervalOverride=null;
@@ -3565,6 +3587,13 @@ function autoGarageContent(){
       const sPct3=Math.min(100,(sinceS3/interval3)*100);
       const odoCol3=odoPct3>80?'#ff6b6b':odoPct3>60?'#ffb84d':'#39d98a';
       const sCol3=od3>0?'#ff6b6b':sPct3>80?'#ffb84d':'#39d98a';
+		  const vBase=VEHICLES[i.model].serviceInterval||10000;
+  const minInt=Math.round(vBase*0.5);
+  const maxInt=Math.round(vBase*1.5);
+  const curInt=i.serviceIntervalOverride||vBase;
+  const mult=(curInt/vBase).toFixed(2);
+  const bonusPct=((0.02-(curInt/vBase-1)*0.09)*100).toFixed(1);
+  const bonusColor=bonusPct>0?'#5ef0a0':bonusPct<0?'#ff8d99':'#cfe0f5';
           html+=`<div class="card ${isCur?'hl':''}">
         <div class="row">
                    <span class="route">${ov.icon} ${ov.n} <span class="veh-cat">${catName(vehCategory(i.model))}</span>
@@ -3586,10 +3615,16 @@ function autoGarageContent(){
             ? `<button class="gold" data-replate="${i.id}" style="flex:1">🔄 Сменить номер · 15 000 ₽</button>`
             : `<button class="ok" data-regplate="${i.id}" style="flex:1">📋 Поставить на учёт · 15 000 ₽</button>`}
         </div>
+             <div class="drv-stats" style="margin-top:6px">
+          <div class="ln"><span>🛠 Регламент ТО</span><b>${fmt(vBase)} км</b></div>
+          <div class="ln"><span>Допустимо</span><b>${fmt(minInt)} – ${fmt(maxInt)} км</b></div>
+          <div class="ln"><span>Твой интервал</span><b>${fmt(curInt)} км (×${mult})</b></div>
+          <div class="ln"><span>Бонус ресурса</span><b style="color:${bonusColor}">${bonusPct>0?'+':''}${bonusPct}% за ТО</b></div>
+        </div>
         <div class="row" style="margin-top:6px;gap:5px;align-items:center">
           <span class="muted" style="font-size:10.5px;flex:0 0 auto">🛠 ТО каждые</span>
-          <input type="number" data-serviceint="${i.id}" value="${i.serviceIntervalOverride||''}" placeholder="${S.autoServiceInterval||''}" min="5000" max="100000" step="1000"
-            style="width:80px;background:#0a1119;border:1px solid #1e2c3f;border-radius:5px;color:#e8eef7;padding:4px 6px;font-size:11px;font-family:inherit">
+          <input type="number" data-serviceint="${i.id}" value="${curInt}" min="${minInt}" max="${maxInt}" step="500"
+            style="width:90px;background:#0a1119;border:1px solid #1e2c3f;border-radius:5px;color:#e8eef7;padding:4px 6px;font-size:11px;font-family:inherit">
           <span class="muted" style="font-size:10.5px;flex:0 0 auto">км</span>
           <button class="sm ok" data-saveint="${i.id}">OK</button>
           ${i.serviceIntervalOverride?`<button class="sm warn" data-resetint="${i.id}">Сброс</button>`:''}
