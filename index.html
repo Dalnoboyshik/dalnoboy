@@ -3492,13 +3492,13 @@ function autoCurrentContent(){
     const vv=VEHICLES[inst.model];
     const interval=serviceIntervalOf(inst);
     if(!interval) return '';
-    const sinceS=(inst.odometer||0)-(inst.lastServiceOdometer||0);
+     const sinceS=(inst.odometer||0)-(inst.lastServiceOdometer||0);
     const od=serviceOverdue(inst);
-    const needRed = od>0 || wear>=80;
-    const needYellow = sinceS>=interval*0.7 || wear>=50;
+    const needRed = od>0;
+    const needYellow = sinceS>=interval*0.7;
     if(!needRed && !needYellow) return '';
     const cls = needRed ? 'bad' : 'warn';
-    const label = needRed ? '🔴 ТО срочно' : '🟡 ТО пора';
+    const label = needRed ? '🔴 ТО просрочено' : '🟡 ТО пора';
     const cost = serviceCost(inst);
     return `<button class="big ${cls}" id="btnService" ${S.truck.traveling?'disabled':''}>
       <span class="ic">🛠</span> ${label} <span class="sub">${fmt(cost)} ₽ · 2 ч</span></button>`;
