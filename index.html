@@ -1822,16 +1822,21 @@ function openInsuranceModal(){
     const doO=$('insOsago').checked,doK=$('insKasko').checked;
     const renew=$('insRenew').checked,all=$('insAll').checked;
     const targets=all?list:[curVehInst()].filter(Boolean);
-    let total=0;
+       let total=0;
     for(const v of targets){
-      const ins=ensureInsurance(v);
-      if(doO&&!hasOsago(v)){total+=osagoCost(v);ins.osago=true;ins.osagoExpires=S.gameTime+INS_YEAR;}
-      if(doK&&!hasKasko(v)){total+=kaskoCost(v);ins.kasko=true;ins.kaskoExpires=S.gameTime+INS_YEAR;}
-      if(doO)ins.osagoRenew=renew;if(doK)ins.kaskoRenew=renew;
+      if(doO&&!hasOsago(v)) total+=osagoCost(v);
+      if(doK&&!hasKasko(v)) total+=kaskoCost(v);
     }
     if(total===0){toast('Нечего менять','warn');return;}
     if(S.money<total){toast(`Нужно ${fmt(total)} ₽`,'bad');return;}
     moneySpend(total,'Страхование');
+    for(const v of targets){
+      const ins=ensureInsurance(v);
+      if(doO&&!hasOsago(v)){ins.osago=true;ins.osagoExpires=S.gameTime+INS_YEAR;}
+      if(doK&&!hasKasko(v)){ins.kasko=true;ins.kaskoExpires=S.gameTime+INS_YEAR;}
+      if(doO)ins.osagoRenew=renew;
+      if(doK)ins.kaskoRenew=renew;
+    }
     Modal.next();
     toast(`🛡️ Застраховано ${targets.length} за ${fmt(total)} ₽`,'ok');updateUI();
   };
