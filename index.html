@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Дальнобойщик: Путь к успеху v18.2</title>
 <style>
-/* ============ ТУЛТИПЫ НА ВКЛАДКИ ============ */
+/* ============ ТУЛТИПЫ НА ВКЛАДКИ ==== ======== */
 .tab-tip{
   position:absolute;bottom:calc(100% + 10px);left:50%;
   transform:translateX(-50%) translateY(4px);
@@ -848,15 +848,15 @@ const CARGO = {
 };
 
 const VEHICLES = {
- vaz2106:{n:'ВАЗ-2106',icon:'🚗',cls:'car',cap:0.15,speed:100,tank:40,cons:7,radius:250,price:45000,sellPrice:40000,wearRate:0.25,repairFull:8000,cargo:['docs','parcel','small'],desc:'Легендарная классика.',maxKm:100000,serviceInterval:10000},
-vaz2114:{n:'ВАЗ-2114',icon:'🚗',cls:'car',cap:0.25,speed:120,tank:45,cons:6.5,radius:350,price:135000,sellPrice:100000,wearRate:0.18,repairFull:15000,cargo:['docs','parcel','small','food_small'],desc:'Проворный хэтчбек.',maxKm:150000,serviceInterval:10000},
-granta:{n:'Лада Гранта',icon:'🚗',cls:'car',cap:0.3,speed:145,tank:50,cons:5.5,radius:450,price:400000,sellPrice:280000,wearRate:0.15,repairFull:25000,cargo:['docs','parcel','small','food_small'],desc:'Быстрая легковушка.',maxKm:200000,serviceInterval:15000},
-largus:{n:'Лада Ларгус',icon:'🚐',cls:'van',cap:1.0,speed:130,tank:55,cons:7.5,radius:400,price:800000,sellPrice:550000,wearRate:0.09,repairFull:40000,cargo:['parcel','small','furniture','appliances','food_small','textile'],desc:'Универсал.',maxKm:250000,serviceInterval:15000},
-sobol:{n:'ГАЗ Соболь',icon:'🚐',cls:'van',cap:1.5,speed:120,tank:70,cons:9,radius:450,price:995000,sellPrice:700000,wearRate:0.08,repairFull:50000,cargo:['parcel','furniture','appliances','food_small','textile','general'],desc:'Рамный фургон.',maxKm:300000,serviceInterval:15000},
-	passat:{n:'Volkswagen Passat B8',icon:'🚗',cls:'car',cap:0.4,speed:180,tank:66,cons:7,radius:700,price:1200000,sellPrice:900000,wearRate:0.10,repairFull:35000,cargo:['docs','parcel','small','food_small'],desc:'Первый премиум. Быстрее и дальше Гранты.',maxKm:400000,serviceInterval:15000},
-bmw5:{n:'BMW 5 Series',icon:'🚗',cls:'car',cap:0.45,speed:210,tank:68,cons:8,radius:900,price:3500000,sellPrice:2500000,wearRate:0.09,repairFull:70000,cargo:['docs','parcel','small','food_small'],desc:'Бизнес-класс. Быстрая и статусная.',maxKm:500000,serviceInterval:20000},
-audi_rs6:{n:'Audi RS6 Avant',icon:'🚗',cls:'car',cap:0.55,speed:250,tank:73,cons:11,radius:1000,price:6500000,sellPrice:4500000,wearRate:0.08,repairFull:120000,cargo:['docs','parcel','small','food_small'],desc:'Спорт-карго. Самая быстрая в классе.',maxKm:600000,serviceInterval:20000},
-mercedes_s:{n:'Mercedes S-Class Maybach',icon:'🚗',cls:'car',cap:0.5,speed:250,tank:76,cons:9,radius:1300,price:15000000,sellPrice:10000000,wearRate:0.06,repairFull:200000,cargo:['docs','parcel','small','food_small'],desc:'Представительский класс. Максимальный радиус.',maxKm:800000,serviceInterval:25000},
+ vaz2106:{n:'ВАЗ-2106',icon:'🚗',cls:'car',cap:0.15,speed:100,tank:40,cons:7,radius:250,price:45000,sellPrice:40000,wearRate:0.10,repairFull:8000,cargo:['docs','parcel','small'],desc:'Легендарная классика.',maxKm:100000,serviceInterval:10000},
+vaz2114:{n:'ВАЗ-2114',icon:'🚗',cls:'car',cap:0.25,speed:120,tank:45,cons:6.5,radius:350,price:135000,sellPrice:100000,wearRate:0.10,repairFull:15000,cargo:['docs','parcel','small','food_small'],desc:'Проворный хэтчбек.',maxKm:150000,serviceInterval:10000},
+granta:{n:'Лада Гранта',icon:'🚗',cls:'car',cap:0.3,speed:145,tank:50,cons:5.5,radius:450,price:400000,sellPrice:280000,wearRate:0.07,repairFull:25000,cargo:['docs','parcel','small','food_small'],desc:'Быстрая легковушка.',maxKm:200000,serviceInterval:15000},
+largus:{n:'Лада Ларгус',icon:'🚐',cls:'van',cap:1.0,speed:130,tank:55,cons:7.5,radius:400,price:800000,sellPrice:550000,wearRate:0.07,repairFull:40000,cargo:['parcel','small','furniture','appliances','food_small','textile'],desc:'Универсал.',maxKm:250000,serviceInterval:15000},
+sobol:{n:'ГАЗ Соболь',icon:'🚐',cls:'van',cap:1.5,speed:120,tank:70,cons:9,radius:450,price:995000,sellPrice:700000,wearRate:0.07,repairFull:50000,cargo:['parcel','furniture','appliances','food_small','textile','general'],desc:'Рамный фургон.',maxKm:300000,serviceInterval:15000},
+	passat:{n:'Volkswagen Passat B8',icon:'🚗',cls:'car',cap:0.4,speed:180,tank:66,cons:7,radius:700,price:1200000,sellPrice:900000,wearRate:0.06,repairFull:35000,cargo:['docs','parcel','small','food_small'],desc:'Первый премиум. Быстрее и дальше Гранты.',maxKm:400000,serviceInterval:15000},
+bmw5:{n:'BMW 5 Series',icon:'🚗',cls:'car',cap:0.45,speed:210,tank:68,cons:8,radius:900,price:3500000,sellPrice:2500000,wearRate:0.05,repairFull:70000,cargo:['docs','parcel','small','food_small'],desc:'Бизнес-класс. Быстрая и статусная.',maxKm:500000,serviceInterval:20000},
+audi_rs6:{n:'Audi RS6 Avant',icon:'🚗',cls:'car',cap:0.55,speed:250,tank:73,cons:11,radius:1000,price:6500000,sellPrice:4500000,wearRate:0.05,repairFull:120000,cargo:['docs','parcel','small','food_small'],desc:'Спорт-карго. Самая быстрая в классе.',maxKm:600000,serviceInterval:20000},
+mercedes_s:{n:'Mercedes S-Class Maybach',icon:'🚗',cls:'car',cap:0.5,speed:250,tank:76,cons:9,radius:1300,price:15000000,sellPrice:10000000,wearRate:0.04,repairFull:200000,cargo:['docs','parcel','small','food_small'],desc:'Представительский класс. Максимальный радиус.',maxKm:800000,serviceInterval:25000},
 gazelle:{n:'ГАЗель Next',icon:'🚚',cls:'truck_small',cap:2.0,speed:120,tank:80,cons:11,radius:450,price:1600000,sellPrice:1100000,wearRate:0.06,repairFull:60000,cargo:['parcel','furniture','appliances','food','building','general','textile'],desc:'Народный грузовичок.',maxKm:350000,serviceInterval:15000},
 bychok:{n:'ЗИЛ Бычок',icon:'🚚',cls:'truck_small',cap:3,speed:95,tank:120,cons:15,radius:500,price:1400000,sellPrice:950000,wearRate:0.05,repairFull:80000,cargo:['general','building','food','furniture','textile','container'],desc:'Старая школа.',maxKm:350000,serviceInterval:20000},
 valdai:{n:'Валдай',icon:'🚚',cls:'truck_small',cap:5,speed:100,tank:150,cons:15,radius:600,price:2900000,sellPrice:2000000,wearRate:0.04,repairFull:120000,cargo:['general','building','food','furniture','textile','container','electronics'],desc:'Первый серьёзный.',maxKm:500000,serviceInterval:20000},
@@ -1990,6 +1990,33 @@ function ensureInsurance(inst){if(!inst.insurance)inst.insurance={osago:false,os
        {n:'👑 Супер-блатной',p:'0.45%'},{n:'⭐ Легендарный',p:'0.05%'}]
     : [{n:'😐 Обычный',p:'69%'},{n:'😎 Красивый',p:'25%'},{n:'💎 Блатной',p:'5%'},
        {n:'👑 Супер-блатной',p:'0.9%'},{n:'⭐ Легендарный',p:'0.1%'}];
+
+  const doReroll = ()=>{
+    if(S.money < cost){toast('Мало денег','bad');return;}
+    moneySpend(cost, isReReg?'Смена номера':'Постановка на учёт');
+    const newPlate = generatePlate(S.truck.cityIndex, isReReg);
+    inst.plate = newPlate;
+    const lv = PLATE_LEVELS[newPlate.level];
+    addNews(`${lv.icon} ${VEHICLES[inst.model].n} · номер ${newPlate.text}`, 'info', 'activity');
+    const rHtml = `<h2>${lv.icon} ${lv.n} номер!</h2>
+      <p>Ваш новый номер:</p>
+      <div style="text-align:center;padding:16px 0">
+        <span class="plate-badge lvl-${newPlate.level}" style="font-size:20px;padding:8px 16px">${newPlate.text}</span>
+      </div>
+      <div class="card" style="font-size:12px">
+        <div class="muted">Шанс остановки ГИБДД: <b style="color:#5ef0a0">×${lv.stopMul.toFixed(1)}</b></div>
+        <div class="muted" style="margin-top:4px">В кошельке: <b>${fmt(S.money)} ₽</b></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button id="plateReroll" class="gold" style="flex:1">🔄 Ещё раз · ${fmt(cost)} ₽</button>
+        <button id="plateOk" class="primary" style="flex:1">Готово</button>
+      </div>`;
+    Modal._render(rHtml);
+    $('plateReroll').onclick = ()=>doReroll();
+    $('plateOk').onclick = ()=>Modal.next();
+    updateUI();
+  };
+
   let html = `<h2>${isReReg?'🔄 Смена номера':'📋 Постановка на учёт'}</h2>
     <p>${VEHICLES[inst.model].icon} <b>${VEHICLES[inst.model].n}</b> · регион ${CITY_REGION_CODE[S.truck.cityIndex]}</p>
     <div class="card">
@@ -2018,29 +2045,7 @@ function ensureInsurance(inst){if(!inst.insurance)inst.insurance={osago:false,os
     </div>`;
   Modal._render(html);
   $('plateNo').onclick = ()=>Modal.next();
-  $('plateYes').onclick = ()=>{
-    if(S.money < cost){toast('Мало денег','bad');return;}
-    moneySpend(cost, isReReg?'Смена номера':'Постановка на учёт');
-    const newPlate = generatePlate(S.truck.cityIndex, isReReg);
-    inst.plate = newPlate;
-    const lv = PLATE_LEVELS[newPlate.level];
-    addNews(`${lv.icon} ${VEHICLES[inst.model].n} · номер ${newPlate.text}`, 'info', 'activity');
-    Modal.next();
-    setTimeout(()=>{
-      const rHtml = `<h2>${lv.icon} ${lv.n} номер!</h2>
-        <p>Ваш новый номер:</p>
-        <div style="text-align:center;padding:16px 0">
-          <span class="plate-badge lvl-${newPlate.level}" style="font-size:20px;padding:8px 16px">${newPlate.text}</span>
-        </div>
-        <div class="card" style="font-size:12px">
-          <div class="muted">Шанс остановки ГИБДД: <b style="color:#5ef0a0">×${lv.stopMul.toFixed(1)}</b></div>
-        </div>
-        <button class="wide primary" id="plateOk">ОК</button>`;
-      Modal._render(rHtml);
-      $('plateOk').onclick = ()=>Modal.next();
-    }, 300);
-    updateUI();
-  };
+  $('plateYes').onclick = ()=>doReroll();
 }
 function openInsuranceModal(vehicleId){
   if(!S.ownedVehicles.length){toast('Нет машин','bad');return;}
