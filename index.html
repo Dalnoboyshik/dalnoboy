@@ -1329,11 +1329,21 @@ function resourceRemainPct(inst){
 function resourceDepleted(inst){
   return (inst.odometer||0)>=getInstMaxKm(inst);
 }
-function serviceCost(inst){
+function serviceCost(inst, driver){
   const v=VEHICLES[inst.model];
   const od=serviceOverdue(inst);
   const interval=serviceIntervalOf(inst)||10000;
-  return Math.round(v.repairFull*0.05*(1+od/interval));
+  let cost = v.repairFull*0.05*(1+od/interval);
+  if(driver){
+    cost *= driverBaseRepairMul(driver);
+   if(driver.stats && driver.stats.courses && driver.stats.courses.includes('service')) cost *= 0.75;
+  } else {
+    const b = basesHere()[0];
+    if(b) cost *= BASE_TYPES[b.type].repairBonus;
+    if(b && b.businesses.includes('garage')) cost *= 0.6;
+  }
+  if(hasStaff('mechanic')) cost *= 0.7;
+  return Math.round(cost);
 }
 function vehRadius(inst){let r=VEHICLES[inst.model].radius;if(upLevel(inst,'gps')>0)r=Math.round(r*1.11);return r;}
 function curCap(){const v=curV();if(v.cls==='tractor')return Math.min(v.cap,curT()?curT().cap:0);return v.cap;}
@@ -2507,7 +2517,7 @@ function driverAutoService(d,inst){
   const sinceS=(inst.odometer||0)-(inst.lastServiceOdometer||0);
   if(sinceS>=interval){
     const od=serviceOverdue(inst);
-    const cost=serviceCost(inst);
+   const cost=serviceCost(inst, d);
     if(S.money>=cost){
       moneySpend(cost,`ТО водителем ${d.name}`);
       d.stats.spentService=(d.stats.spentService||0)+cost;
@@ -2565,7 +2575,7 @@ function driverForceService(driverId){
   const inst=getVeh(d.vehicleId);if(!inst){toast('Нет машины','bad');return;}
   const v=driverVehModel(d);if(!v||!v.serviceInterval){toast('ТО не требуется','bad');return;}
   const od=serviceOverdue(inst);
-  const cost=serviceCost(inst);
+const cost=serviceCost(inst, d);
   if(S.money<cost){toast(`Нужно ${fmt(cost)} ₽`,'bad');return;}
   moneySpend(cost,`ТО водителем ${d.name}`);
   if(!d.stats)d.stats=newDriverStats();
