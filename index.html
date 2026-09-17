@@ -3209,7 +3209,7 @@ function driverTick(dt){
         if(!pool.length)continue;
         const target=pick(pool);const cl=driverCargo(d);if(!cl.length)continue;
         const ct=pick(cl);const cap=driverCap(d);
-        const w=Math.max(0.1,r3(rnd(0.1,cap*0.85)));
+        const w=Math.max(0.1,r3(rnd(0.4,cap*0.95)));
         const wmul=weightMul(w);let rate=baseRatePerKm(target.km)*wmul*repRateBonus();
         if(hasTrait(d,'pro'))rate*=1.1;
         const pay=Math.round(rate*target.km*0.85);
