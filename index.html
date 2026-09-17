@@ -1194,8 +1194,10 @@ const S = {
     houseLevel: 0, houseCityIdx: null, rank: 0,
   routeFilter:{from:null,to:null},
   intlBranches:[],
-    autoService:true, autoServiceInterval:30000,
+     autoService:true, autoServiceInterval:30000,
   autoRepair:false, autoRepairThreshold:70,
+  driverSort:{field:'profit',dir:-1},
+  driverStatsOpen:{},
   };
 let COMPETITORS = [
   {id:'c1',n:'ТрансЛогистик',icon:'🏢',money:60000000,reputation:62,color:'#4da3ff',bases:[],dead:false},
@@ -2460,7 +2462,7 @@ function busyTrailerIds(){return new Set(S.drivers.map(d=>d.trailerId).filter(Bo
 function freeVehicles(){const busy=busyVehicleIds();return S.ownedVehicles.filter(v=>v.id!==S.currentVehicleId&&!busy.has(v.id)).map(v=>v.id);}
 function freeTrailers(){const busy=busyTrailerIds();return S.ownedTrailers.filter(t=>t.id!==S.currentTrailerId&&!busy.has(t.id)).map(t=>t.id);}
 function vehiclesForHire(){return freeVehicles().filter(id=>(getVeh(id).wear||0)<90);}
-function newDriverStats(){return {trips:0,km:0,earned:0,spentFuel:0,spentRepair:0,spentService:0,spentSalary:0,spentOther:0,hours:0,courses:[]};}
+function newDriverStats(){return {trips:0,km:0,earned:0,spentFuel:0,spentRepair:0,spentService:0,spentSalary:0,spentOther:0,hours:0,courses:[],accidents:0};}
 function driverProfit(d){const s=d.stats||newDriverStats();return s.earned-(s.spentFuel+s.spentRepair+(s.spentService||0)+s.spentSalary+s.spentOther);}
 	function driverProfitPerDay(d){
   const days=Math.max(1,(S.gameTime-(d.hiredAt||0))/1440);
@@ -2468,6 +2470,75 @@ function driverProfit(d){const s=d.stats||newDriverStats();return s.earned-(s.sp
 }
 function driverProfitPerMonth(d){
   return Math.round(driverProfitPerDay(d)*30);
+}
+function sortDrivers(list){
+  const f=S.driverSort.field,dir=S.driverSort.dir;
+  return list.slice().sort((a,b)=>{
+    let va,vb;
+    if(f==='profit'){va=driverProfit(a);vb=driverProfit(b);}
+    else if(f==='perDay'){va=driverProfitPerDay(a);vb=driverProfitPerDay(b);}
+    else if(f==='perMonth'){va=driverProfitPerMonth(a);vb=driverProfitPerMonth(b);}
+    else if(f==='rating'){va=a.rating;vb=b.rating;}
+    else if(f==='salary'){va=a.salary;vb=b.salary;}
+    else if(f==='wear'){const wa=getVeh(a.vehicleId),wb=getVeh(b.vehicleId);va=wa?wa.wear:0;vb=wb?wb.wear:0;}
+    else if(f==='name'){return a.name.localeCompare(b.name)*dir;}
+    else if(f==='trips'){va=(a.stats&&a.stats.trips)||0;vb=(b.stats&&b.stats.trips)||0;}
+    else if(f==='accidents'){va=(a.stats&&a.stats.accidents)||0;vb=(b.stats&&b.stats.accidents)||0;}
+    else return 0;
+    if(va<vb)return -1*dir;
+    if(va>vb)return 1*dir;
+    return 0;
+  });
+}
+function driverStatsBlock(d){
+  const v=getVeh(d.vehicleId);
+  const s=d.stats||newDriverStats();
+  const profit=driverProfit(d);
+  const perDay=driverProfitPerDay(d);
+  const perMonth=driverProfitPerMonth(d);
+  const accidents=s.accidents||0;
+  let html=`<div style="margin-top:8px;border-top:1px solid #1e2c3f;padding-top:8px">
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#8ba0bd;font-weight:700;margin-bottom:4px">🚗 Работа</div>
+    <div class="drv-stats">
+      <div class="ln"><span>Рейсов</span><b>${s.trips}</b></div>
+      <div class="ln"><span>Км</span><b>${fmt(s.km)}</b></div>
+      <div class="ln"><span>Заработал</span><b style="color:#5ef0a0">${fmt(s.earned)} ₽</b></div>
+      <div class="ln"><span>💥 ДТП</span><b style="color:${accidents>=6?'#ff8d99':accidents>=3?'#ffb84d':'#cfe0f5'}">${accidents}</b></div>
+    </div>
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#8ba0bd;font-weight:700;margin:8px 0 4px">💸 Расходы</div>
+    <div class="drv-stats">
+      <div class="ln"><span>Топливо</span><b style="color:#ff8d99">−${fmt(s.spentFuel)} ₽</b></div>
+      <div class="ln"><span>ТО (${s.serviceCount||0}×)</span><b style="color:#ff8d99">−${fmt(s.spentService||0)} ₽</b></div>
+      <div class="ln"><span>Ремонт</span><b style="color:#ff8d99">−${fmt(s.spentRepair)} ₽</b></div>
+      <div class="ln"><span>Оклад</span><b style="color:#ff8d99">−${fmt(s.spentSalary)} ₽</b></div>
+    </div>
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#8ba0bd;font-weight:700;margin:8px 0 4px">💰 Итог</div>
+    <div class="drv-stats">
+      <div class="ln"><span><b>Прибыль всего</b></span><b style="color:${profit>=0?'#5ef0a0':'#ff8d99'}">${fmt(profit)} ₽</b></div>
+      <div class="ln"><span>Прибыль / день</span><b style="color:${perDay>=0?'#5ef0a0':'#ff8d99'}">${fmt(perDay)} ₽</b></div>
+      <div class="ln"><span>Прибыль / мес</span><b style="color:${perMonth>=0?'#5ef0a0':'#ff8d99'}">${fmt(perMonth)} ₽</b></div>
+    </div>`;
+  if(v){
+    const odo2=v.odometer||0;
+    const maxK=getInstMaxKm(v);
+    const sinceS2=(v.odometer||0)-(v.lastServiceOdometer||0);
+    const interval2=serviceIntervalOf(v)||30000;
+    const od2=serviceOverdue(v);
+    const w2=Math.round(v.wear);
+    const odoPct=Math.min(100,(odo2/maxK)*100);
+    const sPct=Math.min(100,(sinceS2/interval2)*100);
+    html+=`<div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#8ba0bd;font-weight:700;margin:8px 0 4px">🚛 Машина</div>
+      <div class="drv-stats">
+        <div class="ln"><span>🚗 Ресурс</span><b>${fmt(odo2)} / ${fmt(maxK)} км</b></div>
+        <div class="bar" style="margin-top:2px"><i style="width:${odoPct}%;background:${odoPct>80?'#ff6b6b':odoPct>60?'#ffb84d':'#39d98a'}"></i></div>
+        <div class="ln" style="margin-top:6px"><span>🛠 ТО</span><b style="color:${od2>0?'#ff8d99':(sinceS2>=interval2*0.7?'#ffb84d':'#5ef0a0')}">${fmt(sinceS2)} / ${fmt(interval2)} км</b></div>
+        <div class="bar" style="margin-top:2px"><i style="width:${sPct}%;background:${od2>0?'#ff6b6b':sPct>80?'#ffb84d':'#39d98a'}"></i></div>
+        <div class="ln" style="margin-top:6px"><span>🔧 Износ</span><b style="color:${w2>=80?'#ff8d99':w2>=50?'#ffb84d':'#5ef0a0'}">${w2}%</b></div>
+        <div class="bar" style="margin-top:2px"><i style="width:${w2}%;background:${w2>=80?'#ff6b6b':w2>=50?'#ffb84d':'#39d98a'}"></i></div>
+      </div>`;
+  }
+  html+=`</div>`;
+  return html;
 }
 function hasTrait(d,t){return d.traits&&d.traits.includes(t);}
 function openDriverHireModal(c){
@@ -2701,7 +2772,9 @@ function driverTick(dt){
       }
       const tired=d.hoursDriven>8&&upLevel(inst,'autopilot')===0;
       const accChance=tired?0.01:0.005;
-      if(Math.random()<dt*accChance){
+          if(Math.random()<dt*accChance){
+        if(!d.stats)d.stats=newDriverStats();
+        d.stats.accidents=(d.stats.accidents||0)+1;
         toast(`💥 ${d.name} ДТП`,'bad');
         inst.wear=Math.min(100,inst.wear+20);
         d.status='idle';d.progress=0;d.route=null;continue;
@@ -3905,47 +3978,54 @@ function renderLabor(){
 function laborStaffContent(){
   if(!isIP())return `<div class="card warn">📄 Для найма нужен ИП</div>`;
   if(!S.drivers.length)return `<h3>👷 Мои водители</h3><div class="empty">Нет нанятых. Перейдите в «📋 Найм»</div>`;
+  const SORT_FIELDS=[
+    {k:'profit',n:'Прибыль'},{k:'perDay',n:'₽/день'},{k:'perMonth',n:'₽/мес'},
+    {k:'rating',n:'Рейтинг'},{k:'salary',n:'Оклад'},{k:'wear',n:'Износ'},
+    {k:'name',n:'Имя'},{k:'trips',n:'Рейсы'},{k:'accidents',n:'💥 ДТП'},
+  ];
   let html=`<h3>👷 Мои водители · ${S.drivers.length}</h3>`;
-  const sorted=S.drivers.slice().sort((a,b)=>driverProfit(b)-driverProfit(a));
+  html+=`<div class="sort-row"><span class="lbl">Сортировка:</span>`;
+  for(const sf of SORT_FIELDS){
+    const on=S.driverSort.field===sf.k;
+    const arr=on?(S.driverSort.dir>0?'▲':'▼'):'';
+    html+=`<button class="sort-btn ${on?'on':''}" data-drvsrt="${sf.k}">${sf.n}<span class="sort-arrow">${arr}</span></button>`;
+  }
+  html+=`<button class="sort-btn" data-drvsrt="reset">↺</button></div>`;
+  const sorted=sortDrivers(S.drivers);
   for(const d of sorted){
     const v=getVeh(d.vehicleId);const w=v?Math.round(v.wear):0;
     const vl=v?`${VEHICLES[v.model].icon} ${VEHICLES[v.model].n} (${w}%)`:'—';
-    const st=d.sick>0?'🤒':(d.status==='trip'?'🚚':(d.waitingFunding?'⏸ ждёт денег':(d.needsReplacement?'⚠️ ресурс':`🏙️ ${CITIES[d.cityIdx].n}`)));
-    const s=d.stats||newDriverStats();const profit=driverProfit(d);
+    const st=d.sick>0?'🤒 болеет':(d.status==='trip'?'🚚 в рейсе':(d.waitingFunding?'⏸ ждёт денег':(d.needsReplacement?'⚠️ ресурс':`🏙️ ${CITIES[d.cityIdx].n}`)));
+    const s=d.stats||newDriverStats();
+    const perDay=driverProfitPerDay(d);
     const traitsHtml=(d.traits||[]).map(t=>`<span class="badge ${DRIVER_TRAITS[t].cls}">${DRIVER_TRAITS[t].icon}</span>`).join('');
-    const odo2=v?(v.odometer||0):0;const maxK=v?getInstMaxKm(v):0;
-    const sinceS2=v?((v.odometer||0)-(v.lastServiceOdometer||0)):0;
-        const interval2=v?(serviceIntervalOf(v)||30000):30000;
-    const od2=v?serviceOverdue(v):0;
-    const w2=v?Math.round(v.wear):0;
-    const sickBadge=d.sick>0?'🤒':(d.needsReplacement?'⚠️ ресурс':(d.unpaidService?'⚠️ ТО':(d.status==='trip'?'🚚':'🅿️')));
+    const accidents=s.accidents||0;
+    const accCol=accidents>=6?'#ff8d99':accidents>=3?'#ffb84d':'#cfe0f5';
+    const perDayCls=perDay<0?'#ff8d99':perDay<1000?'#ffb84d':'#5ef0a0';
+    const isOpen=!!S.driverStatsOpen[d.id];
     html+=`<div class="driver-card">
-      <div class="head"><span class="name">${d.avatar} ${d.name} ${traitsHtml}</span><span class="rt ${ratingCls(d.rating)}">★ ${d.rating.toFixed(1)}</span></div>
-      <div class="meta">${vl} · ${sickBadge} ${st}</div>
-      ${v?`<div class="drv-stats">
-        <div class="ln"><span>🚗 Ресурс</span><b>${fmt(odo2)} / ${fmt(maxK)} км</b></div>
-        <div class="ln"><span>🛠 ТО</span><b style="color:${od2>0?'#ff8d99':(sinceS2>=interval2*0.7?'#ffb84d':'#5ef0a0')}">${fmt(sinceS2)} / ${fmt(interval2)} км</b></div>
-        <div class="ln"><span>🔧 Износ</span><b style="color:${w2>=80?'#ff8d99':w2>=50?'#ffb84d':'#5ef0a0'}">${w2}%</b></div>
-      </div>`:''}
+      <div class="head">
+        <span class="name">${d.avatar} ${d.name} ${traitsHtml}${accidents>0?` <span class="badge" style="background:#1b2a42;color:${accCol}">💥 ${accidents}</span>`:''}</span>
+        <span class="rt ${ratingCls(d.rating)}">★ ${d.rating.toFixed(1)}</span>
+      </div>
+      <div class="meta">${vl} · ${st}</div>
+      <div class="drv-stats" style="margin-top:6px">
+        <div class="ln"><span>💰 Доход/день</span><b style="color:${perDayCls}">${perDay>=0?'+':''}${fmt(perDay)} ₽</b></div>
+        <div class="ln"><span>💼 Оклад/мес</span><b>${fmt(d.salary)} ₽</b></div>
+        <div class="ln"><span>📊 Доля</span><b>${Math.round(d.share*100)}%</b></div>
+        <div class="ln"><span>💥 ДТП</span><b style="color:${accCol}">${accidents}</b></div>
+      </div>
       ${d.needsReplacement?`<div class="card bad" style="margin-top:5px;font-size:11px">⚠️ Ресурс исчерпан — машина на списание</div>`:''}
       ${d.unpaidService?`<div class="card warn" style="margin-top:5px;font-size:11px">⚠️ ТО просрочено, нет денег</div>`:''}
-      <div class="drv-stats">
-        <div class="ln"><span>Рейсов</span><b>${s.trips}</b></div>
-        <div class="ln"><span>Км</span><b>${fmt(s.km)}</b></div>
-        <div class="ln"><span>Заработал</span><b style="color:#5ef0a0">${fmt(s.earned)} ₽</b></div>
-        <div class="ln"><span>Топливо</span><b style="color:#ff8d99">−${fmt(s.spentFuel)} ₽</b></div>
-        <div class="ln"><span>ТО (${s.serviceCount||0}×)</span><b style="color:#ff8d99">−${fmt(s.spentService||0)} ₽</b></div>
-        <div class="ln"><span>Ремонт</span><b style="color:#ff8d99">−${fmt(s.spentRepair)} ₽</b></div>
-        <div class="ln"><span>Оклад</span><b style="color:#ff8d99">−${fmt(s.spentSalary)} ₽</b></div>
-              <div class="ln"><span><b>Прибыль всего</b></span><b style="color:${profit>=0?'#5ef0a0':'#ff8d99'}">${fmt(profit)} ₽</b></div>
-        <div class="ln"><span>Прибыль / день</span><b style="color:${driverProfitPerDay(d)>=0?'#5ef0a0':'#ff8d99'}">${fmt(driverProfitPerDay(d))} ₽</b></div>
-        <div class="ln"><span>Прибыль / мес</span><b style="color:${driverProfitPerMonth(d)>=0?'#5ef0a0':'#ff8d99'}">${fmt(driverProfitPerMonth(d))} ₽</b></div>
-      </div>
+      <button class="wide" data-drvstat="${d.id}" style="margin-top:6px;background:${isOpen?'#1a5ba0':'#16202f'};border-color:${isOpen?'#2b7bd4':'#2f4a75'}">${isOpen?'× Скрыть статистику':'📈 Показать статистику'}</button>
+      ${isOpen?driverStatsBlock(d):''}
       <div class="row" style="margin-top:5px;gap:4px;flex-wrap:wrap">
         <button class="warn sm" data-service="${d.id}" ${d.status==='trip'?'disabled':''}>🛠 ТО сейчас</button>
         <button class="warn sm" data-repair="${d.id}" ${d.status==='trip'?'disabled':''}>🔧 Ремонт сейчас</button>
         <button class="primary sm" data-train="${d.id}">🎓 Курсы</button>
-        <button class="bad sm" data-fire="${d.id}" ${d.status==='trip'?'disabled':''}>Уволить</button></div></div>`;
+        <button class="bad sm" data-fire="${d.id}" ${d.status==='trip'?'disabled':''}>Уволить</button>
+      </div>
+    </div>`;
   }
   return html;
 }
@@ -4004,6 +4084,19 @@ function bindLaborHandlers(p){
   p.querySelectorAll('[data-train]').forEach(b=>{b.onclick=()=>openTrainModal(b.dataset.train);});
   p.querySelectorAll('[data-service]').forEach(b=>{b.onclick=()=>driverForceService(b.dataset.service);});
   p.querySelectorAll('[data-repair]').forEach(b=>{b.onclick=()=>driverForceRepair(b.dataset.repair);});
+  p.querySelectorAll('[data-drvsrt]').forEach(b=>{b.onclick=()=>{
+    const k=b.dataset.drvsrt;
+    if(k==='reset'){S.driverSort={field:'profit',dir:-1};}
+    else if(S.driverSort.field===k){S.driverSort.dir=-S.driverSort.dir;}
+    else {S.driverSort={field:k,dir:(k==='name')?1:-1};}
+    renderLabor();
+  };});
+  p.querySelectorAll('[data-drvstat]').forEach(b=>{b.onclick=()=>{
+    const id=b.dataset.drvstat;
+    if(!S.driverStatsOpen)S.driverStatsOpen={};
+    S.driverStatsOpen[id]=!S.driverStatsOpen[id];
+    renderLabor();
+  };});
   p.querySelectorAll('[data-hirestaff]').forEach(b=>{b.onclick=()=>{
     const k=b.dataset.hirestaff;
     if(S.money<40000){toast('Мало денег','bad');return;}
@@ -4858,9 +4951,12 @@ function loadGame(){
       if(dr.repairThresholdOverride===undefined)dr.repairThresholdOverride=null;
       if(dr.unpaidService===undefined)dr.unpaidService=false;
       if(dr.needsReplacement===undefined)dr.needsReplacement=false;
-      if(dr.stats.spentService===undefined)dr.stats.spentService=0;
+           if(dr.stats.spentService===undefined)dr.stats.spentService=0;
       if(dr.stats.serviceCount===undefined)dr.stats.serviceCount=0;
+      if(dr.stats.accidents===undefined)dr.stats.accidents=0;
     }
+    if(!S.driverSort)S.driverSort={field:'profit',dir:-1};
+    if(!S.driverStatsOpen)S.driverStatsOpen={};
     if(S.autoService===undefined)S.autoService=true;
     if(S.autoServiceInterval===undefined)S.autoServiceInterval=30000;
     if(S.autoRepair===undefined)S.autoRepair=false;
