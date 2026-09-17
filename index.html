@@ -1079,7 +1079,8 @@ function makeEliteDigits(){
   return String(Math.floor(Math.random()*10)).repeat(3);
 }
 function makeEliteLetters(){
-  return PLATE_LETTERS[Math.floor(Math.random()*PLATE_LETTERS.length)].repeat(3);
+  const l = PLATE_LETTERS[Math.floor(Math.random()*PLATE_LETTERS.length)];
+  return l + l;
 }
 
 function genPlateText(level, cityIdx){
@@ -1130,7 +1131,8 @@ function genPlateText(level, cityIdx){
     digits = String(Math.floor(Math.random()*1000)).padStart(3,'0');
     letters = plateRndLetter()+plateRndLetter();
   }
-  const b1 = plateRndLetter();
+    const isElite = (level === 'elite' || level === 'super' || level === 'legendary');
+  const b1 = isElite ? letters[0] : plateRndLetter();
   return `${b1}${digits}${letters} ${code}`;
 }
 
