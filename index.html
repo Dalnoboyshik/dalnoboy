@@ -3183,7 +3183,7 @@ function driverTick(dt){
       continue;
     }
     d.needsReplacement=false;
-    if(d.sick>0){d.sick-=dt;d.stats.spentSalary+=d.salary/720*dt*TIME_SCALE/60;continue;}
+    if(d.sick>0){d.sick-=dt;continue;}
     const sickChance=dt*0.00005*(upLevel(inst,'climate')>0?0.5:1);
     if(Math.random()<sickChance){d.sick=rnd(120,240);toast(`🤒 ${d.name}`,'warn');continue;}
     d.stats.spentSalary+=d.salary/720*dt*TIME_SCALE/60;
@@ -5435,7 +5435,7 @@ function loadGame(){
     if(S.rank===undefined)S.rank=getRankIndex();
     if(!S.intlBranches)S.intlBranches=[];
     if(S.bases)for(const b of S.bases)if(!b.id)b.id='b'+(++baseIdCounter);
-    if(S.drivers)for(const dr of S.drivers){
+      if(S.drivers)for(const dr of S.drivers){
       if(!dr.stats)dr.stats=newDriverStats();
       if(!dr.traits)dr.traits=[];
       if(dr.serviceIntervalOverride===undefined)dr.serviceIntervalOverride=null;
@@ -5445,6 +5445,7 @@ function loadGame(){
            if(dr.stats.spentService===undefined)dr.stats.spentService=0;
       if(dr.stats.serviceCount===undefined)dr.stats.serviceCount=0;
       if(dr.stats.accidents===undefined)dr.stats.accidents=0;
+      if(dr.hiredAt===undefined)dr.hiredAt=Math.max(0, S.gameTime-30*1440);
     }
        if(!S.driverSort)S.driverSort={field:'profit',dir:-1};
     if(!S.driverStatsOpen)S.driverStatsOpen={};
