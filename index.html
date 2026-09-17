@@ -5766,13 +5766,13 @@ function showStartCityPicker(){
       <button class="wide ok" id="btnContinue" style="font-size:32px;padding:32px 24px;min-height:100px;line-height:1.2;font-weight:700">▶️ Продолжить</button>
       <button class="wide bad" id="btnNewGame" style="margin-top:16px;font-size:32px;padding:32px 24px;min-height:100px;line-height:1.2;font-weight:700">🆕 Новая игра</button>`;
     $('modal').classList.add('show');
-    $('btnContinue').onclick=()=>{
-      if(loadGame()){Modal.next();
-        if(S.truck.cityIndex===null&&!S.truck.traveling)S.truck.cityIndex=0;
-        refillATI();refillLaborMarket();refillContracts();
-        toast('💾 Загружено','ok');updateUI();
-        if(S.dailyTaskDay!==S.day)generateDailyTasks(S.day);}
-      else toast('Ошибка','bad');};
+  $('btnContinue').onclick=()=>{
+  if(loadGame()){Modal.next();gameStarted=true;
+    if(S.truck.cityIndex===null&&!S.truck.traveling)S.truck.cityIndex=0;
+    refillATI();refillLaborMarket();refillContracts();
+    toast('💾 Загружено','ok');updateUI();
+    if(S.dailyTaskDay!==S.day)generateDailyTasks(S.day);}
+  else toast('Ошибка','bad');};
        $('btnNewGame').onclick=()=>{
       // Первое окно
       Modal._render(`<h2>⚠️ Начать новую игру?</h2>
@@ -5822,6 +5822,7 @@ function showCityPicker(){
   $('modalBox').innerHTML=html;$('modal').classList.add('show');
   $('modalBox').querySelectorAll('[data-city]').forEach(b=>{
     b.onclick=()=>{
+      gameStarted=true;
       S.startCity=+b.dataset.city;S.truck.cityIndex=S.startCity;S.firmFounded=1;
       S.season='summer';S.seasonDay=0;Modal.next();
       const baseMax=VEHICLES.vaz2106.maxKm||100000;
@@ -5850,6 +5851,7 @@ S.ownedVehicles.push({id:'v'+(++vehIdCounter),model:'vaz2106',fuel:VEHICLES.vaz2
 /* ============ ЦИКЛ ============ */
 let last=performance.now();
 let uiT=0,atiT=0,saveT=0,eventT=0,compT=0;
+let gameStarted=false;
 function loop(now){
   let dt=(now-last)/1000;last=now;if(dt>0.15)dt=0.15;
 advanceTime(dt*TIME_SCALE);
@@ -5902,8 +5904,10 @@ if(_codexTick>2){_codexTick=0;tryCodex();}
     if(atiOrders.length!==b&&$('pane-orders').classList.contains('active'))renderOrders();}
   uiT+=dt;
   if(uiT>0.6){uiT=0;updateUI();}
-  saveT+=dt;
-  if(saveT>30){saveT=0;saveGame();}
+   if(gameStarted){
+    saveT+=dt;
+    if(saveT>30){saveT=0;saveGame();}
+  }
   drawMap();requestAnimationFrame(loop);
 }
 S.ownedVehicles=[];S.ownedTrailers=[];
