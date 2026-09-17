@@ -2535,11 +2535,17 @@ function driverAutoService(d,inst){
     }
   }
 }
+function driverFuelPrice(d){
+  const base=S.bases.find(b=>b.cityIdx===d.cityIdx);
+  let price=FUEL_PRICE_BASE*SEASONS[S.season].fuelMul;
+  if(base&&base.businesses.includes('fuel'))price*=0.75;
+  return price*1.05;
+}
 function driverAutoRefuel(d,inst,km){
   const cons=driverVehModel(d).cons;
   const nf=km*cons/100*SEASONS[S.season].fuelMul;
   if(inst.fuel>=nf)return true;
-  const need=nf-inst.fuel;const price=fuelPrice()*1.05;const cost=Math.round(need*price);
+  const need=nf-inst.fuel;const price=driverFuelPrice(d);const cost=Math.round(need*price);
   if(S.money<cost)return false;
   moneySpend(cost,`Заправка водителем ${d.name}`);
   d.stats.spentFuel+=cost;inst.fuel+=need;return true;
