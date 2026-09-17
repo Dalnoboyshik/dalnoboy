@@ -4207,13 +4207,29 @@ function firmFinanceContent(){
     return '💥 Прочее';
   }
 
+   function incCatOf(desc){
+    if(!desc) return '❓ Прочее';
+    if(/^Доставка/i.test(desc))                 return '🚚 Ваши рейсы';
+    if(/^Рейс /i.test(desc))                    return '👷 Наёмные водители';
+    if(/^Бизнесы/i.test(desc))                  return '🏭 Бизнесы';
+    if(/^Контракт |^Аванс [А-ЯЁ]/i.test(desc))  return '📝 Контракты';
+    if(/Тендер|Квест: |Премия|Задача/i.test(desc)) return '🎁 Разовые';
+    if(/Продажа|Утиль/i.test(desc))             return '💸 Продажи';
+    if(/Находка|Попутчик|Бонус/i.test(desc))    return '🎲 Мелочи';
+    return '❓ Прочее';
+  }
+
   const cutoff = S.gameTime - 30*1440;
   const expMap = {};
+  const incMap = {};
   let incTotal30 = 0, expTotal30 = 0;
   for(const tx of S.finance.history){
     if(tx.t < cutoff) continue;
-    if(tx.delta > 0) incTotal30 += tx.delta;
-    else {
+    if(tx.delta > 0){
+      incTotal30 += tx.delta;
+      const c = incCatOf(tx.desc);
+      incMap[c] = (incMap[c]||0) + tx.delta;
+    } else {
       expTotal30 += Math.abs(tx.delta);
       const c = catOf(tx.desc);
       expMap[c] = (expMap[c]||0) + Math.abs(tx.delta);
@@ -4221,6 +4237,7 @@ function firmFinanceContent(){
   }
   const profit30 = incTotal30 - expTotal30;
   const sortedExp = Object.entries(expMap).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const sortedInc = Object.entries(incMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
 
   let html = `<h3>📊 Обязательства</h3>
   <div class="card">
@@ -4239,22 +4256,47 @@ function firmFinanceContent(){
     <div class="fin-cell ${profit30>=0?'inc':'exp'}"><div class="l">В день</div><div class="v">${fmt(Math.round(profit30/30))} ₽</div></div>
   </div>
 
-  <h3>💸 Куда уходят деньги</h3>
-  <div class="card" style="padding:6px 10px">
-    ${sortedExp.length
-      ? sortedExp.map(([cat,sum])=>{
-          const pct = expTotal30>0 ? (sum/expTotal30*100).toFixed(0) : 0;
-          return `<div style="margin:5px 0">
-            <div class="row" style="margin:0">
-              <span style="font-size:11px">${cat}</span>
-              <span style="color:#ff8d99;font-weight:700;font-size:11px">−${fmt(sum)} ₽ <span class="muted">(${pct}%)</span></span>
-            </div>
-            <div style="height:3px;background:#000;border-radius:2px;overflow:hidden;margin-top:2px">
-              <i style="display:block;height:100%;background:#ff6b6b;width:${pct}%"></i>
-            </div>
-          </div>`;
-        }).join('')
-      : '<div class="empty">Нет расходов</div>'}
+   <h3>💸 Движение денег · 30 дней</h3>
+  <div class="card" style="padding:8px 10px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+
+      <div>
+        <div style="font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;color:#5ef0a0;font-weight:700;margin-bottom:6px">
+          ↓ Поступления<br><span style="font-size:12px">+${fmt(incTotal30)} ₽</span>
+        </div>
+        ${sortedInc.length
+          ? sortedInc.map(([cat,sum])=>{
+              const pct = incTotal30>0 ? (sum/incTotal30*100).toFixed(0) : 0;
+              return `<div style="margin:6px 0">
+                <div style="font-size:10.5px;color:#cfe0f5;line-height:1.25">${cat}</div>
+                <div style="font-size:10.5px;color:#5ef0a0;font-weight:700">+${fmt(sum)} ₽ <span class="muted" style="font-size:9.5px">(${pct}%)</span></div>
+                <div style="height:2px;background:#000;border-radius:2px;overflow:hidden;margin-top:2px">
+                  <i style="display:block;height:100%;background:#39d98a;width:${pct}%"></i>
+                </div>
+              </div>`;
+            }).join('')
+          : '<div class="empty" style="padding:6px 0;font-size:10px">Пусто</div>'}
+      </div>
+
+      <div>
+        <div style="font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;color:#ff8d99;font-weight:700;margin-bottom:6px">
+          ↑ Расходы<br><span style="font-size:12px">−${fmt(expTotal30)} ₽</span>
+        </div>
+        ${sortedExp.length
+          ? sortedExp.map(([cat,sum])=>{
+              const pct = expTotal30>0 ? (sum/expTotal30*100).toFixed(0) : 0;
+              return `<div style="margin:6px 0">
+                <div style="font-size:10.5px;color:#cfe0f5;line-height:1.25">${cat}</div>
+                <div style="font-size:10.5px;color:#ff8d99;font-weight:700">−${fmt(sum)} ₽ <span class="muted" style="font-size:9.5px">(${pct}%)</span></div>
+                <div style="height:2px;background:#000;border-radius:2px;overflow:hidden;margin-top:2px">
+                  <i style="display:block;height:100%;background:#ff6b6b;width:${pct}%"></i>
+                </div>
+              </div>`;
+            }).join('')
+          : '<div class="empty" style="padding:6px 0;font-size:10px">Пусто</div>'}
+      </div>
+
+    </div>
   </div>`;
 
   return html;
