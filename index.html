@@ -3231,8 +3231,13 @@ const pay=Math.round(rate*target.km*loadMul*ratingMul*expMul);
         inst.fuel-=nf;const wr=vehWearRate(inst);
         inst.wear=Math.min(100,inst.wear+target.km*wr);
         inst.odometer=(inst.odometer||0)+target.km;
-        let dur=Math.max(8,target.km/200)+rnd(5,15);
-        if(hasTrait(d,'lazy'))dur*=1.2;
+      // Скорость берём от машины + сезон + черта лени
+const _v=driverVehModel(d);
+const _spd=_v?_v.speed:90;
+const _sm=SEASONS[S.season].speedMul;
+let dur=Math.max(5,(target.km/(_spd*_sm))*60/TIME_SCALE);
+dur*=rnd(1.05,1.20);  // водитель едет на 5-20% медленнее, чем теоретически
+if(hasTrait(d,'lazy'))dur*=1.2;
         d.route={from,to:target.idx,km:target.km,pay,ctype:ct,weight:w};
         d.status='trip';d.progress=0;d.duration=dur;d.hoursDriven=0;
       }
