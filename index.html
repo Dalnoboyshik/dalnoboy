@@ -2902,8 +2902,22 @@ function payIncome(gameMin){
     for(const k of b.businesses)tph+=BUSINESSES[k].income*mult;
   }
   if(tph===0)return;
-    let inc=tph*(gameMin/1440);inc*=(1+S.achEffects.biz);inc*=(1+S.achEffects.income);
-  if(inc>0) moneyAdd(inc,'Бизнесы');
+  let inc=tph*(gameMin/1440);inc*=(1+S.achEffects.biz);inc*=(1+S.achEffects.income);
+  if(inc<=0)return;
+
+  // Капаем деньги напрямую, без записи в историю каждый кадр
+  S.money += inc;
+  S.finance.income += inc;
+  S.finance.monthIncome += inc;
+
+  // В историю пишем раз в игровой час, накопительно
+  S._bizAccum = (S._bizAccum || 0) + inc;
+  if(S.gameTime - (S._bizLastLog || 0) >= 60){
+    S.finance.history.push({t:S.gameTime, delta:S._bizAccum, desc:'Бизнесы'});
+    if(S.finance.history.length > 500) S.finance.history.shift();
+    S._bizAccum = 0;
+    S._bizLastLog = S.gameTime;
+  }
 }
 
 /* ============ БИРЖА ТРУДА ============ */
