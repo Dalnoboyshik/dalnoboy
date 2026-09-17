@@ -1668,7 +1668,7 @@ function tryMajorEvent(){
         {t:'Ждать (2 дня −50%)',fn:()=>{S.powerOutageUntil=S.gameTime+1440*2;S.reputation=clamp(S.reputation-2,0,100);}},
       ]},
     {title:'📉 Кризис',text:'Ставки −20% на неделю.',opts:[{t:'Понятно',fn:()=>{S.crisisUntil=S.gameTime+1440*7;}}]},
-    {title:'🎉 Гос тендер',text:'3 млн ₽ за заказ. Нужно 3 машины.',opts:[{t:'Участвовать',fn:()=>{if(S.ownedVehicles.length>=3){moneyAdd(3000000,'Тендер');S.reputation=clamp(S.reputation+5,0,100);toast('🎉 +3 млн ₽','ok');}else toast('Нужно 3 машины','bad');}},{t:'Отказать',fn:()=>{S.reputation=clamp(S.reputation-1,0,100);}}]},
+   
     {title:'🚧 Забастовка',text:'Водители отказываются работать 2 дня.',opts:[{t:'Поднять оклады +10%',fn:()=>{S.drivers.forEach(d=>d.salary=Math.round(d.salary*1.1));}},{t:'Уговорить (−5 реп)',fn:()=>{S.reputation=clamp(S.reputation-5,0,100);}}]},
     {title:'📰 Чёрный PR',text:'Слухи о вашей фирме.',opts:[{t:'Реклама за 200 000 ₽',fn:()=>{if(S.money<200000)return;moneySpend(200000,'Реклама');S.reputation=clamp(S.reputation+2,0,100);}},{t:'Игнорировать',fn:()=>{S.reputation=clamp(S.reputation-8,0,100);}}]},
    
