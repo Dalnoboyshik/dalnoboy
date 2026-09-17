@@ -974,6 +974,8 @@ const ACHIEVEMENTS = [
   {id:'monopolist',n:'Монополист',cond:s=>COMPETITORS.every(c=>c.dead),eff:'Поглотить всех конкурентов'},
   {id:'international',n:'Международный',cond:s=>s.intlBranches.length>0,eff:'Открыть филиал за границей'},
   {id:'billionaire',n:'Миллиардер',cond:s=>s.money>=1000000000,eff:'Заработать 1 млрд ₽'},
+  {id:'logist',n:'Логист года',cond:s=>(s.stats.logistWins||0)>=1,eff:'Победить в главной премии'},
+  {id:'scandal',n:'Позор года',cond:s=>(s.stats.scandals||0)>=1,eff:'Запятнать себя скандалом'},
 ];
 	/* ============ ЗВАНИЯ / РАНГИ ============ */
 const RANKS = [
@@ -1182,7 +1184,7 @@ const S = {
   achEffects:{rate:0,fuel:0,buy:0,biz:0,income:0,hrBonus:0},
    finance:{income:0,expense:0,history:[],monthIncome:0,monthExpense:0},
    news:{items:[],lastRead:0,unreadNotify:0},
-  stats:{totalTrips:0,totalKm:0,deliveryTotal:0,deliveriesDone:0,kicked:0},
+    stats:{totalTrips:0,totalKm:0,deliveryTotal:0,deliveriesDone:0,kicked:0,logistWins:0,scandals:0},
   reputation: 30,
   truck:{cityIndex:null,traveling:false,paused:false,from:0,to:0,progress:0,duration:1,local:false,wearStart:0,wearDelta:0},
   gameTime: 0, day: 1, season: 'summer', seasonDay: 0,
@@ -1196,8 +1198,10 @@ const S = {
   intlBranches:[],
      autoService:true, autoServiceInterval:30000,
   autoRepair:false, autoRepairThreshold:70,
-  driverSort:{field:'profit',dir:-1},
+    driverSort:{field:'profit',dir:-1},
   driverStatsOpen:{},
+  lastNominationDay:0,
+  nomination:null,
   };
 let COMPETITORS = [
   {id:'c1',n:'ТрансЛогистик',icon:'🏢',money:60000000,reputation:62,color:'#4da3ff',bases:[],dead:false},
@@ -1667,11 +1671,143 @@ function tryMajorEvent(){
     {title:'🎉 Гос тендер',text:'3 млн ₽ за заказ. Нужно 3 машины.',opts:[{t:'Участвовать',fn:()=>{if(S.ownedVehicles.length>=3){moneyAdd(3000000,'Тендер');S.reputation=clamp(S.reputation+5,0,100);toast('🎉 +3 млн ₽','ok');}else toast('Нужно 3 машины','bad');}},{t:'Отказать',fn:()=>{S.reputation=clamp(S.reputation-1,0,100);}}]},
     {title:'🚧 Забастовка',text:'Водители отказываются работать 2 дня.',opts:[{t:'Поднять оклады +10%',fn:()=>{S.drivers.forEach(d=>d.salary=Math.round(d.salary*1.1));}},{t:'Уговорить (−5 реп)',fn:()=>{S.reputation=clamp(S.reputation-5,0,100);}}]},
     {title:'📰 Чёрный PR',text:'Слухи о вашей фирме.',opts:[{t:'Реклама за 200 000 ₽',fn:()=>{if(S.money<200000)return;moneySpend(200000,'Реклама');S.reputation=clamp(S.reputation+2,0,100);}},{t:'Игнорировать',fn:()=>{S.reputation=clamp(S.reputation-8,0,100);}}]},
-    {title:'🏆 Премия Логист года',text:'Вас номинировали!',opts:[{t:'Забрать',fn:()=>{moneyAdd(500000,'Премия');S.reputation=clamp(S.reputation+5,0,100);}}]},
+   
   ];
   const ev=pick(list);currentCityEvent=ev;renderCityEvent(ev);
 }
+/* ============ НОМИНАЦИИ / ПРЕМИИ ============ */
+const NOM_COOLDOWN_DAYS = 90;  // «год» = 90 игровых дней
 
+function tryNomination(){
+  if(S.nomination) return;
+  const cd = NOM_COOLDOWN_DAYS*1440;
+  if(S.lastNominationDay && S.gameTime - S.lastNominationDay < cd) return;
+  if(S.reputation < 50) return;
+  if(S.ownedVehicles.length < 3) return;
+  if(S.bases.length < 1) return;
+  S.nomination = {
+    type:'logistYear',
+    startAt:S.gameTime,
+    ceremonyAt:S.gameTime + 5*1440,
+    applicationType:null,
+    costPaid:0
+  };
+  showNominationModal();
+}
+
+function showNominationModal(){
+  const html = `<h2>🏆 Премия «Логист года»</h2>
+    <p>Вас номинировали в категории «Лучший региональный перевозчик». Церемония через 5 дней. Как подготовить анкету?</p>
+    <div class="big-event"><h3>Заявка на участие</h3>
+      <p>От качества анкеты зависит шанс победы.</p></div>
+    <button class="wide primary" data-nom="self">📝 Заполнить самому · бесплатно<br><small style="font-size:11px;opacity:.8">Базовый шанс</small></button>
+    <button class="wide gold" data-nom="pro" style="margin-top:6px">💼 Нанять специалиста · 300 000 ₽<br><small style="font-size:11px;opacity:.8">+15% к шансу победы</small></button>
+    <button class="wide warn" data-nom="lie" style="margin-top:6px">🎭 Спец + приукрасить заслуги · 500 000 ₽<br><small style="font-size:11px;opacity:.8">+25% к шансу, но риск разоблачения</small></button>`;
+  Modal.show(html, 1);
+  setTimeout(()=>{
+    const box = $('modalBox');
+    box.querySelectorAll('[data-nom]').forEach(b=>{
+      b.onclick = ()=>{
+        const t = b.dataset.nom;
+        const cost = t==='pro'?300000:t==='lie'?500000:0;
+        if(cost>0 && S.money<cost){toast(`Нужно ${fmt(cost)} ₽`,'bad');return;}
+        if(cost>0) moneySpend(cost, t==='pro'?'Спец по анкетам':'Спец + приукрасить');
+        S.nomination.applicationType = t;
+        S.nomination.costPaid = cost;
+        Modal.next();
+        if(t==='self') toast('📝 Анкета подана. Ждём церемонию','ok');
+        else if(t==='pro') toast(`💼 Спец готовит анкету`,'ok');
+        else toast(`🎭 Анкета с приукрашениями. Риск есть...`,'warn');
+        addNews('🏆 Номинация на Логиста года · анкета подана','info','world');
+      };
+    });
+  }, 0);
+}
+
+function resolveNomination(){
+  if(!S.nomination) return;
+  const n = S.nomination;
+  S.lastNominationDay = S.gameTime;
+  S.nomination = null;
+
+  if(!n.applicationType){
+    toast('🏆 Номинация сгорела — вы не подали анкету','warn');
+    addNews('🏆 Пропущена номинация Логиста года','warn','world');
+    return;
+  }
+
+  // Шанс победы
+  let chance = 0.30;
+  if(n.applicationType==='pro') chance += 0.15;
+  if(n.applicationType==='lie') chance += 0.25;
+  chance += S.reputation/200;
+  chance += S.bases.length * 0.02;
+  chance += S.ownedVehicles.length * 0.005;
+  chance = clamp(chance, 0.05, 0.95);
+
+  // Риск разоблачения
+  let caught = false;
+  if(n.applicationType==='lie'){
+    let risk = 0.40 - S.reputation/300 - S.bases.length*0.03 - S.ownedVehicles.length*0.005;
+    risk = clamp(risk, 0.02, 0.60);
+    caught = Math.random() < risk;
+  }
+
+  // === СПАЛИЛСЯ ===
+  if(caught){
+    S.reputation = clamp(S.reputation-15,0,100);
+    S.stats.scandals = (S.stats.scandals||0)+1;
+    addNews('📰 Скандал: ложь в анкете «Логиста года»','bad','notify');
+    const html = `<h2>🚨 Скандал!</h2>
+      <div class="big-event danger"><h3>Вас разоблачили</h3>
+        <p>Журналисты раскопали, что данные в анкете приукрашены. Премию не дали, зато дали позор на всю страну.</p></div>
+      <div class="card">
+        <div class="row"><span class="muted">Потрачено на анкету</span><b style="color:#ff8d99">−${fmt(n.costPaid)} ₽</b></div>
+        <div class="row"><span class="muted">Репутация</span><b style="color:#ff8d99">−15</b></div>
+      </div>
+      <button class="wide primary" id="nomOk" style="margin-top:8px">Понятно</button>`;
+    Modal.show(html, 1);
+    setTimeout(()=>{const b=$('nomOk');if(b)b.onclick=()=>Modal.next();}, 0);
+    return;
+  }
+
+  // === ПОБЕДА ===
+  if(Math.random() < chance){
+    moneyAdd(1500000,'Премия Логист года');
+    S.reputation = clamp(S.reputation+8,0,100);
+    S.stats.logistWins = (S.stats.logistWins||0)+1;
+    checkAchievements();
+    addNews('🏆 Логист года! +1 500 000 ₽ · +8 репутации','ok','notify');
+    const html = `<h2>🏆 Логист года!</h2>
+      <div class="big-event"><h3>Вы победили</h3>
+        <p>Зал аплодирует стоя. На сцену поднимается ${S.firmName||'ваша фирма'} — лучший региональный перевозчик этого года.</p></div>
+      <div class="card">
+        <div class="row"><span class="muted">Премия</span><b style="color:#39d98a">+1 500 000 ₽</b></div>
+        <div class="row"><span class="muted">Репутация</span><b style="color:#39d98a">+8</b></div>
+        <div class="row"><span class="muted">Ачивка</span><b>🏆 Логист года</b></div>
+      </div>
+      <button class="wide primary" id="nomOk" style="margin-top:8px">Принять</button>`;
+    Modal.show(html, 1);
+    setTimeout(()=>{const b=$('nomOk');if(b)b.onclick=()=>Modal.next();}, 0);
+    return;
+  }
+
+  // === ПРОИГРАЛ ===
+  const refund = Math.round(n.costPaid * 0.2);
+  if(refund>0) moneyAdd(refund,'Возврат части расходов');
+  S.reputation = clamp(S.reputation+1,0,100);
+  addNews('🥈 Проиграли Логиста года','warn','world');
+  const html = `<h2>🥈 Не в этот раз</h2>
+    <div class="big-event"><h3>Проиграли</h3>
+      <p>Премию забрал кто-то другой. Но вас запомнили — значит, следующий год может стать вашим.</p></div>
+    <div class="card">
+      <div class="row"><span class="muted">Возврат 20% от анкеты</span><b style="color:#39d98a">+${fmt(refund)} ₽</b></div>
+      <div class="row"><span class="muted">Репутация</span><b style="color:#39d98a">+1</b></div>
+    </div>
+    <button class="wide primary" id="nomOk" style="margin-top:8px">Ок</button>`;
+  Modal.show(html, 1);
+  setTimeout(()=>{const b=$('nomOk');if(b)b.onclick=()=>Modal.next();}, 0);
+}
 /* ============ УГОН ============ */
 function triggerTheft(cityIdx){
   if(hasStaff('guard')){toast('💂 Охранник предотвратил','ok');return;}
@@ -2902,11 +3038,14 @@ if(currDay > prevDay){
    const t=pick(news);toast(t,'info');addNews(t,'info','world');}
   processStolenQuests();checkAchievements();checkQuests();
   const nd=Math.floor(S.gameTime/1440)+1;
-  if(nd!==S.day){S.day=nd;S.laborMarket=[];refillLaborMarket();
+  if(nd!==S.day){
+    S.day=nd;S.laborMarket=[];refillLaborMarket();
     if(nd!==S.dailyTaskDay)generateDailyTasks(nd);
     if(nd%7===0)refillContracts();
     if(nd%7===0){tenderTimer++;genTender();}
+    tryNomination();
   }
+  if(S.nomination && S.gameTime >= S.nomination.ceremonyAt) resolveNomination();
   checkWearWarn();
 }
 function generateDailyTasks(day){
@@ -4955,8 +5094,13 @@ function loadGame(){
       if(dr.stats.serviceCount===undefined)dr.stats.serviceCount=0;
       if(dr.stats.accidents===undefined)dr.stats.accidents=0;
     }
-    if(!S.driverSort)S.driverSort={field:'profit',dir:-1};
+       if(!S.driverSort)S.driverSort={field:'profit',dir:-1};
     if(!S.driverStatsOpen)S.driverStatsOpen={};
+    if(S.lastNominationDay===undefined)S.lastNominationDay=0;
+    if(S.nomination===undefined)S.nomination=null;
+    if(!S.stats)S.stats={};
+    if(S.stats.logistWins===undefined)S.stats.logistWins=0;
+    if(S.stats.scandals===undefined)S.stats.scandals=0;
     if(S.autoService===undefined)S.autoService=true;
     if(S.autoServiceInterval===undefined)S.autoServiceInterval=30000;
     if(S.autoRepair===undefined)S.autoRepair=false;
