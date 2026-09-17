@@ -1382,6 +1382,7 @@ function addNews(txt,cls,cat){
   try{updateTicker();}catch(_){}
 }
 function basesHere(){if(S.truck.cityIndex===null)return[];return S.bases.filter(b=>b.cityIdx===S.truck.cityIndex);}
+	function driverBaseRepairMul(d){const base=S.bases.find(b=>b.cityIdx===d.cityIdx);if(!base)return 1;let mul=BASE_TYPES[base.type].repairBonus;if(base.businesses.includes('garage'))mul*=0.6;return mul;}
 function baseBuffMult(kind){
   const list=basesHere();if(!list.length)return 1;let active=false;
   for(const b of list){for(const k of b.businesses)if(BUSINESSES[k].buff===kind){active=true;break;}if(active)break;}
@@ -2522,7 +2523,7 @@ function driverAutoService(d,inst){
   // === Авто-ремонт (выключен по умолчанию) ===
   const threshold=d.repairThresholdOverride||S.autoRepairThreshold||70;
   if(S.autoRepair&&inst.wear>=threshold){
-    let base=v.repairFull*(inst.wear/100);
+    let base=v.repairFull*(inst.wear/100)*driverBaseRepairMul(d);
     if(hasStaff('mechanic'))base*=0.7;
     if(d.stats.courses&&d.stats.courses.includes('service'))base*=0.75;
     const cost=Math.round(base);
@@ -2574,7 +2575,7 @@ function driverForceRepair(driverId){
   const inst=getVeh(d.vehicleId);if(!inst)return;
   const v=driverVehModel(d);if(!v)return;
   if(inst.wear<1){toast('В порядке','ok');return;}
-  let base=v.repairFull*(inst.wear/100);
+  let base=v.repairFull*(inst.wear/100)*driverBaseRepairMul(d);
   if(hasStaff('mechanic'))base*=0.7;
   if(d.stats&&d.stats.courses&&d.stats.courses.includes('service'))base*=0.75;
   const cost=Math.round(base);
