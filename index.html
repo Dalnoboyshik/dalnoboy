@@ -2863,13 +2863,16 @@ function driverTick(dt){
     if(Math.random()<sickChance){d.sick=rnd(120,240);toast(`🤒 ${d.name}`,'warn');continue;}
     d.stats.spentSalary+=d.salary/720*dt*TIME_SCALE/60;
     const boost=hasStaff('dispatcher')?2.5:1;
+     // Авто-обслуживание и авто-ремонт — ДО проверок износа,
+    // чтобы водитель мог починить уже сломанную машину
+    if(d.status !== 'trip') driverAutoService(d, inst);
+
     if(inst.wear>=100){
       if(d.status==='trip'){d.status='idle';d.route=null;d.progress=0;toast(`💥 ${d.name}`,'bad');}
       continue;
     }
     if(inst.wear>=90&&d.status==='idle')continue;
 	    if(d.status==='idle'){
-      driverAutoService(d,inst);
       if(Math.random()<dt*0.03*boost){
         const from=d.cityIdx;const maxR=driverRadius(d);const pool=[];
         for(let j=0;j<CITIES.length;j++){
