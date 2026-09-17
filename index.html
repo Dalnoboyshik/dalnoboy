@@ -203,8 +203,8 @@ canvas:active{cursor:grabbing}
 .tab.hidden{display:none}
 .tab .dot{position:absolute;top:4px;right:10px;width:8px;height:8px;background:#ff6b6b;border-radius:50%;display:none;box-shadow:0 0 6px #ff6b6b}
 .tab.hasdot .dot{display:block}
-#subtabsBar{display:flex;gap:3px;padding:6px 8px;background:#0a1018;
-  border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none;
+#subtabsBar{display:flex;flex-wrap:wrap;gap:4px 3px;padding:6px 8px;background:#0a1018;
+  border-bottom:1px solid var(--line);
   flex-shrink:0;min-height:42px;align-items:center}
 #subtabsBar::-webkit-scrollbar{display:none}
 #subtabsBar.hidden{display:none}
@@ -500,7 +500,7 @@ button.sm{font-size:10px;padding:3px 7px}
   .tabs{overflow-x:auto;scrollbar-width:none}
   .tab{padding:8px 2px;min-width:52px;font-size:9.5px;gap:2px}
   .tab .tab-ic{font-size:17px}
-  #subtabsBar{min-height:38px;padding:5px 6px}
+ #subtabsBar{min-height:38px;padding:5px 6px;gap:3px 2px}
   .subtab{padding:7px 10px;font-size:11px;min-height:34px}
   .pane{padding:6px}
   button{padding:7px 10px;font-size:12px;min-height:34px;border-radius:7px}
