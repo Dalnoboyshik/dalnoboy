@@ -3212,7 +3212,7 @@ function driverTick(dt){
         const w=r3(rnd(cap*0.4, cap*0.99));
         const wmul=weightMul(w);let rate=baseRatePerKm(target.km)*wmul*repRateBonus();
         if(hasTrait(d,'pro'))rate*=1.1;
-        const pay=Math.round(rate*target.km*0.85);
+        const pay=Math.round(rate*target.km);
         if(!driverAutoRefuel(d,inst,target.km)){d.status='idle';d.waitingFunding=true;continue;}
         d.waitingFunding=false;
         const nf=target.km*driverVehModel(d).cons/100*SEASONS[S.season].fuelMul;
