@@ -2038,49 +2038,112 @@ function ensureInsurance(inst){if(!inst.insurance)inst.insurance={osago:false,os
     updateUI();
   };
 }
-function openInsuranceModal(){
+function openInsuranceModal(vehicleId){
   if(!S.ownedVehicles.length){toast('Нет машин','bad');return;}
-  const list=S.ownedVehicles;let totO=0,totK=0;
-  list.forEach(v=>{totO+=osagoCost(v);totK+=kaskoCost(v);});
-  $('modalBox').innerHTML=`<h2>🛡️ Страхование парка</h2>
-    <p>Машин всего: <b>${list.length}</b></p>
-    <div class="card"><div class="row"><span class="muted">ОСАГО (1 год) — все</span><b>${fmt(totO)} ₽</b></div>
-      <div class="muted" style="font-size:10.5px;margin-top:3px">Штрафы ГИБДД −75%</div></div>
-    <div class="card"><div class="row"><span class="muted">КАСКО (1 год) — все</span><b>${fmt(totK)} ₽</b></div>
-      <div class="muted" style="font-size:10.5px;margin-top:3px">Крупное ДТП: −75%</div></div>
-    <div class="card">
-      <label class="adm-check"><input type="checkbox" id="insAll"> Ко всем машинам</label>
-      <label class="adm-check" style="margin-top:6px"><input type="checkbox" id="insOsago" checked> ОСАГО</label>
-      <label class="adm-check"><input type="checkbox" id="insKasko"> КАСКО</label>
-      <label class="adm-check"><input type="checkbox" id="insRenew" checked> Автопродление</label>
-    </div>
-    <div style="display:flex;gap:8px;margin-top:8px">
-      <button id="insApply" class="primary" style="flex:1">Применить</button>
-      <button id="insCancel" class="ok" style="flex:1">Отмена</button></div>`;
-  $('modal').classList.add('show');
-  $('insCancel').onclick=()=>Modal.next();
-  $('insApply').onclick=()=>{
-    const doO=$('insOsago').checked,doK=$('insKasko').checked;
-    const renew=$('insRenew').checked,all=$('insAll').checked;
-    const targets=all?list:[curVehInst()].filter(Boolean);
-       let total=0;
+  const isSingle = !!vehicleId;
+  const targets = isSingle ? S.ownedVehicles.filter(v=>v.id===vehicleId) : S.ownedVehicles.slice();
+  if(!targets.length){toast('Машина не найдена','bad');return;}
+  
+  let doO = true, doK = false, renew = true;
+  
+  function render(){
+    const willOsago=[], willKasko=[], haveO=[], haveK=[];
+    let totO=0, totK=0;
     for(const v of targets){
-      if(doO&&!hasOsago(v)) total+=osagoCost(v);
-      if(doK&&!hasKasko(v)) total+=kaskoCost(v);
+      if(hasOsago(v)) haveO.push(v);
+      else if(doO){willOsago.push(v); totO+=osagoCost(v);}
+      if(hasKasko(v)) haveK.push(v);
+      else if(doK){willKasko.push(v); totK+=kaskoCost(v);}
     }
-    if(total===0){toast('Нечего менять','warn');return;}
-    if(S.money<total){toast(`Нужно ${fmt(total)} ₽`,'bad');return;}
-    moneySpend(total,'Страхование');
-    for(const v of targets){
-      const ins=ensureInsurance(v);
-      if(doO&&!hasOsago(v)){ins.osago=true;ins.osagoExpires=S.gameTime+INS_YEAR;}
-      if(doK&&!hasKasko(v)){ins.kasko=true;ins.kaskoExpires=S.gameTime+INS_YEAR;}
-      if(doO)ins.osagoRenew=renew;
-      if(doK)ins.kaskoRenew=renew;
+    const total = totO + totK;
+    const title = isSingle
+      ? `🛡️ Страховка · ${VEHICLES[targets[0].model].n}`
+      : `🛡️ Страхование парка`;
+    
+    let html = `<h2>${title}</h2>
+      <p>Машин выбрано: <b>${targets.length}</b></p>
+      
+      <h3>Что оформлять</h3>
+      <div class="card">
+        <label class="adm-check"><input type="checkbox" id="insOsago" ${doO?'checked':''}> ОСАГО <span class="muted" style="font-size:10px">−75% к штрафам ГИБДД</span></label>
+        <label class="adm-check" style="margin-top:5px"><input type="checkbox" id="insKasko" ${doK?'checked':''}> КАСКО <span class="muted" style="font-size:10px">−75% к ущербу от ДТП</span></label>
+        <label class="adm-check" style="margin-top:5px"><input type="checkbox" id="insRenew" ${renew?'checked':''}> Автопродление</label>
+      </div>`;
+    
+    if(willOsago.length || willKasko.length){
+      html += `<h3>🟢 Будет застраховано</h3>`;
+      const allWill = [...new Set([...willOsago, ...willKasko])];
+      for(const v of allWill){
+        const mdl = VEHICLES[v.model];
+        const o = willOsago.includes(v) ? osagoCost(v) : 0;
+        const k = willKasko.includes(v) ? kaskoCost(v) : 0;
+        const parts = [];
+        if(o) parts.push(`ОСАГО ${fmt(o)} ₽`);
+        if(k) parts.push(`КАСКО ${fmt(k)} ₽`);
+        html += `<div class="card hl">
+          <div class="row"><b>${mdl.icon} ${mdl.n}</b><b class="money">${fmt(o+k)} ₽</b></div>
+          <div class="muted" style="font-size:10.5px;margin-top:2px">${parts.join(' + ')}</div>
+        </div>`;
+      }
     }
-    Modal.next();
-    toast(`🛡️ Застраховано ${targets.length} за ${fmt(total)} ₽`,'ok');updateUI();
-  };
+    
+    if(haveO.length || haveK.length){
+      html += `<h3>✓ Уже застраховано</h3>`;
+      const allHave = [...new Set([...haveO, ...haveK])];
+      for(const v of allHave){
+        const mdl = VEHICLES[v.model];
+        const ins = v.insurance || {};
+        const os = hasOsago(v), kas = hasKasko(v);
+        const osD = os ? Math.max(0,Math.ceil((ins.osagoExpires-S.gameTime)/1440)) : 0;
+        const kaD = kas ? Math.max(0,Math.ceil((ins.kaskoExpires-S.gameTime)/1440)) : 0;
+        const parts = [];
+        if(os) parts.push(`ОСАГО ${osD} дн.`);
+        if(kas) parts.push(`КАСКО ${kaD} дн.`);
+        html += `<div class="card" style="opacity:.7">
+          <div class="row"><span>${mdl.icon} ${mdl.n}</span><span class="badge ok">активно</span></div>
+          <div class="muted" style="font-size:10.5px;margin-top:2px">${parts.join(' · ')}</div>
+        </div>`;
+      }
+    }
+    
+    if(!willOsago.length && !willKasko.length){
+      html += `<div class="card warn" style="margin-top:6px">Всё уже застраховано. Нечего оформлять.</div>`;
+    }
+    
+    html += `<div class="card" style="margin-top:8px">
+        <div class="row"><span class="muted">Итого к оплате</span><b style="color:#39d98a;font-size:15px">${fmt(total)} ₽</b></div>
+        <div class="row"><span class="muted">В кошельке</span><b style="color:${S.money>=total?'#5ef0a0':'#ff8d99'}">${fmt(S.money)} ₽</b></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button id="insApply" class="primary" style="flex:1" ${total===0||S.money<total?'disabled':''}>Применить${total>0?' · '+fmt(total)+' ₽':''}</button>
+        <button id="insCancel" class="ok" style="flex:1">Отмена</button>
+      </div>`;
+    
+    Modal._render(html);
+    
+    $('insOsago').onchange = ()=>{ doO=$('insOsago').checked; render(); };
+    $('insKasko').onchange = ()=>{ doK=$('insKasko').checked; render(); };
+    $('insRenew').onchange = ()=>{ renew=$('insRenew').checked; };
+    $('insCancel').onclick = ()=>Modal.next();
+    $('insApply').onclick = ()=>{
+      const applyTargets = [...new Set([...willOsago, ...willKasko])];
+      if(!applyTargets.length) return;
+      let sum = 0;
+      for(const v of willOsago) sum += osagoCost(v);
+      for(const v of willKasko) sum += kaskoCost(v);
+      if(S.money<sum){toast(`Нужно ${fmt(sum)} ₽`,'bad');return;}
+      moneySpend(sum,'Страхование');
+      for(const v of targets){
+        const ins = ensureInsurance(v);
+        if(willOsago.includes(v)){ ins.osago=true; ins.osagoExpires=S.gameTime+INS_YEAR; ins.osagoRenew=renew; }
+        if(willKasko.includes(v)){ ins.kasko=true; ins.kaskoExpires=S.gameTime+INS_YEAR; ins.kaskoRenew=renew; }
+      }
+      Modal.next();
+      toast(`🛡️ Застраховано ${applyTargets.length} ${applyTargets.length===1?'машина':'машин'} за ${fmt(sum)} ₽`,'ok');
+      updateUI();
+    };
+  }
+  render();
 }
 
 /* ============ ЛИЗИНГ (v18) ============ */
@@ -3943,8 +4006,9 @@ function renderAuto(){
     p.querySelectorAll('[data-lease-vehicle]').forEach(b=>{b.onclick=()=>openLeaseModal(b.dataset.leaseVehicle);});
     p.querySelectorAll('[data-buy-trailer]').forEach(b=>{b.onclick=()=>buyTrailer(b.dataset.buyTrailer);});
   }
-  if(sub==='insurance'){
-    const bi=$('btnInsurance');if(bi)bi.onclick=openInsuranceModal;
+     if(sub==='insurance'){
+    const bi=$('btnInsurance');if(bi)bi.onclick=()=>openInsuranceModal();
+    p.querySelectorAll('[data-ins-veh]').forEach(b=>{b.onclick=()=>openInsuranceModal(b.dataset.insVeh);});
   }
 }
 function autoCurrentContent(){
@@ -4168,18 +4232,33 @@ function autoShopContent(){
 }
 function autoInsuranceContent(){
   if(!S.ownedVehicles.length)return `<div class="card warn">Нет машин</div>`;
+  const needAny = S.ownedVehicles.some(v=>!hasOsago(v)||!hasKasko(v));
   let html=`<h3>🛡️ Страховка парка</h3>
   <div class="card" style="font-size:11px">ОСАГО: штрафы ГИБДД −75%<br>КАСКО: крупное ДТП — компенсация 75%</div>
-  <button class="primary wide" id="btnInsurance">Управление страховками</button>
+  ${needAny?`<button class="primary wide" id="btnInsurance">🛡️ Застраховать весь парк</button>`:
+    `<div class="card ok" style="font-size:11px">✓ Весь парк застрахован</div>`}
   <h3 style="margin-top:8px">По машинам</h3>`;
   for(const v of S.ownedVehicles){
     const ins=v.insurance||{};const os=hasOsago(v),kas=hasKasko(v);
     const osD=os?Math.max(0,Math.ceil((ins.osagoExpires-S.gameTime)/1440)):0;
     const kaD=kas?Math.max(0,Math.ceil((ins.kaskoExpires-S.gameTime)/1440)):0;
     const mdl=VEHICLES[v.model];
-    html+=`<div class="card"><div class="row"><b>${mdl.icon} ${mdl.n}</b></div>
-      <div class="row"><span class="muted">ОСАГО</span><b style="color:${os?'#5ef0a0':'#ff8d99'}">${os?osD+' дн.':'нет'}</b></div>
-      <div class="row"><span class="muted">КАСКО</span><b style="color:${kas?'#5ef0a0':'#ff8d99'}">${kas?kaD+' дн.':'нет'}</b></div>
+    const needIns = !os || !kas;
+    const cost = (!os?osagoCost(v):0) + (!kas?kaskoCost(v):0);
+    const needText = !os && !kas ? 'ОСАГО + КАСКО' : !os ? 'ОСАГО' : 'КАСКО';
+    html+=`<div class="card ${needIns?'':'hl'}">
+      <div class="row">
+        <span style="display:flex;gap:6px;align-items:center;min-width:0">
+          <b>${mdl.icon} ${mdl.n}</b>
+          ${v.plate?`<span class="plate-badge lvl-${v.plate.level}" style="font-size:10px;padding:1px 5px">${v.plate.text}</span>`:''}
+        </span>
+      </div>
+      <div class="row" style="margin-top:5px"><span class="muted">ОСАГО</span>
+        <b style="color:${os?'#5ef0a0':'#ff8d99'}">${os?osD+' дн.':'нет'}</b></div>
+      <div class="row"><span class="muted">КАСКО</span>
+        <b style="color:${kas?'#5ef0a0':'#ff8d99'}">${kas?kaD+' дн.':'нет'}</b></div>
+      ${needIns?`<button class="wide ok" data-ins-veh="${v.id}" style="margin-top:6px">🛡️ Застраховать ${needText} · ${fmt(cost)} ₽</button>`:
+        `<div class="row" style="margin-top:5px"><span class="muted" style="font-size:10.5px;color:#5ef0a0">✓ Всё застраховано</span></div>`}
     </div>`;
   }
   return html;
