@@ -2318,19 +2318,20 @@ function sellVehicle(id){
   if(S.truck.traveling){toast('В пути нельзя','bad');return;}
   if(S.drivers.some(d=>d.vehicleId===id)){toast('Занята','bad');return;}
   if(inst.lease){toast('Лизинг — сначала выкупите','bad');return;}
-  const v=VEHICLES[inst.model];
+   const v=VEHICLES[inst.model];
   const w=inst.wear||0, odo=inst.odometer||0;
   const maxKm=getInstMaxKm(inst);
   const remainPct=Math.max(0, 1-odo/maxKm);
   let resK, resLabel;
   if(remainPct>0.6){resK=1.0;resLabel='хороший';}
-  else if(remainPct>0.4){resK=0.7;resLabel='средний';}
-  else if(remainPct>0.2){resK=0.4;resLabel='низкий';}
-  else if(remainPct>0){resK=0.15;resLabel='на грани';}
-  else {resK=0.3;resLabel='только на запчасти';}
-  const wearK=1-w/300;
+  else if(remainPct>0.4){resK=0.85;resLabel='средний';}
+  else if(remainPct>0.2){resK=0.6;resLabel='низкий';}
+  else if(remainPct>0.05){resK=0.3;resLabel='на грани';}
+  else {resK=0.1;resLabel='почти исчерпан';}
   const bp=v.sellPrice||Math.round((v.price||50000)*0.7);
-  const price=Math.round(bp*resK*wearK);
+  const basePrice=Math.round(bp*resK);
+  const repairCost=Math.round(v.repairFull*(w/100));
+  const price=Math.max(0, basePrice-repairCost);
   const isLast=S.ownedVehicles.length===1;
   if(isLast&&S.money+price<45000){toast('Нельзя продать последнюю','bad');return;}
   const depleted=odo>=maxKm;
@@ -2342,10 +2343,11 @@ function sellVehicle(id){
       <div class="row"><span class="muted">🚗 Ресурс</span><b style="color:${remainColor}">${fmt(odo)} / ${fmt(maxKm)} км</b></div>
       <div class="row"><span class="muted">Осталось</span><b style="color:${remainColor}">${Math.round(remainPct*100)}% · ${resLabel}</b></div>
       <div class="row"><span class="muted">Множитель ресурса</span><b>×${resK.toFixed(2)}</b></div>
-      <div class="row"><span class="muted">🔧 Износ</span><b>${Math.round(w)}% · множитель ×${wearK.toFixed(2)}</b></div>
       <div class="row" style="margin-top:6px;padding-top:6px;border-top:1px solid #1e2c3f">
-        <span class="muted">База (sellPrice)</span><b>${fmt(bp)} ₽</b></div>
-      <div class="row"><span class="muted">Итоговая выручка</span><b style="color:#39d98a;font-size:14px">${fmt(price)} ₽</b></div>
+        <span class="muted">Цена по ресурсу</span><b>${fmt(bp)} × ${resK.toFixed(2)} = ${fmt(basePrice)} ₽</b></div>
+      <div class="row"><span class="muted">🔧 Ремонт (${Math.round(w)}% износа)</span><b style="color:#ff8d99">−${fmt(repairCost)} ₽</b></div>
+      <div class="row" style="margin-top:6px;padding-top:6px;border-top:1px solid #1e2c3f">
+        <span class="muted">Итоговая выручка</span><b style="color:#39d98a;font-size:14px">${fmt(price)} ₽</b></div>
     </div>
     ${depleted?`<div class="card warn" style="margin-top:6px;font-size:11px">⚠️ Ресурс исчерпан — машина идёт на запчасти</div>`:''}
     <div style="display:flex;gap:8px;margin-top:8px">
@@ -2361,7 +2363,23 @@ function sellVehicle(id){
     Modal.next();toast(`💸 ${fmt(price)} ₽`,'ok');updateUI();
   };
 }
-
+function scrapVehicle(id){
+  const inst=getVeh(id);if(!inst)return;
+  if(S.truck.traveling){toast('В пути нельзя','bad');return;}
+  if(S.drivers.some(d=>d.vehicleId===id)){toast('Занята','bad');return;}
+  if(inst.lease){toast('Лизинг — сначала выкупите','bad');return;}
+  if(!resourceDepleted(inst)){toast('Ресурс ещё не исчерпан — продай обычным способом','bad');return;}
+  const v=VEHICLES[inst.model];
+  const bp=v.sellPrice||Math.round((v.price||50000)*0.7);
+  const price=Math.round(bp*0.05);
+  if(!confirm(`Списать ${v.icon} ${v.n} в утиль за ${fmt(price)} ₽?`))return;
+  moneyAdd(price,`Утиль ${v.n}`);
+  addNews(`♻️ Утиль: ${v.n} · +${fmt(price)} ₽`,'info','finance');
+  S.ownedVehicles=S.ownedVehicles.filter(x=>x.id!==id);
+  if(S.currentVehicleId===id)S.currentVehicleId=S.ownedVehicles.length?S.ownedVehicles[0].id:null;
+  toast(`♻️ ${v.n} списана · +${fmt(price)} ₽`,'ok');
+  updateUI();
+}
 /* ============ ФИРМА ============ */
 function openSelf(){
   if(S.firmLevel!=='person'){toast('Уже открыто');return;}
@@ -3384,6 +3402,7 @@ function renderAuto(){
     const r3b=$('btnRepairAll');if(r3b)r3b.onclick=repairAllFleet;
     const r4b=$('btnRefuelAll');if(r4b)r4b.onclick=refuelAllFleet;
     const rs=$('btnSell');if(rs)rs.onclick=()=>sellVehicle(S.currentVehicleId);
+	      const scr=$('btnScrap');if(scr)scr.onclick=()=>scrapVehicle(S.currentVehicleId);
     const bo=$('btnBuyout');if(bo)bo.onclick=()=>buyoutLease(S.currentVehicleId);
      const pd=$('btnPayDebt');if(pd)pd.onclick=()=>payLeaseDebt(S.currentVehicleId);
     const rp=$('btnRegPlate');if(rp)rp.onclick=()=>openPlateModal(S.currentVehicleId, false);
@@ -3510,8 +3529,11 @@ function autoCurrentContent(){
    ${inst.plate
     ? `<button class="big gold" id="btnReplate" ${S.truck.traveling?'disabled':''}><span class="ic">🔄</span> Сменить номер · 15 000 ₽</button>`
     : `<button class="big ok" id="btnRegPlate" ${S.truck.traveling?'disabled':''}><span class="ic">📋</span> Поставить на учёт · 15 000 ₽</button>`}
-  <button class="big bad" id="btnSell" ${S.truck.traveling?'disabled':''}>
-    <span class="ic">💸</span> Продать машину</button>
+  ${resourceDepleted(inst)
+    ? `<button class="big bad" id="btnScrap" ${S.truck.traveling?'disabled':''}>
+         <span class="ic">♻️</span> Списать в утиль <span class="sub">${fmt(Math.round((v.sellPrice||v.price*0.7)*0.05))} ₽</span></button>`
+    : `<button class="big bad" id="btnSell" ${S.truck.traveling?'disabled':''}>
+         <span class="ic">💸</span> Продать машину</button>`}
   ${inst.lease?`<button class="big gold" id="btnBuyout"><span class="ic">🏦</span> Досрочно выкупить</button>`:''}
   ${inst.lease&&inst.lease.debt>0?`<button class="big bad" id="btnPayDebt"><span class="ic">💳</span> Погасить долг ${fmt(inst.lease.debt)} ₽</button>`:''}
   <h3 style="margin-top:10px">⚙️ Апгрейды</h3>`;
@@ -4866,6 +4888,9 @@ const CODEX=[
   {id:'serviceOverdue',icon:'🛠',title:'ТО просрочено',
    text:'Ресурс и ТО — разные вещи. Просрочил ТО — износ идёт быстрее. Сделай ТО в «Авто».',
    when:s=>{const v=curVehInst();return v&&serviceOverdue(v)>0;}},
+	{id:'resourceLow',icon:'🕰️',title:'Ресурс машины на исходе',
+ text:'Пробег подходит к концу ресурса. Когда счётчик дойдёт до нуля — машина встанет навсегда, отремонтировать её будет нельзя. Продай заранее или подготовь замену.',
+ when:s=>{const v=curVehInst();return v && !resourceDepleted(v) && resourceRemainPct(v)<0.2;}},
   {id:'fuelLow',icon:'⛽',title:'Мало топлива',
    text:'Бак почти пустой. Заправься в «Авто» — иначе можно встрять в пути.',
    when:s=>hasVehicle()&&!s.truck.traveling&&curFuel()<curFuelMax()*0.15},
