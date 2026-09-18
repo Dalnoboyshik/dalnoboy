@@ -1157,6 +1157,26 @@ function generatePlate(cityIdx, isReReg){
     level = rollPlateLevel(isReReg, isIntl);
     text = genPlateText(level, cityIdx);
   }
+   // === Пересчёт уровня по тексту (upgrade-only) ===
+  if(!isIntl){
+    const m = text.match(/^([А-Я])(\d{3})([А-Я]{2})\s/);
+    if(m){
+      const b1 = m[1];          // первая буква (перед цифрами)
+      const d  = m[2];          // три цифры
+      const l1 = m[3][0];       // вторая буква (первая в паре после цифр)
+      const l2 = m[3][1];       // третья буква (вторая в паре)
+      const tripleDigits  = (d[0]===d[1] && d[1]===d[2]);
+      const tripleLetters = (b1===l1 && l1===l2);   // ВСЕ ТРИ буквы одинаковы
+
+      if(tripleDigits && tripleLetters){
+        if(level !== 'legendary') level = 'super';
+      } else if(tripleDigits || tripleLetters){
+        if(level === 'normal' || level === 'nice') level = 'elite';
+      }
+    }
+  }
+
+
   return {text, level, regionCode: code, registeredAt: S.gameTime};
 }
 
