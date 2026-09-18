@@ -4957,7 +4957,7 @@ function vehTileHTML(i, busy){
   }
 
   const plateStr = i.plate
-    ? `<span class="plate-badge lvl-${i.plate.level}">${i.plate.text}</span>`
+    ? `<span class="plate-badge lvl-${i.plate.level}">${i.plate.text}</span><span class="plate-lvl-icon">${PLATE_LEVELS[i.plate.level].icon}</span>`
     : `<span class="plate-badge no-plate">без номера</span>`;
 
   let statusBadge = '';
@@ -5067,7 +5067,7 @@ function autoInsuranceContent(){
       <div class="row">
         <span style="display:flex;gap:6px;align-items:center;min-width:0">
           <b>${mdl.icon} ${mdl.n}</b>
-              ${v.plate?`<span class="plate-badge lvl-${v.plate.level}">${v.plate.text}</span>`:''}
+                         ${v.plate?`<span class="plate-badge lvl-${v.plate.level}">${v.plate.text}</span><span class="plate-lvl-icon">${PLATE_LEVELS[v.plate.level].icon}</span>`:''}
         </span>
       </div>
       <div class="row" style="margin-top:5px"><span class="muted">ОСАГО</span>
