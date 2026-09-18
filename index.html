@@ -4859,13 +4859,13 @@ function renderWorld(){
       else if(!canOOO) reason = 'нужно ООО';
       else if(!canBases) reason = `баз ${req.bases}+`;
       else if(!canMoney) reason = 'мало денег';
-      const bonusTxt = tier==='local' && c.bases.length
-        ? `+5% к заказам в ${CITIES[c.bases[0]].n}`
+          const bonusTxt = tier==='local' && c.bases.length
+        ? `+5% к ставке на маршруты из/в ${CITIES[c.bases[0]].n}`
         : tier==='regional'
-        ? `+10% к заказам в регионе ${REGIONS[c.region].n}`
+        ? `+10% к ставке на маршруты в регионе ${REGIONS[c.region].n}`
         : tier==='national'
-        ? `+15% ко всем заказам по стране`
-        : `+10% к международным маршрутам`;
+        ? `+15% к ставке на все маршруты`
+        : `+10% к ставке на международные`;
       html+=`<div class="card comp" style="border-left-color:${c.color}">
         <div class="row"><b>${c.icon} ${c.n}</b><span class="rt ${ratingCls(c.reputation/20)}">Репутация ${Math.round(c.reputation)}</span></div>
         <div class="row" style="margin-top:4px"><span class="muted">Капитал</span><b class="money">${fmt(c.money)} ₽</b></div>
@@ -4981,14 +4981,14 @@ function firmGeneralContent(){
     const dead = COMPETITORS.filter(c=>c.dead);
     if(!dead.length) return '';
     let html2=`<h3>🏆 Монопольные бонусы</h3><div class="card ok">`;
-    for(const c of dead){
+      for(const c of dead){
       const bTxt = c.tier==='local' && c.origCity!==undefined
-        ? `+5% в ${CITIES[c.origCity].n}`
+        ? `+5% к ставке в ${CITIES[c.origCity].n}`
         : c.tier==='regional' && c.region
-        ? `+10% в ${REGIONS[c.region].n}`
+        ? `+10% к ставке в ${REGIONS[c.region].n}`
         : c.tier==='national'
-        ? `+15% по стране`
-        : `+10% на междунар.`;
+        ? `+15% к ставке по стране`
+        : `+10% к ставке на междунар.`;
       html2+=`<div class="row"><span>${c.icon} ${c.n}</span><b style="color:#5ef0a0">${bTxt}</b></div>`;
     }
     html2+=`</div>`;
