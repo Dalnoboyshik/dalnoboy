@@ -1044,6 +1044,10 @@ const LEASE_TERMS = [
 ];
 const LEASE_PERIOD_DAYS = 15;
 const LEASE_FINE_PCT = 0.15;
+/* ====== ДОЛГ У РЕБЯТ ====== */
+const LOAN_DAYS = 7;
+const LOAN_RATE = 0.10;
+const LOAN_MAX_PCT = 0.70;
 /* ============ ГОСНОМЕРА (v18.2) ============ */
 const PLATE_LETTERS = 'АВЕКМНОРСТУХ';
 const CITY_REGION_CODE = [
@@ -1241,8 +1245,9 @@ const S = {
   lastNominationDay:0,
   nomination:null,
   pendingEvents:[],
-  lastCityEventDay:0,
+   lastCityEventDay:0,
   rateBonusUntil:0,
+  loan:null,
   };
 let COMPETITORS = [
   // Локальные — 1 база в одном городе, уровень covered
@@ -2390,8 +2395,131 @@ function buyoutLease(vehicleId){
   $('boYes').onclick=()=>{
     if(S.money<disc){toast('Мало денег','bad');return;}
     moneySpend(disc,'Выкуп');delete v.lease;S.leasesCount--;
-    Modal.next();toast(`✅ ${VEHICLES[v.model].n} выкуплен`,'ok');updateUI();
+       Modal.next();toast(`✅ ${VEHICLES[v.model].n} выкуплен`,'ok');updateUI();
   };
+}
+
+/* ============ ДОЛГ У «РЕБЯТ» ============ */
+function loanMaxFor(inst){
+  const v = VEHICLES[inst.model];
+  const base = v.sellPrice || Math.round((v.price||50000) * 0.7);
+  return Math.round(base * LOAN_MAX_PCT);
+}
+
+function openLoanModal(){
+  if(S.loan){ toast('У тебя уже есть долг у ребят','warn'); return; }
+  const inst = curVehInst();
+  if(!inst){ toast('Нет машины','bad'); return; }
+  if(inst.lease){ toast('Лизинговую не берём','bad'); return; }
+  const maxAmt = loanMaxFor(inst);
+  const total = Math.round(maxAmt * (1 + LOAN_RATE));
+  const v = VEHICLES[inst.model];
+
+  const html = `<h2>💼 Обратиться к «ребятам»</h2>
+    <div class="big-event"><h3>Разговор на стоянке</h3>
+      <p>«Слышь, командир. Видим — <b>${v.icon} ${v.n}</b>. Дадим <b>${fmt(maxAmt)} ₽</b> на неделю. Вернёшь <b>${fmt(total)} ₽</b> — и разойдёмся. Не вернёшь — машина наша.»</p></div>
+    <div class="card hl">
+      <div class="row"><b>${v.icon} ${v.n}</b><b class="money">${fmt(maxAmt)} ₽</b></div>
+      <div class="muted" style="font-size:11px;margin-top:4px">70% от оценочной стоимости (${fmt(Math.round(v.sellPrice || (v.price||50000)*0.7))} ₽)</div>
+    </div>
+    <div class="card">
+      <div class="row"><span class="muted">Взять сейчас</span><b style="color:#5ef0a0;font-size:14px">+${fmt(maxAmt)} ₽</b></div>
+      <div class="row"><span class="muted">Вернуть через ${LOAN_DAYS} дней</span><b style="color:#ff6b6b;font-size:14px">${fmt(total)} ₽</b></div>
+      <div class="row"><span class="muted">Переплата</span><b style="color:#ffb27a">+${fmt(Math.round(maxAmt*LOAN_RATE))} ₽</b></div>
+    </div>
+    <div class="card warn" style="font-size:11px;margin-top:8px">
+      ⚠️ Машина <b>остаётся у тебя</b> — можешь ездить и зарабатывать.<br>
+      ⚠️ Продать/списать её пока нельзя.<br>
+      ⚠️ Не вернёшь через ${LOAN_DAYS} дней — <b style="color:#ff6b6b">машину заберут</b>. Если будешь на ней в рейсе — заберут после рейса.
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button id="lnYes" class="gold" style="flex:1">Взять ${fmt(maxAmt)} ₽</button>
+      <button id="lnNo" class="ok" style="flex:1">Отказаться</button>
+    </div>`;
+  Modal.show(html, 1, ()=>{
+    const y = $('lnYes'), n = $('lnNo');
+    if(n) n.onclick = ()=>Modal.next();
+    if(y) y.onclick = ()=>takeLoan();
+  });
+}
+
+function takeLoan(){
+  if(S.loan){ Modal.next(); return; }
+  const inst = curVehInst();
+  if(!inst){ Modal.next(); toast('Нет машины','bad'); return; }
+  const amount = loanMaxFor(inst);
+  S.loan = {
+    vehicleId: inst.id,
+    model: inst.model,
+    amount,
+    startedAt: S.gameTime,
+    dueAt: S.gameTime + LOAN_DAYS*1440,
+  };
+  // Заём — не доход, пишем в историю напрямую
+  S.money += amount;
+  S.finance.history.push({t:S.gameTime, delta:amount, desc:`Долг у ребят · ${VEHICLES[inst.model].n}`});
+  if(S.finance.history.length>500)S.finance.history.shift();
+  Modal.next();
+  toast(`💼 Занял ${fmt(amount)} ₽ у ребят`,'warn');
+  addNews(`💼 Долг у ребят: ${fmt(amount)} ₽ · вернуть ${fmt(Math.round(amount*1.1))} ₽ через ${LOAN_DAYS} дн.`,'warn','notify');
+  updateUI();
+}
+
+function repayLoan(){
+  if(!S.loan){ toast('Нет долга','ok'); return; }
+  const total = Math.round(S.loan.amount * (1 + LOAN_RATE));
+  if(S.money < total){ toast(`Нужно ${fmt(total)} ₽`,'bad'); return; }
+  moneySpend(total, `Возврат долга · ${VEHICLES[S.loan.model] ? VEHICLES[S.loan.model].n : ''}`);
+  const modelName = VEHICLES[S.loan.model] ? VEHICLES[S.loan.model].n : 'машина';
+  S.loan = null;
+  toast('✅ Ребята довольны. Долг закрыт','ok');
+  addNews(`💼 Долг закрыт · ${modelName}`,'ok','finance');
+  updateUI();
+}
+
+function showLoanCollectModal(modelName, amount, interest){
+  const html = `<h2>🚨 Ребята вернулись</h2>
+    <div class="big-event danger"><h3>Машина уехала</h3>
+      <p>Двое крепких подошли к стоянке, сели в <b>${modelName}</b> и уехали. Никто не пикнул. Долг закрыт — с процентами, но не деньгами.</p></div>
+    <div class="card">
+      <div class="row"><span class="muted">Изъято</span><b>${modelName}</b></div>
+      <div class="row"><span class="muted">Занято было</span><b>${fmt(amount)} ₽</b></div>
+      <div class="row"><span class="muted">Проценты ребят</span><b style="color:#ff8d99">−${fmt(interest)} ₽</b></div>
+    </div>
+    <button class="wide primary" onclick="Modal.next()" style="margin-top:8px">Понятно</button>`;
+  Modal.show(html, 1);
+}
+
+function checkLoan(){
+  if(!S.loan) return;
+  if(S.gameTime < S.loan.dueAt) return;
+
+  const inst = getVeh(S.loan.vehicleId);
+  if(!inst){
+    // Машины уже нет (продана не могла быть, но на всякий)
+    S.loan = null;
+    return;
+  }
+  // Если игрок сейчас на этой машине и в рейсе — ждём завершения
+  if(S.truck.traveling && S.currentVehicleId === S.loan.vehicleId) return;
+
+  // Изъятие
+  const modelName = VEHICLES[S.loan.model] ? VEHICLES[S.loan.model].n : 'машина';
+   const interest = Math.round(S.loan.amount * LOAN_RATE);
+  const loanAmount = S.loan.amount;
+  const wasCurrent = (S.currentVehicleId === S.loan.vehicleId);
+
+  S.ownedVehicles = S.ownedVehicles.filter(v=>v.id !== S.loan.vehicleId);
+  S.drivers = S.drivers.filter(d=>d.vehicleId !== S.loan.vehicleId);
+
+  if(wasCurrent){
+    const free = S.ownedVehicles.find(v=>!S.drivers.some(d=>d.vehicleId===v.id));
+    S.currentVehicleId = free ? free.id : null;
+  }
+    S.loan = null;
+  showLoanCollectModal(modelName, loanAmount, interest);
+  addNews(`🚨 Ребята забрали ${modelName} за долг`,'bad','notify');
+  updateUI();
 }
 
 /* ============ КОНКУРЕНТЫ ============ */
@@ -2944,6 +3072,7 @@ function sellVehicle(id){
   if(S.truck.traveling){toast('В пути нельзя','bad');return;}
   if(S.drivers.some(d=>d.vehicleId===id)){toast('Занята','bad');return;}
   if(inst.lease){toast('Лизинг — сначала выкупите','bad');return;}
+  if(S.loan && S.loan.vehicleId===id){toast('Машина под залогом','bad');return;}
    const v=VEHICLES[inst.model];
   const w=inst.wear||0, odo=inst.odometer||0;
   const maxKm=getInstMaxKm(inst);
@@ -2994,6 +3123,7 @@ function scrapVehicle(id){
   if(S.truck.traveling){toast('В пути нельзя','bad');return;}
   if(S.drivers.some(d=>d.vehicleId===id)){toast('Занята','bad');return;}
   if(inst.lease){toast('Лизинг — сначала выкупите','bad');return;}
+  if(S.loan && S.loan.vehicleId===id){toast('Машина под залогом','bad');return;}
   if(!resourceDepleted(inst)){toast('Ресурс ещё не исчерпан — продай обычным способом','bad');return;}
   const v=VEHICLES[inst.model];
   const bp=v.sellPrice||Math.round((v.price||50000)*0.7);
@@ -3485,6 +3615,7 @@ if(currDay > prevDay){
     }
   }
   leasePaymentTick();
+  checkLoan();
   for(const b of S.bases){
     if(b.building&&S.gameTime>=b.building.finishAt){
       b.upgrades=b.upgrades||{};const u=b.building.key;
@@ -3608,6 +3739,21 @@ function gameDate(){
 }
 function obligationsList(){
   const list=[];
+  if(S.loan){
+    const ln = S.loan;
+    const daysTo = Math.max(0, Math.ceil((ln.dueAt - S.gameTime) / 1440));
+    const total = Math.round(ln.amount * (1 + LOAN_RATE));
+    const mdl = VEHICLES[ln.model];
+    list.push({
+      ic:'💼',
+      txt:`Долг ребятам · ${mdl?mdl.n:'машина'}`,
+      sum: total,
+      days: daysTo,
+      danger: daysTo <= 2,
+      progress: 0,
+      note: `Занято ${fmt(ln.amount)} ₽ · вернуть ${fmt(total)} ₽`
+    });
+  }
   for(const v of S.ownedVehicles){
     if(!v.lease)continue;
     const daysTo=Math.max(0,Math.ceil((v.lease.nextPaymentAt-S.gameTime)/1440));
@@ -4803,6 +4949,30 @@ function renderWorld(){
   const sub=uiSubTab.world||'news';
   let html='';
   if(sub==='news'){
+    if(S.loan){
+      const ln = S.loan;
+      const total = Math.round(ln.amount * (1 + LOAN_RATE));
+      const daysLeft = Math.max(0, Math.ceil((ln.dueAt - S.gameTime) / 1440));
+      const mdl = VEHICLES[ln.model];
+      const canPay = S.money >= total;
+      html += `<h3>💼 Долг у ребят</h3>
+        <div class="card ${daysLeft<=2?'bad':'warn'}">
+          <div class="row"><b>🔒 ${mdl?mdl.icon+' '+mdl.n:'Машина'} в залоге</b>
+            <b style="color:${daysLeft<=2?'#ff6b6b':'#ffb84d'}">через ${daysLeft} дн.</b></div>
+          <div class="row" style="margin-top:6px"><span class="muted">Занято</span><b>${fmt(ln.amount)} ₽</b></div>
+          <div class="row"><span class="muted">Вернуть</span><b style="color:#ff6b6b;font-size:14px">${fmt(total)} ₽</b></div>
+          <button class="wide ${canPay?'gold':''}" id="worldRepayLoan" style="margin-top:8px" ${canPay?'':'disabled'}>
+            💼 Вернуть ${fmt(total)} ₽
+          </button>
+          ${!canPay?`<div class="muted" style="font-size:10.5px;text-align:center;margin-top:4px">Не хватает ${fmt(total-S.money)} ₽</div>`:''}
+        </div>`;
+    } else {
+      html += `<h3>💼 Деньги у ребят</h3>
+        <div class="card hl">
+          <div class="muted" style="font-size:11.5px;line-height:1.5">Нужны деньги? «Ребята» дадут под залог текущей машины: 70% стоимости на ${LOAN_DAYS} дней. Вернёшь с +10%. Не вернёшь — заберут машину.</div>
+          <button class="wide gold" id="worldTakeLoan" style="margin-top:8px">💼 Обратиться к ребятам</button>
+        </div>`;
+    }
     html+=`<h3>📰 Лента новостей</h3><div class="news-panel" style="max-height:none">`;
     if(!S.news.items.length)html+=`<div class="empty">Пока ничего</div>`;
     else for(const n of S.news.items){
@@ -4899,6 +5069,8 @@ function renderWorld(){
     }
   }
   p.innerHTML=html;
+  const _wlTake = $('worldTakeLoan'); if(_wlTake) _wlTake.onclick = ()=>openLoanModal();
+  const _wlRepay = $('worldRepayLoan'); if(_wlRepay) _wlRepay.onclick = ()=>repayLoan();
   p.querySelectorAll('[data-buycomp]').forEach(b=>{b.onclick=()=>buyCompetitor(b.dataset.buycomp);});
   p.querySelectorAll('[data-tender]').forEach(b=>{b.onclick=()=>participateTender(b.dataset.tender);});
   p.querySelectorAll('[data-intl]').forEach(b=>{b.onclick=()=>intlBranch(+b.dataset.intl);});
@@ -5704,6 +5876,7 @@ function loadGame(){
     if(!S.pendingEvents)S.pendingEvents=[];
     if(S.lastCityEventDay===undefined)S.lastCityEventDay=0;
     if(S.rateBonusUntil===undefined)S.rateBonusUntil=0;
+    if(S.loan===undefined)S.loan=null;
     if(!S.stats)S.stats={};
     if(S.stats.logistWins===undefined)S.stats.logistWins=0;
     if(S.stats.scandals===undefined)S.stats.scandals=0;
