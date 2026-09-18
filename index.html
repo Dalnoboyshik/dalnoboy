@@ -1372,7 +1372,13 @@ const TIER_REQ = {
 };
 
 // Множитель цены поглощения
-const TIER_MULT = {local:1.5, regional:2.0, national:2.5, intl:3.0};
+const TIER_MULT = {local:2.0, regional:3.0, national:5.0, intl:8.0};
+function absorbCost(c){
+  const base = c.bases.length * (BASE_TYPES[c.baseType || 'open'].price || 0);
+  return Math.round(base * (TIER_MULT[c.tier] || 1.5) * 0.75
+                  + c.money * 0.4
+                  + c.reputation * 300000);
+}
 
 // Порядок уровней баз (для апгрейда при поглощении)
 const BASE_ORDER = ['open','covered','small','medium','hub','federal'];
@@ -2631,15 +2637,17 @@ function checkLoan(){
 function competitorTick(){
   for(const c of COMPETITORS){
     if(c.dead) continue;
+    c.bases = [...new Set(c.bases)];   // ← чистка дублей от старых сейвов
 
     const g = TIER_GROWTH[c.tier] || TIER_GROWTH.local;
     const growthChance = Math.max(0.002, g.chance - c.bases.length * 0.0025);
 
     if(c.bases.length < g.maxBases && Math.random() < growthChance){
       const avail=[];
-      for(let i=0;i<CITIES.length;i++){
+          for(let i=0;i<CITIES.length;i++){
         if(CITIES[i].intl && c.tier !== 'intl') continue;
         if(!CITIES[i].intl && c.tier === 'intl') continue;
+        if(c.bases.includes(i)) continue;              // ← НЕ добавлять свой же город
         if(S.bases.some(b=>b.cityIdx===i)) continue;
         if(COMPETITORS.some(x=>x!==c && !x.dead && x.bases.includes(i))) continue;
         if(c.tier === 'regional' && c.region){
@@ -2681,9 +2689,7 @@ function buyCompetitor(id){
   if(req.ooo && !isOOO()){ toast('Нужно ООО','bad'); return; }
   if(S.bases.length < req.bases){ toast(`Нужно баз ≥ ${req.bases}`,'bad'); return; }
 
-    const mult = TIER_MULT[c.tier] || 1.5;
-  const baseValue = c.bases.length * (BASE_TYPES[c.baseType || 'open'].price || 0);
-  const cost = Math.round(baseValue * mult * 0.75 + c.reputation * 500000);
+       const cost = absorbCost(c);
   if(S.money < cost){ toast(`Нужно ${fmt(cost)} ₽`,'bad'); return; }
   if(!confirm(`Поглотить ${c.n} за ${fmt(cost)} ₽?`)) return;
 
@@ -5426,9 +5432,7 @@ function renderWorld(){
         </div>`;
         continue;
       }
-         const mult = TIER_MULT[tier] || 1.5;
-      const baseValue = c.bases.length * (BASE_TYPES[c.baseType || 'open'].price || 0);
-      const cost = Math.round(baseValue * mult * 0.75 + c.reputation * 500000);
+                 const cost = absorbCost(c);
       const req = TIER_REQ[tier];
       const canRep = S.reputation >= req.rep;
       const canOOO = !req.ooo || isOOO();
@@ -6305,6 +6309,7 @@ function loadGame(){
     if(S.rank===undefined)S.rank=getRankIndex();
     if(!S.intlBranches)S.intlBranches=[];
     if(S.bases)for(const b of S.bases)if(!b.id)b.id='b'+(++baseIdCounter);
+	      if(COMPETITORS)for(const c of COMPETITORS)if(c.bases)c.bases=[...new Set(c.bases)];
       if(S.drivers)for(const dr of S.drivers){
       if(!dr.stats)dr.stats=newDriverStats();
       if(!dr.traits)dr.traits=[];
