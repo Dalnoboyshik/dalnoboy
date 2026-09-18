@@ -3404,7 +3404,7 @@ function driverAutoService(d,inst){
 }
 function driverFuelPrice(d){
   const base=S.bases.find(b=>b.cityIdx===d.cityIdx);
-  let price=FUEL_PRICE_BASE*SEASONS[S.season].fuelMul;
+  let price=FUEL_PRICE_BASE;  // ← убран fuelMul, он уже учтён в объёме
   if(base&&base.businesses.includes('fuel'))price*=0.75;
   return price*1.05;
 }
@@ -3537,9 +3537,11 @@ if(hasTrait(d,'lazy'))dur*=1.2;
         moneySpend(steal,`Вор ${d.name}`);d.stats.spentOther+=steal;
         toast(`🛢️ ${d.name} −${fmt(steal)} ₽`,'bad');
       }
-      const tired=d.hoursDriven>8&&upLevel(inst,'autopilot')===0;
-      const accChance=tired?0.01:0.005;
-          if(Math.random()<dt*accChance){
+     const tired=d.hoursDriven>8&&upLevel(inst,'autopilot')===0;
+// Считаем по километрам, а не по секундам — иначе длинные рейсы обречены
+const kmTick = (dt / d.duration) * d.route.km;
+const accChance = (tired ? 0.00005 : 0.000015) * kmTick;
+if(Math.random()<accChance){
         if(!d.stats)d.stats=newDriverStats();
         d.stats.accidents=(d.stats.accidents||0)+1;
         toast(`💥 ${d.name} ДТП`,'bad');
