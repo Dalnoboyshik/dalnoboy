@@ -151,6 +151,13 @@ html,body{height:100%;height:100dvh;overflow:hidden;overscroll-behavior:none;bac
   backdrop-filter:blur(8px);
   z-index:10;position:relative;
 }
+	.tb-speed{display:flex;gap:3px;align-items:center}
+.spd-btn{padding:4px 8px;font-size:12px;font-weight:700;min-width:32px;
+  background:#0c141e;border:1px solid var(--line);color:#8ba0bd;border-radius:5px;
+  cursor:pointer;transition:.15s;font-family:inherit}
+.spd-btn:hover{background:#16202f;color:#cfe0f5;border-color:#2f4a75}
+.spd-btn.on{background:#4a3a14;border-color:#8a7020;color:#ffd479}
+.spd-btn[data-spd="0"].on{background:#5c1a24;border-color:#8a2f3e;color:#ff8d99}
 .tb-block{display:flex;align-items:center;gap:6px;font-size:13px}
 .tb-block .ic{font-size:15px;opacity:.85}
 .tb-block b{font-weight:700;font-variant-numeric:tabular-nums}
@@ -681,8 +688,14 @@ button.sm{font-size:10px;padding:3px 7px}
 
 <div id="app">
   <div id="topbar">
-    <div class="tb-main">
-      <div class="tb-block tb-date"><span class="ic">📅</span><b id="uiDate">День 1 · 06:00</b></div>
+<div class="tb-main">
+  <div class="tb-block tb-speed" id="speedCtrl">
+    <button class="spd-btn" data-spd="0" title="Пауза (Space)">⏸</button>
+    <button class="spd-btn on" data-spd="1" title="Обычная скорость (1)">1×</button>
+    <button class="spd-btn" data-spd="2" title="Ускорение ×2 (2)">2×</button>
+    <button class="spd-btn" data-spd="3" title="Ускорение ×3 (3)">3×</button>
+  </div>
+  <div class="tb-block tb-date"><span class="ic">📅</span><b id="uiDate">День 1 · 06:00</b></div>
       <div class="tb-block tb-money"><span class="ic">💰</span><b id="uiMoney">0 ₽</b></div>
       <div class="tb-block tb-passive"><span class="ic">📈</span><b id="uiPassive">0 ₽/нед</b></div>
       <div class="tb-block tb-debt" id="uiDebtBox" title="Открыть финансы" style="display:none">
@@ -1195,6 +1208,7 @@ function plateStopMultiplier(inst){
 }
 let vehIdCounter=1,trlIdCounter=1,drvIdCounter=1,contractId=1,baseIdCounter=1,questId=1,tenderId=1;
 const S = {
+	  timeSpeed: 1,      // 0 = пауза, 1 = норм, 2, 3 = ускорение
   money: START_MONEY,
   firmName: null, firmFounded: 0, firmLevel: 'person',
   startCity: null,
@@ -5891,13 +5905,40 @@ S.ownedVehicles.push({id:'v'+(++vehIdCounter),model:'vaz2106',fuel:VEHICLES.vaz2
 let last=performance.now();
 let uiT=0,atiT=0,saveT=0,eventT=0,compT=0;
 let gameStarted=false;
+	function setTimeSpeed(v){
+  S.timeSpeed = clamp(v, 0, 3) | 0;
+  document.querySelectorAll('.spd-btn').forEach(b => {
+    b.classList.toggle('on', +b.dataset.spd === S.timeSpeed);
+  });
+  const labels = {0:'⏸ Пауза', 1:'▶️ Обычная', 2:'⏩ ×2', 3:'⏭ ×3'};
+  toast(labels[S.timeSpeed] || '', 'info');
+}
+document.querySelectorAll('.spd-btn').forEach(b => {
+  b.onclick = () => setTimeSpeed(+b.dataset.spd);
+});
+document.addEventListener('keydown', e => {
+  if(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if(e.code === 'Space'){
+    e.preventDefault();
+    setTimeSpeed(S.timeSpeed === 0 ? 1 : 0);
+  }
+  if(e.key === '1') setTimeSpeed(1);
+  if(e.key === '2') setTimeSpeed(2);
+  if(e.key === '3') setTimeSpeed(3);
+});
 function loop(now){
   let dt=(now-last)/1000;last=now;if(dt>0.15)dt=0.15;
-advanceTime(dt*TIME_SCALE);
+
+  // === Разделяем dt: игровое и реальное ===
+  const speed = (S.timeSpeed === undefined) ? 1 : S.timeSpeed;
+  const sdt = dt * speed;   // игровое (для gameTime, рейсов, водителей)
+  const rdt = dt;           // реальное (для UI, автосейва, обновления биржи)
+
+  advanceTime(sdt*TIME_SCALE);
   if(S.truck.traveling&&!breakdownActive&&!S.truck.paused){
-    S.truck.progress+=dt/S.truck.duration;
+    S.truck.progress+=sdt/S.truck.duration;
     const veh=curVehInst();
-    if(veh){
+        if(veh){
       const nw=Math.min(100,S.truck.wearStart+S.truck.wearDelta*S.truck.progress);
       const d=nw-veh.wear;veh.wear=nw;
       if(d>0&&vehWearRate(veh)>0)veh.odometer=(veh.odometer||0)+d/vehWearRate(veh);
@@ -5906,8 +5947,10 @@ advanceTime(dt*TIME_SCALE);
       const kt=S.dailyTasks.find(t=>t.id==='km');
       if(kt&&!kt.done){
         const kps=S.truck.local?S.activeOrders.filter(o=>o.local).reduce((s,o)=>s+o.km,0)/S.truck.duration:roadKm(S.truck.from,S.truck.to)/S.truck.duration;
-        kt.prog+=kps*dt;}}
-    tryRoadEvent(dt);
+        kt.prog+=kps*sdt;
+      }
+    }
+    tryRoadEvent(sdt);
     if(veh&&veh.wear>=100&&S.truck.progress<1)triggerBreakdown();
     if(S.truck.progress>=1&&!breakdownActive){
       S.truck.progress=1;S.truck.traveling=false;S.truck.paused=false;
@@ -5923,20 +5966,28 @@ advanceTime(dt*TIME_SCALE);
       toast(`📍 Прибытие: <b>${CITIES[ac].n}</b>`);updateUI();
     }
   }
-  driverTick(dt);
- eventT+=dt;
-if(eventT>8){eventT=0;
+  driverTick(sdt);
+  // eventT копит игровое время. Порог 8/speed делится на скорость,
+  // чтобы событие срабатывало с одинаковой частотой в ИГРОВЫХ часах,
+  // а не частило на ×2 и ×3. При speed=0 (пауза) 8/0=Infinity,
+  // поэтому условие никогда не срабатывает — событие не запустится,
+  // пока игра на паузе. Это правильно.
+  eventT+=sdt;
+if(eventT>8/speed){eventT=0;
   if(!S.truck.traveling&&!breakdownActive&&!currentCityEvent&&!adminOpen)tryCityEvent();}
 _codexTick+=dt;
 if(_codexTick>2){_codexTick=0;tryCodex();}
   if(!S.truck.traveling&&S.truck.cityIndex!==null){
     const list=basesHere();let maxRisk=0;
     for(const b of list){const r=BASE_TYPES[b.type].riskSteal;if(r>maxRisk)maxRisk=r;if(b.upgrades&&b.upgrades.cameras)maxRisk=0;}
-    if(maxRisk>0&&!currentCityEvent&&!breakdownActive&&!adminOpen){
+      if(S.timeSpeed>0 && maxRisk>0 && !currentCityEvent && !breakdownActive && !adminOpen){
       if(Math.random()<maxRisk*0.01)triggerTheft(S.truck.cityIndex);}
   }
-  compT+=dt;
-  if(compT>20){compT=0;competitorTick();}
+  // То же самое: 20/speed делится на скорость, чтобы конкуренты
+  // ходили раз в 20 игровых секунд независимо от множителя.
+  // При паузе 20/0=Infinity — ход не срабатывает, время стоит.
+  compT+=sdt;
+ if(compT>20/speed){compT=0;competitorTick();}
   atiT+=dt;
   if(atiT>3){atiT=0;
     const b=atiOrders.length;refillATI();
