@@ -1265,10 +1265,11 @@ let COMPETITORS = [
 ];
 	// Доход и шанс роста по типу конкурента
 const TIER_GROWTH = {
-  local:    {chance:0.10, incomePerTick:  15000, upkeepPerBase:  5000},
-  regional: {chance:0.08, incomePerTick:  80000, upkeepPerBase: 30000},
-  national: {chance:0.05, incomePerTick: 350000, upkeepPerBase:180000},
-  intl:     {chance:0.03, incomePerTick:1200000, upkeepPerBase:700000},
+  local:    {chance:0.030, incomePerTick:   3000, upkeepPerBase:  1500, maxBases:3},
+  regional: {chance:0.018, incomePerTick:  12000, upkeepPerBase:  7000, maxBases:6},
+  national: {chance:0.010, incomePerTick:  45000, upkeepPerBase: 28000, maxBases:12},
+  intl:     {chance:0.004, incomePerTick: 140000, upkeepPerBase: 90000, maxBases:18},
+
 };
 
 // Требования игрока для поглощения
@@ -1524,11 +1525,38 @@ function weightMul(w){
   if(w<=20)return 2.75+(w-10)*0.16;  // ← поменяли 2.40 на 2.75
   return 4.35+(w-20)*0.066;          // ← поменяли 3.50 на 4.35
 }
-function repRateBonus(){
+	function compBonusFor(fromIdx, toIdx){
+  let bonus = 0;
+  const cities = [];
+  if(fromIdx !== null && fromIdx !== undefined) cities.push(fromIdx);
+  if(toIdx   !== null && toIdx   !== undefined && toIdx !== fromIdx) cities.push(toIdx);
+
+  for(const c of COMPETITORS){
+    if(!c.dead) continue;
+    if(c.tier === 'national'){
+      bonus += 0.15;
+    } else if(c.tier === 'intl'){
+      const isIntlRoute = (fromIdx != null && CITIES[fromIdx] && CITIES[fromIdx].intl)
+                       || (toIdx   != null && CITIES[toIdx]   && CITIES[toIdx].intl);
+      if(isIntlRoute) bonus += 0.10;
+    } else if(c.tier === 'regional' && c.region){
+      for(const ci of cities){
+        if(regionOf(ci) === c.region){ bonus += 0.10; break; }
+      }
+    } else if(c.tier === 'local' && c.origCity !== undefined){
+      for(const ci of cities){
+        if(ci === c.origCity){ bonus += 0.05; break; }
+      }
+    }
+  }
+  return bonus;
+}
+function repRateBonus(fromIdx, toIdx){
   let b=1+Math.max(0,S.reputation-50)/50*0.08;b+=S.achEffects.rate;
   if(hasStaff('logistician'))b+=0.10;
   if(S.truck.cityIndex!==null){const r=regionOf(S.truck.cityIndex);if(r&&S.regionRep[r])b+=Math.max(0,S.regionRep[r]-50)/50*0.06;}
   if(S.rateBonusUntil && S.rateBonusUntil>S.gameTime) b+=0.10;
+  b += compBonusFor(fromIdx, toIdx);
   return b;
 }
 const ORDER_TYPE={normal:{n:'Обычный',cashMul:1.00,bankMul:1.00,deadlineH:4,fineMul:0.15},urgent:{n:'Срочный',cashMul:1.30,bankMul:1.30,deadlineH:1,fineMul:0.10},express:{n:'Экспресс',cashMul:1.80,bankMul:1.80,deadlineH:0.5,fineMul:0.20}};
@@ -1566,7 +1594,7 @@ w=Math.max(0.01, w); w=r3(w);
   let sMul=1;if(S.season==='autumn'&&['grain','food','milk'].includes(ct))sMul=1.3;
   if(S.season==='summer'&&['building','food'].includes(ct))sMul=1.2;
   if(S.season==='winter'&&ct==='fuel')sMul=1.5;
-  const rateBase=baseRatePerKm(km)*rm*wmul*repRateBonus()*(1+lic)*rMul*sMul;
+  const rateBase=baseRatePerKm(km)*rm*wmul*repRateBonus(from, to)*(1+lic)*rMul*sMul;
   const cashMul=(local?0.72:0.85)*ti.cashMul;const bankMul=(local?0.88:1.02)*firmLevelBonus()*ti.bankMul;
   const minC=local?1500:3000;const minB=local?1800:3500;
   return {id:++orderId,from,to,km,ctype:ct,weight:w,rating,local,orderType:otype,company:genCompany(),
@@ -2375,21 +2403,18 @@ function competitorTick(){
     if(c.dead) continue;
 
     const g = TIER_GROWTH[c.tier] || TIER_GROWTH.local;
-    const growthChance = Math.max(0.01, g.chance - c.bases.length * 0.005);
+    const growthChance = Math.max(0.002, g.chance - c.bases.length * 0.0025);
 
-    if(Math.random() < growthChance){
+    if(c.bases.length < g.maxBases && Math.random() < growthChance){
       const avail=[];
       for(let i=0;i<CITIES.length;i++){
         if(CITIES[i].intl && c.tier !== 'intl') continue;
         if(!CITIES[i].intl && c.tier === 'intl') continue;
         if(S.bases.some(b=>b.cityIdx===i)) continue;
         if(COMPETITORS.some(x=>x!==c && !x.dead && x.bases.includes(i))) continue;
-
-        // Регион-ограничение для regional
         if(c.tier === 'regional' && c.region){
           if(regionOf(i) !== c.region) continue;
         }
-        // local растёт только рядом с родным городом (500 км)
         if(c.tier === 'local' && c.bases.length){
           if(roadKm(c.bases[0], i) > 500) continue;
         }
@@ -2406,10 +2431,13 @@ function competitorTick(){
       }
     }
 
-       // Доход с потолком — крупные фирмы растут медленнее
     const gross = c.bases.length * (g.incomePerTick - g.upkeepPerBase);
     c.money += Math.max(0, gross);
-    c.reputation = Math.min(100, c.reputation + rnd(-0.3, 0.6));
+    c.reputation = Math.min(100, c.reputation + rnd(-0.15, 0.25));
+
+    const baseValue = c.bases.length * (BASE_TYPES[c.baseType || 'open'].price || 0);
+    const cap = baseValue * 2.5 + 15000000;
+    if(c.money > cap) c.money = cap;
   }
 }
 function buyCompetitor(id){
@@ -2423,8 +2451,9 @@ function buyCompetitor(id){
   if(req.ooo && !isOOO()){ toast('Нужно ООО','bad'); return; }
   if(S.bases.length < req.bases){ toast(`Нужно баз ≥ ${req.bases}`,'bad'); return; }
 
-  const mult = TIER_MULT[c.tier] || 1.5;
-  const cost = Math.round(c.money * mult + c.reputation * 1000000);
+    const mult = TIER_MULT[c.tier] || 1.5;
+  const baseValue = c.bases.length * (BASE_TYPES[c.baseType || 'open'].price || 0);
+  const cost = Math.round(baseValue * mult * 0.75 + c.reputation * 500000);
   if(S.money < cost){ toast(`Нужно ${fmt(cost)} ₽`,'bad'); return; }
   if(!confirm(`Поглотить ${c.n} за ${fmt(cost)} ₽?`)) return;
 
@@ -2447,7 +2476,8 @@ function buyCompetitor(id){
     }
   }
   if(refunded > 0) moneyAdd(refunded, 'Компенсация за базы');
-
+  // Запомнить «родной» город локала для регионального бонуса
+  if(c.tier === 'local' && c.bases.length) c.origCity = c.bases[0];
   c.dead = true;
   c.bases = [];
   S.reputation = clamp(S.reputation + 10, 0, 100);
@@ -3346,7 +3376,7 @@ function driverTick(dt){
         const target=pick(pool);const cl=driverCargo(d);if(!cl.length)continue;
         const ct=pick(cl);const cap=driverCap(d);
        const w=r3(rnd(cap*0.4, cap*0.99));
-const wmul=weightMul(w);let rate=baseRatePerKm(target.km)*wmul*repRateBonus();
+const wmul=weightMul(w);let rate=baseRatePerKm(target.km)*wmul*repRateBonus(from, target.idx);
 if(hasTrait(d,'pro'))rate*=1.1;
 // Бонус за загруженность
 let loadMul=1;
@@ -4802,12 +4832,22 @@ function renderWorld(){
     html+=`<h4 style="font-size:11px;color:#8ba0bd;margin:10px 0 2px">${lbl.icon} ${lbl.n}</h4>`;
     html+=`<div class="muted" style="font-size:10px;margin-bottom:4px">${lbl.hint}</div>`;
     for(const c of list){
-      if(c.dead){
-        html+=`<div class="card" style="opacity:.4"><b>${c.icon} ${c.n}</b> — Поглощена</div>`;
+           if(c.dead){
+        const bTxt = tier==='local' && c.origCity!==undefined
+          ? `+5% в ${CITIES[c.origCity].n}`
+          : tier==='regional' && c.region
+          ? `+10% в ${REGIONS[c.region].n}`
+          : tier==='national'
+          ? `+15% по стране`
+          : `+10% на междунар.`;
+        html+=`<div class="card" style="opacity:.55;border-left:3px solid #39d98a">
+          <div class="row"><b>${c.icon} ${c.n}</b><span class="badge ok">✅ ${bTxt}</span></div>
+        </div>`;
         continue;
       }
-      const mult = TIER_MULT[tier] || 1.5;
-      const cost = Math.round(c.money * mult + c.reputation * 1000000);
+         const mult = TIER_MULT[tier] || 1.5;
+      const baseValue = c.bases.length * (BASE_TYPES[c.baseType || 'open'].price || 0);
+      const cost = Math.round(baseValue * mult * 0.75 + c.reputation * 500000);
       const req = TIER_REQ[tier];
       const canRep = S.reputation >= req.rep;
       const canOOO = !req.ooo || isOOO();
@@ -4819,10 +4859,18 @@ function renderWorld(){
       else if(!canOOO) reason = 'нужно ООО';
       else if(!canBases) reason = `баз ${req.bases}+`;
       else if(!canMoney) reason = 'мало денег';
+      const bonusTxt = tier==='local' && c.bases.length
+        ? `+5% к заказам в ${CITIES[c.bases[0]].n}`
+        : tier==='regional'
+        ? `+10% к заказам в регионе ${REGIONS[c.region].n}`
+        : tier==='national'
+        ? `+15% ко всем заказам по стране`
+        : `+10% к международным маршрутам`;
       html+=`<div class="card comp" style="border-left-color:${c.color}">
         <div class="row"><b>${c.icon} ${c.n}</b><span class="rt ${ratingCls(c.reputation/20)}">Репутация ${Math.round(c.reputation)}</span></div>
         <div class="row" style="margin-top:4px"><span class="muted">Капитал</span><b class="money">${fmt(c.money)} ₽</b></div>
         <div class="muted">Баз: ${c.bases.length}${c.bases.length?' ('+c.bases.slice(0,4).map(i=>CITIES[i].n).join(', ')+(c.bases.length>4?'…':'')+')':''}</div>
+        <div class="muted" style="margin-top:4px;font-size:10.5px;color:#5ef0a0">🏆 После поглощения: ${bonusTxt}</div>
         <button class="gold" data-buycomp="${c.id}" ${can?'':'disabled'} style="margin-top:6px;width:100%">Поглотить за ${fmt(cost)} ₽${reason?' · '+reason:''}</button>
       </div>`;
     }
@@ -4929,6 +4977,23 @@ function firmGeneralContent(){
     <div class="row"><b>${quote.title}</b></div>
     <div class="muted" style="font-size:11.5px;line-height:1.5;margin-top:4px">${quote.text}</div>
   </div>`:''}
+    ${(()=>{
+    const dead = COMPETITORS.filter(c=>c.dead);
+    if(!dead.length) return '';
+    let html2=`<h3>🏆 Монопольные бонусы</h3><div class="card ok">`;
+    for(const c of dead){
+      const bTxt = c.tier==='local' && c.origCity!==undefined
+        ? `+5% в ${CITIES[c.origCity].n}`
+        : c.tier==='regional' && c.region
+        ? `+10% в ${REGIONS[c.region].n}`
+        : c.tier==='national'
+        ? `+15% по стране`
+        : `+10% на междунар.`;
+      html2+=`<div class="row"><span>${c.icon} ${c.n}</span><b style="color:#5ef0a0">${bTxt}</b></div>`;
+    }
+    html2+=`</div>`;
+    return html2;
+  })()}
     <h3>🎖️ Звание</h3>
   <div class="card hl">
     <div class="row"><b>${rk.icon} ${rk.n}</b><span class="muted">${getRankIndex()+1}/${RANKS.length}</span></div>
