@@ -203,9 +203,9 @@
 
 .chk{width:18px;height:18px;accent-color:#4da3ff;cursor:pointer;flex-shrink:0}
 
-.mass-bar{position:sticky;bottom:0;background:#0f1722;border:1px solid #2f4a75;
-  border-radius:10px;padding:10px 12px;margin-top:10px;z-index:5;
-  box-shadow:0 -6px 20px rgba(0,0,0,.5);
+.mass-bar{background:#0f1722;border:1px solid #2f4a75;
+  border-radius:10px;padding:10px 12px;margin-top:4px;margin-bottom:10px;z-index:5;
+  box-shadow:0 6px 20px rgba(0,0,0,.4);
   display:none;flex-direction:column;gap:8px}
 .mass-bar.show{display:flex}
 .mass-toggle-row,.mass-actions{display:flex;gap:6px;width:100%}
@@ -2588,14 +2588,25 @@ function checkLoan(){
 
   const inst = getVeh(S.loan.vehicleId);
   if(!inst){
-    // Машины уже нет (продана не могла быть, но на всякий)
     S.loan = null;
     return;
   }
   // Если игрок сейчас на этой машине и в рейсе — ждём завершения
   if(S.truck.traveling && S.currentVehicleId === S.loan.vehicleId) return;
 
-  // Изъятие
+  // === АВТО-ВОЗВРАТ ДОЛГА (если денег хватает) ===
+  const total = Math.round(S.loan.amount * (1 + LOAN_RATE));
+  if(S.money >= total){
+    const modelName = VEHICLES[S.loan.model] ? VEHICLES[S.loan.model].n : 'машина';
+    moneySpend(total, `Возврат долга · ${modelName}`);
+    S.loan = null;
+    toast(`💼 Долг автоматически закрыт · −${fmt(total)} ₽`,'ok');
+    addNews(`💼 Долг у ребят закрыт: ${modelName} · −${fmt(total)} ₽`,'ok','finance');
+    updateUI();
+    return;
+  }
+
+  // Изъятие (если денег не хватило)
   const modelName = VEHICLES[S.loan.model] ? VEHICLES[S.loan.model].n : 'машина';
    const interest = Math.round(S.loan.amount * LOAN_RATE);
   const loanAmount = S.loan.amount;
@@ -4706,6 +4717,26 @@ function autoGarageContent(){
       <div class="health-cell"><div class="n" style="color:#ff8d99">${crit}</div><div class="l">Критично</div></div>
     </div>
   </div>`;
+// === Массовая панель ===
+  if(S.ownedVehicles.length > 1){
+    if(massMode){
+      const selCount = Object.keys(massSelected).filter(k=>massSelected[k]).length;
+      html += `<div class="mass-bar show">
+        <div class="mass-toggle-row">
+          <button class="ok" data-mass-all>Все свободные</button>
+          <button data-mass-none>Снять</button>
+        </div>
+        <div class="mass-actions">
+          <button class="ok" data-mass-sell ${selCount?'':'disabled'}>💸 Продать (${selCount})</button>
+          <button class="bad" data-mass-scrap ${selCount?'':'disabled'}>♻️ Списать (${selCount})</button>
+        </div>
+      </div>`;
+    } else {
+      html += `<div style="display:flex;gap:6px;margin-top:8px">
+        <button class="primary" data-mass-toggle style="flex:1">☑️ Включить массовый режим</button>
+      </div>`;
+    }
+  }
 
   // === Группы ===
   if(S.ownedVehicles.length <= 1){
@@ -4730,27 +4761,7 @@ function autoGarageContent(){
     }
   }
 
-  // === Массовая панель ===
-  if(S.ownedVehicles.length > 1){
-    if(massMode){
-      const selCount = Object.keys(massSelected).filter(k=>massSelected[k]).length;
-      html += `<div class="mass-bar show">
-        <div class="mass-toggle-row">
-          <button class="ok" data-mass-all>Все свободные</button>
-          <button data-mass-none>Снять</button>
-        </div>
-        <div class="mass-actions">
-          <button class="ok" data-mass-sell ${selCount?'':'disabled'}>💸 Продать (${selCount})</button>
-          <button class="bad" data-mass-scrap ${selCount?'':'disabled'}>♻️ Списать (${selCount})</button>
-        </div>
-      </div>`;
-    } else {
-      html += `<div style="display:flex;gap:6px;margin-top:8px">
-        <button class="primary" data-mass-toggle style="flex:1">☑️ Включить массовый режим</button>
-      </div>`;
-    }
-  }
-
+  
   // === Прицепы ===
   if(S.ownedTrailers.length>1){
     html += `<h3 style="margin-top:12px">🎪 Сменить прицеп</h3>`;
