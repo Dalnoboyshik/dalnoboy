@@ -207,6 +207,14 @@
   border-radius:10px;padding:10px 12px;margin-top:4px;margin-bottom:10px;z-index:5;
   box-shadow:0 6px 20px rgba(0,0,0,.4);
   display:none;flex-direction:column;gap:8px}
+	.garage-sticky-head{
+  position:sticky;
+  top:-8px;
+  z-index:7;
+  background:var(--panel);
+  padding:6px 0 10px;
+  margin:0;
+}
 .mass-bar.show{display:flex}
 .mass-toggle-row,.mass-actions{display:flex;gap:6px;width:100%}
 .mass-toggle-row button,.mass-actions button{flex:1}
@@ -4799,7 +4807,8 @@ function autoGarageContent(){
 
   let html = `<h3>🏢 Гараж · ${S.ownedVehicles.length}</h3>`;
 
-  // === Плашка здоровья ===
+   // === Sticky-шапка: парк + массовая панель ===
+  html += `<div class="garage-sticky-head">`;
   html += `<div class="health">
     <div class="health-title">Парк</div>
     <div class="health-grid">
@@ -4823,12 +4832,15 @@ function autoGarageContent(){
           <button class="bad" data-mass-scrap ${selCount?'':'disabled'}>♻️ Списать (${selCount})</button>
         </div>
       </div>`;
-    } else {
+       } else {
       html += `<div style="display:flex;gap:6px;margin-top:8px">
         <button class="primary" data-mass-toggle style="flex:1">☑️ Включить массовый режим</button>
       </div>`;
     }
   }
+  html += `</div>`;   // ← закрытие garage-sticky-head
+
+  // === Группы ===
 
   // === Группы ===
   if(S.ownedVehicles.length <= 1){
