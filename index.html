@@ -1245,12 +1245,45 @@ const S = {
   rateBonusUntil:0,
   };
 let COMPETITORS = [
-  {id:'c1',n:'ТрансЛогистик',icon:'🏢',money:60000000,reputation:62,color:'#4da3ff',bases:[],dead:false},
-  {id:'c2',n:'СеверТранс',icon:'🚛',money:35000000,reputation:52,color:'#ffb84d',bases:[],dead:false},
-  {id:'c3',n:'АвтоТрейд',icon:'🏭',money:90000000,reputation:72,color:'#39d98a',bases:[],dead:false},
-  {id:'c4',n:'ГрузПрогресс',icon:'📦',money:22000000,reputation:42,color:'#ff6b6b',bases:[],dead:false},
-  {id:'c5',n:'ДальТранс',icon:'🚂',money:15000000,reputation:38,color:'#c0a0ff',bases:[],dead:false},
+  // Локальные — 1 база в одном городе, уровень covered
+  {id:'c_l1', n:'Столичный извозчик', icon:'🚐', tier:'local',    money:4500000,    reputation:32, color:'#7dd6ff', baseType:'covered', bases:[6],  dead:false},
+  {id:'c_l2', n:'Донской грузовик',   icon:'🚚', tier:'local',    money:3800000,    reputation:30, color:'#ffb84d', baseType:'covered', bases:[7],  dead:false},
+  {id:'c_l3', n:'Волжский малый',     icon:'🚐', tier:'local',    money:4200000,    reputation:31, color:'#c0a0ff', baseType:'covered', bases:[11], dead:false},
+
+  // Региональные — держат один регион, уровень small
+  {id:'c_r1', n:'ЮгТранс',    icon:'🌾', tier:'regional', region:'S',   money:48000000, reputation:55, color:'#ff6b6b', baseType:'small', bases:[8,9,31,33],   dead:false},
+  {id:'c_r2', n:'ВолгаЛог',   icon:'⚓', tier:'regional', region:'V',   money:40000000, reputation:53, color:'#4da3ff', baseType:'small', bases:[11,12,13,14], dead:false},
+  {id:'c_r3', n:'УралАвто',   icon:'⛏️', tier:'regional', region:'U',   money:44000000, reputation:56, color:'#39d98a', baseType:'small', bases:[15,16,17],     dead:false},
+  {id:'c_r4', n:'СибирьТранс',icon:'🌲', tier:'regional', region:'SIB', money:38000000, reputation:50, color:'#9c8cff', baseType:'small', bases:[19,20,21,22],  dead:false},
+
+  // Национальные — вся Россия, уровень medium
+  {id:'c_n1', n:'ТрансЛогистик', icon:'🏢', tier:'national', money:280000000, reputation:68, color:'#4da3ff', baseType:'medium', bases:[4,1,15,6],     dead:false},
+  {id:'c_n2', n:'АвтоТрейд',     icon:'🏭', tier:'national', money:340000000, reputation:72, color:'#39d98a', baseType:'medium', bases:[4,10,16,24,25], dead:false},
+
+  // Международный — СНГ + Китай, уровень hub
+  {id:'c_i1', n:'Global Cargo', icon:'🌍', tier:'intl', money:3000000000, reputation:90, color:'#ffd479', baseType:'hub', bases:[27,28,29,30], dead:false},
 ];
+	// Доход и шанс роста по типу конкурента
+const TIER_GROWTH = {
+  local:    {chance:0.10, incomePerTick:  15000, upkeepPerBase:  5000},
+  regional: {chance:0.08, incomePerTick:  80000, upkeepPerBase: 30000},
+  national: {chance:0.05, incomePerTick: 350000, upkeepPerBase:180000},
+  intl:     {chance:0.03, incomePerTick:1200000, upkeepPerBase:700000},
+};
+
+// Требования игрока для поглощения
+const TIER_REQ = {
+  local:    {rep:20, ooo:false, bases:0},
+  regional: {rep:45, ooo:false, bases:1},
+  national: {rep:65, ooo:true,  bases:3},
+  intl:     {rep:80, ooo:true,  bases:5},
+};
+
+// Множитель цены поглощения
+const TIER_MULT = {local:1.5, regional:2.0, national:2.5, intl:3.0};
+
+// Порядок уровней баз (для апгрейда при поглощении)
+const BASE_ORDER = ['open','covered','small','medium','hub','federal'];
 let TENDERS = [];
 let atiOrders=[],orderId=0,hoverCity=-1,highlightedOrderId=null;
 let breakdownActive=false,currentCityEvent=null;
@@ -2339,44 +2372,90 @@ function buyoutLease(vehicleId){
 /* ============ КОНКУРЕНТЫ ============ */
 function competitorTick(){
   for(const c of COMPETITORS){
-    if(c.dead)continue;
-    if(Math.random()<0.15){
+    if(c.dead) continue;
+
+    const g = TIER_GROWTH[c.tier] || TIER_GROWTH.local;
+    const growthChance = Math.max(0.01, g.chance - c.bases.length * 0.005);
+
+    if(Math.random() < growthChance){
       const avail=[];
       for(let i=0;i<CITIES.length;i++){
-        if(CITIES[i].intl)continue;
-        if(S.bases.some(b=>b.cityIdx===i))continue;
-        if(COMPETITORS.some(x=>x!==c&&x.bases.includes(i)))continue;
+        if(CITIES[i].intl && c.tier !== 'intl') continue;
+        if(!CITIES[i].intl && c.tier === 'intl') continue;
+        if(S.bases.some(b=>b.cityIdx===i)) continue;
+        if(COMPETITORS.some(x=>x!==c && !x.dead && x.bases.includes(i))) continue;
+
+        // Регион-ограничение для regional
+        if(c.tier === 'regional' && c.region){
+          if(regionOf(i) !== c.region) continue;
+        }
+        // local растёт только рядом с родным городом (500 км)
+        if(c.tier === 'local' && c.bases.length){
+          if(roadKm(c.bases[0], i) > 500) continue;
+        }
         avail.push(i);
       }
       if(avail.length){
-        const city=pick(avail);
-        const cost=BASE_TYPES.open.price;
-        if(c.money>=cost){
-          c.money-=cost;c.bases.push(city);
-         addNews(`🏢 ${c.n} купила базу в ${CITIES[city].n}`,'warn','world');
+        const city = pick(avail);
+        const cost = BASE_TYPES[c.baseType || 'open'].price;
+        if(c.money >= cost){
+          c.money -= cost;
+          c.bases.push(city);
+          addNews(`🏢 ${c.n} купила базу в ${CITIES[city].n}`,'warn','world');
         }
       }
     }
-    c.money+=c.bases.length*50000+100000;
-    c.reputation=Math.min(100,c.reputation+rnd(-0.5,1));
+
+       // Доход с потолком — крупные фирмы растут медленнее
+    const gross = c.bases.length * (g.incomePerTick - g.upkeepPerBase);
+    c.money += Math.max(0, gross);
+    c.reputation = Math.min(100, c.reputation + rnd(-0.3, 0.6));
   }
 }
 function buyCompetitor(id){
-  const c=COMPETITORS.find(x=>x.id===id);if(!c)return;
-  if(c.dead){toast('Уже','bad');return;}
-  const cost=Math.round(c.money*1.2+c.reputation*1000000);
-  if(S.money<cost){toast(`Нужно ${fmt(cost)} ₽`,'bad');return;}
-  if(!confirm(`Поглотить ${c.n} за ${fmt(cost)} ₽?`))return;
-  moneySpend(cost,'Поглощение');
+  const c = COMPETITORS.find(x => x.id === id);
+  if(!c) return;
+  if(c.dead){ toast('Уже поглощён','bad'); return; }
+
+  const req = TIER_REQ[c.tier];
+  if(!req){ toast('Неизвестный тип','bad'); return; }
+  if(S.reputation < req.rep){ toast(`Нужна репутация ≥ ${req.rep}`,'bad'); return; }
+  if(req.ooo && !isOOO()){ toast('Нужно ООО','bad'); return; }
+  if(S.bases.length < req.bases){ toast(`Нужно баз ≥ ${req.bases}`,'bad'); return; }
+
+  const mult = TIER_MULT[c.tier] || 1.5;
+  const cost = Math.round(c.money * mult + c.reputation * 1000000);
+  if(S.money < cost){ toast(`Нужно ${fmt(cost)} ₽`,'bad'); return; }
+  if(!confirm(`Поглотить ${c.n} за ${fmt(cost)} ₽?`)) return;
+
+  moneySpend(cost, `Поглощение ${c.n}`);
+
+  let upgraded = 0, refunded = 0;
   for(const cityIdx of c.bases){
-    if(!S.bases.some(b=>b.cityIdx===cityIdx)){
-      S.bases.push({id:'b'+(++baseIdCounter),cityIdx,type:'open',businesses:[],upgrades:{}});
+    const mine = S.bases.find(b => b.cityIdx === cityIdx);
+    if(!mine){
+      S.bases.push({id:'b'+(++baseIdCounter), cityIdx, type: c.baseType||'open', businesses:[], upgrades:{}});
+    } else {
+      const mineLvl = BASE_ORDER.indexOf(mine.type);
+      const theirLvl = BASE_ORDER.indexOf(c.baseType||'open');
+      if(theirLvl > mineLvl){
+        mine.type = c.baseType;
+        upgraded++;
+      } else {
+        refunded += Math.round(BASE_TYPES[c.baseType||'open'].price * 0.7);
+      }
     }
   }
-  c.dead=true;c.bases=[];
-  S.reputation=clamp(S.reputation+10,0,100);
-  toast(`🏆 ${c.n} поглощена!`,'ok');addNews(`🏆 Поглощение: ${c.n}`,'ok','world');
-  checkAchievements();updateUI();
+  if(refunded > 0) moneyAdd(refunded, 'Компенсация за базы');
+
+  c.dead = true;
+  c.bases = [];
+  S.reputation = clamp(S.reputation + 10, 0, 100);
+
+  toast(`🏆 ${c.n} поглощена! ${upgraded?`+${upgraded} апгрейд(ов)`:''}${refunded?` · +${fmt(refunded)} ₽`:''}`,'ok');
+  addNews(`🏆 Поглощение: ${c.n}`,'ok','world');
+  checkAchievements();
+  updateUI();
 }
 
 /* ============ ТЕНДЕРЫ ============ */
@@ -2756,7 +2835,7 @@ if(del.length>=5) pay=Math.round(pay*1.05); // ещё +5% за 5+
   moneyAdd(total,`Доставка (${del.length})`);
   S.activeOrders=S.activeOrders.filter(o=>o.to!==idx);
   const succ=lines.filter(l=>l.pay>0).length;
-  S.reputation=clamp(S.reputation+succ*0.3-(lines.length-succ)*0.8,0,100);
+S.reputation=clamp(S.reputation+succ*0.08-(lines.length-succ)*0.5,0,100);
   for(const c of S.contracts){
     if(c.from===S.truck.from&&c.to===idx&&c.tripsLeft>0){
       c.tripsLeft--;moneyAdd(c.payPerTrip,`Контракт ${c.company}`);
@@ -4707,19 +4786,47 @@ function renderWorld(){
       html+=`<div class="ln"><span>${n.txt}</span><span class="t">Д${d}</span></div>`;
     }
     html+=`</div>`;
-  } else if(sub==='comps'){
-    html+=`<h3>🏢 Конкуренты</h3>`;
-    for(const c of COMPETITORS){
-      if(c.dead){html+=`<div class="card" style="opacity:.4"><b>${c.icon} ${c.n}</b> — Поглощена</div>`;continue;}
-      const cost=Math.round(c.money*1.2+c.reputation*1000000);
-      const can=S.money>=cost;
+} else if(sub==='comps'){
+  const TIER_ORDER = ['local','regional','national','intl'];
+  const TIER_LABEL = {
+    local:    {icon:'🏙️', n:'Локальные фирмы',  hint:'Слабые новички. Репа 20+.'},
+    regional: {icon:'🗺️', n:'Региональные',      hint:'Держат свой регион. Репа 45+ и 1 база.'},
+    national: {icon:'🇷🇺', n:'Федеральные',       hint:'Вся Россия. ООО, репа 65+, 3 базы.'},
+    intl:     {icon:'🌍', n:'Международные',      hint:'Глобальные игроки. ООО, репа 80+, 5 баз.'},
+  };
+  html+=`<h3>🏢 Конкуренты</h3>`;
+  for(const tier of TIER_ORDER){
+    const list = COMPETITORS.filter(c => c.tier === tier);
+    if(!list.length) continue;
+    const lbl = TIER_LABEL[tier];
+    html+=`<h4 style="font-size:11px;color:#8ba0bd;margin:10px 0 2px">${lbl.icon} ${lbl.n}</h4>`;
+    html+=`<div class="muted" style="font-size:10px;margin-bottom:4px">${lbl.hint}</div>`;
+    for(const c of list){
+      if(c.dead){
+        html+=`<div class="card" style="opacity:.4"><b>${c.icon} ${c.n}</b> — Поглощена</div>`;
+        continue;
+      }
+      const mult = TIER_MULT[tier] || 1.5;
+      const cost = Math.round(c.money * mult + c.reputation * 1000000);
+      const req = TIER_REQ[tier];
+      const canRep = S.reputation >= req.rep;
+      const canOOO = !req.ooo || isOOO();
+      const canBases = S.bases.length >= req.bases;
+      const canMoney = S.money >= cost;
+      const can = canRep && canOOO && canBases && canMoney;
+      let reason = '';
+      if(!canRep) reason = `реп. ${req.rep}+`;
+      else if(!canOOO) reason = 'нужно ООО';
+      else if(!canBases) reason = `баз ${req.bases}+`;
+      else if(!canMoney) reason = 'мало денег';
       html+=`<div class="card comp" style="border-left-color:${c.color}">
         <div class="row"><b>${c.icon} ${c.n}</b><span class="rt ${ratingCls(c.reputation/20)}">Репутация ${Math.round(c.reputation)}</span></div>
         <div class="row" style="margin-top:4px"><span class="muted">Капитал</span><b class="money">${fmt(c.money)} ₽</b></div>
         <div class="muted">Баз: ${c.bases.length}${c.bases.length?' ('+c.bases.slice(0,4).map(i=>CITIES[i].n).join(', ')+(c.bases.length>4?'…':'')+')':''}</div>
-        <button class="gold" data-buycomp="${c.id}" ${can?'':'disabled'} style="margin-top:6px;width:100%">Поглотить за ${fmt(cost)} ₽</button>
+        <button class="gold" data-buycomp="${c.id}" ${can?'':'disabled'} style="margin-top:6px;width:100%">Поглотить за ${fmt(cost)} ₽${reason?' · '+reason:''}</button>
       </div>`;
     }
+  }
   } else if(sub==='tenders'){
     html+=`<h3>📢 Активные тендеры</h3>`;
     TENDERS=TENDERS.filter(t=>t.deadline>S.gameTime);
@@ -5490,7 +5597,14 @@ function loadGame(){
     vehIdCounter=d.vehIdCounter||1;trlIdCounter=d.trlIdCounter||1;
     drvIdCounter=d.drvIdCounter||1;contractId=d.contractId||1;
     baseIdCounter=d.baseIdCounter||1;questId=d.questId||1;tenderId=d.tenderId||1;
-    if(d.COMPETITORS)COMPETITORS=d.COMPETITORS;
+  if(d.COMPETITORS){
+  // Миграция: если у конкурентов нет tier — старый формат, сбрасываем на дефолт
+  if(d.COMPETITORS.some(c => !c.tier)){
+    // оставляем новый COMPETITORS как есть
+  } else {
+    COMPETITORS = d.COMPETITORS;
+  }
+}
     if(d.TENDERS)TENDERS=d.TENDERS;
     if(d.sortBy)sortBy=d.sortBy;
     if(d.firmSubTab)firmSubTab=d.firmSubTab;
