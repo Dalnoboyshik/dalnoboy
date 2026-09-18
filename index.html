@@ -5354,9 +5354,10 @@ function laborStaffContent(){
       ${d.unpaidService?`<div class="card warn" style="margin-top:5px;font-size:11px">⚠️ ТО просрочено, нет денег</div>`:''}
       <button class="wide" data-drvstat="${d.id}" style="margin-top:6px;background:${isOpen?'#1a5ba0':'#16202f'};border-color:${isOpen?'#2b7bd4':'#2f4a75'}">${isOpen?'× Скрыть статистику':'📈 Показать статистику'}</button>
       ${isOpen?driverStatsBlock(d):''}
-      <div class="row" style="margin-top:5px;gap:4px;flex-wrap:wrap">
-        <button class="warn sm" data-service="${d.id}" ${d.status==='trip'?'disabled':''}>🛠 ТО сейчас</button>
-        <button class="warn sm" data-repair="${d.id}" ${d.status==='trip'?'disabled':''}>🔧 Ремонт сейчас</button>
+            <div class="row" style="margin-top:5px;gap:4px;flex-wrap:wrap">
+        ${!d.vehicleId?`<button class="ok sm" data-assign="${d.id}">🚗 Посадить на машину</button>`:''}
+        <button class="warn sm" data-service="${d.id}" ${d.status==='trip'||!d.vehicleId?'disabled':''}>🛠 ТО сейчас</button>
+        <button class="warn sm" data-repair="${d.id}" ${d.status==='trip'||!d.vehicleId?'disabled':''}>🔧 Ремонт сейчас</button>
         <button class="primary sm" data-train="${d.id}">🎓 Курсы</button>
         <button class="bad sm" data-fire="${d.id}" ${d.status==='trip'?'disabled':''}>Уволить</button>
       </div>
@@ -5416,6 +5417,7 @@ function laborOfficeContent(){
 function bindLaborHandlers(p){
   p.querySelectorAll('[data-hire]').forEach(b=>{b.onclick=()=>{const c=S.laborMarket.find(x=>x.id===b.dataset.hire);if(c)openDriverHireModal(c);};});
   p.querySelectorAll('[data-fire]').forEach(b=>{b.onclick=()=>fireDriver(b.dataset.fire);});
+	  p.querySelectorAll('[data-assign]').forEach(b=>{b.onclick=()=>openAssignVehicleModal(b.dataset.assign);});
   p.querySelectorAll('[data-train]').forEach(b=>{b.onclick=()=>openTrainModal(b.dataset.train);});
   p.querySelectorAll('[data-service]').forEach(b=>{b.onclick=()=>driverForceService(b.dataset.service);});
   p.querySelectorAll('[data-repair]').forEach(b=>{b.onclick=()=>driverForceRepair(b.dataset.repair);});
@@ -5443,7 +5445,107 @@ function bindLaborHandlers(p){
   const rl=$('refreshLabor');if(rl)rl.onclick=refreshLaborMarket;
 }
 
- 
+/* ============ ПОСАДИТЬ ВОДИТЕЛЯ НА МАШИНУ ============ */
+function openAssignVehicleModal(driverId){
+  const d = S.drivers.find(x=>x.id===driverId);
+  if(!d){toast('Водитель не найден','bad');return;}
+  if(d.vehicleId){toast('Уже за рулём','bad');return;}
+  if(d.status==='trip'){toast('В рейсе','bad');return;}
+
+  const fv = vehiclesForHire();
+  if(!fv.length){toast('Нет свободных машин (износ <90%, не заняты)','bad');return;}
+
+  let selV = fv[0], selT = null;
+
+  function render(){
+    const vModel = getVeh(selV).model;
+    const needT  = VEHICLES[vModel].cls==='tractor';
+    const ft     = freeTrailers();
+
+    let html = `<h2>🚗 Посадить на машину</h2>
+      <p>${d.avatar||'👤'} <b>${d.name}</b> · ★${d.rating.toFixed(1)} · ${d.vehicleId?'—':CITIES[d.cityIdx].n}</p>
+      <h3>Машина · ${fv.length}</h3>`;
+
+    for(const id of fv){
+      const inst = getVeh(id);
+      const v    = VEHICLES[inst.model];
+      const w    = Math.round(inst.wear||0);
+      const cond = 100 - w;
+      const condColor = cond<=10?'#ff8d99':cond<=20?'#ffb84d':'#5ef0a0';
+      html += `<div class="vpick ${id===selV?'sel':''}" data-v="${id}">
+        <div class="t">${v.icon} ${v.n} <span class="veh-cat">${catName(vehCategory(inst.model))}</span></div>
+        <div class="s">${v.cap} т · ${v.radius} км · 🛠 До ремонта <b style="color:${condColor}">${cond}%</b></div>
+      </div>`;
+    }
+
+    if(needT){
+      html += `<h3>Прицеп · ${ft.length}</h3>`;
+      if(!ft.length){
+        html += `<div class="empty">Нет свободных прицепов</div>`;
+      } else {
+        if(!ft.includes(selT)) selT = ft[0];
+        for(const id of ft){
+          const t = TRAILERS[getTrl(id).model];
+          html += `<div class="vpick ${id===selT?'sel':''}" data-t="${id}">
+            <div class="t">${t.icon} ${t.n}</div>
+            <div class="s">до ${t.cap} т</div>
+          </div>`;
+        }
+      }
+    } else selT = null;
+
+    const canAssign = needT ? (ft.length>0) : true;
+    html += `<div style="display:flex;gap:8px;margin-top:10px">
+      <button id="assignYes" class="ok" style="flex:1" ${canAssign?'':'disabled'}>Посадить</button>
+      <button id="assignNo" class="primary" style="flex:1">Отмена</button>
+    </div>`;
+
+    $('modalBox').innerHTML = html;
+
+    $('modalBox').querySelectorAll('[data-v]').forEach(el=>{
+      el.onclick = ()=>{ selV = el.dataset.v; render(); };
+    });
+    $('modalBox').querySelectorAll('[data-t]').forEach(el=>{
+      el.onclick = ()=>{ selT = el.dataset.t; render(); };
+    });
+
+    const y = $('assignYes');
+    if(y) y.onclick = ()=>{
+      const inst = getVeh(selV);
+      if(!inst){ toast('Машина исчезла','bad'); return; }
+      const v = VEHICLES[inst.model];
+      const needTrailer = v.cls === 'tractor';
+      if(needTrailer && !selT){ toast('Выбери прицеп','bad'); return; }
+
+      // На всякий случай проверяем, что машина не занята другим водителем
+      if(S.drivers.some(o => o.id!==d.id && o.vehicleId===selV)){
+        toast('Машина уже занята','bad'); updateUI(); return;
+      }
+      if(selT && S.drivers.some(o => o.id!==d.id && o.trailerId===selT)){
+        toast('Прицеп уже занят','bad'); updateUI(); return;
+      }
+
+      d.vehicleId  = selV;
+      d.trailerId  = needTrailer ? selT : null;
+      d.status     = 'idle';
+      d.route      = null;
+      d.progress   = 0;
+      d.duration   = 0;
+
+      Modal.next();
+      toast(`🚗 ${d.name} сел на ${v.n}`,'ok');
+      addNews(`🚗 ${d.name} сел на ${v.n}`,'info','activity');
+      updateUI();
+    };
+
+    const n = $('assignNo');
+    if(n) n.onclick = ()=>Modal.next();
+  }
+
+  $('modal').classList.add('show');
+  render();
+}
+	
 function openTrainModal(driverId){
   const d=S.drivers.find(x=>x.id===driverId);if(!d)return;
   if(!d.stats)d.stats=newDriverStats();if(!d.stats.courses)d.stats.courses=[];
