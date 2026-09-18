@@ -1769,6 +1769,42 @@ function toast(msg,type){
   const d=document.createElement('div');d.className='toast '+(type||'');d.innerHTML=msg;
   $('toasts').appendChild(d);setTimeout(()=>{d.classList.add('out');setTimeout(()=>d.remove(),300);},3200);
 }
+	/* ============ БАТЧИНГ ТОСТОВ ВОДИТЕЛЕЙ ============ */
+const _drvBatch = {
+  queue: [],
+  lastFlush: 0,
+  pending: false,
+};
+function _flushDrvBatch(){
+  if(!_drvBatch.queue.length) return;
+  const q = _drvBatch.queue;
+  const total = q.reduce((s,x)=>s+x.net,0);
+  const count = q.length;
+  const cities = {};
+  for(const x of q){ cities[x.from] = (cities[x.from]||0)+1; }
+  const topCities = Object.entries(cities).sort((a,b)=>b[1]-a[1]).slice(0,2)
+    .map(([c])=>c).join(', ');
+  const last3 = q.slice(-3).map(x=>`${x.name.split(' ')[0]}: ${x.from} → ${x.to}`).join(' · ');
+  const more = count > 3 ? ` <span style="opacity:.6">+${count-3}</span>` : '';
+  toast(`👷 <b>${count} ${count===1?'рейс':'рейсов'}</b> · <span style="color:#5ef0a0">+${fmt(total)} ₽</span>`
+    + (topCities?`<br><span style="font-size:10.5px;opacity:.8">${last3}${more}</span>`:'')
+    , 'ok');
+  _drvBatch.queue = [];
+  _drvBatch.pending = false;
+}
+function _addDrvTrip(info){
+  _drvBatch.queue.push(info);
+  if(_drvBatch.queue.length >= 20){
+    // На случай флуда — форсированный флеш
+    if(!_drvBatch.pending){ _flushDrvBatch(); }
+    return;
+  }
+  if(!_drvBatch.pending){
+    _drvBatch.pending = true;
+    setTimeout(()=>{ _flushDrvBatch(); }, 3000);
+  }
+}
+/* ============ /БАТЧИНГ ============ */
 let lastWearWarn=0;
 function checkWearWarn(){
   const w=curWear();
@@ -3746,7 +3782,7 @@ if(Math.random()<accChance){
         inst.wear=Math.min(100,inst.wear+20);
         d.status='idle';d.progress=0;d.route=null;continue;
       }
-      if(d.progress>=1){
+           if(d.progress>=1){
         const gross=d.route.pay;const net=Math.round(gross*(1-d.share));
         moneyAdd(net,`Рейс ${d.name}`);
         d.stats.earned+=net;d.stats.trips++;d.stats.km+=d.route.km;
@@ -3756,7 +3792,12 @@ if(Math.random()<accChance){
         d.trips=(d.trips||0)+1;d.cityIdx=d.route.to;
         d.status='idle';d.progress=0;
         const ri2=d.route;d.route=null;
-        toast(`👷 <b>${d.name}</b>: ${CITIES[ri2.from].n} → ${CITIES[ri2.to].n} · +${fmt(net)} ₽`,'ok');
+        _addDrvTrip({
+          name: d.name,
+          from: CITIES[ri2.from].n,
+          to:   CITIES[ri2.to].n,
+          net:  net
+        });
         updateUI();
       }
     }
