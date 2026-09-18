@@ -4285,6 +4285,8 @@ function renderAuto(){
      const pd=$('btnPayDebt');if(pd)pd.onclick=()=>payLeaseDebt(S.currentVehicleId);
     const rp=$('btnRegPlate');if(rp)rp.onclick=()=>openPlateModal(S.currentVehicleId, false);
     const rr=$('btnReplate');if(rr)rr.onclick=()=>openPlateModal(S.currentVehicleId, true);
+	      const tl=$('btnTakeLoan');if(tl)tl.onclick=()=>openLoanModal();
+    const rl=$('btnRepayLoan2');if(rl)rl.onclick=()=>repayLoan();
     p.querySelectorAll('[data-up]').forEach(b=>{b.onclick=()=>buyUpgrade(b.dataset.up);});
   }
        if(sub==='garage'){
@@ -4425,7 +4427,11 @@ function autoCurrentContent(){
          <span class="ic">♻️</span> Списать в утиль <span class="sub">${fmt(Math.round((v.sellPrice||v.price*0.7)*0.05))} ₽</span></button>`
     : `<button class="big bad" id="btnSell" ${S.truck.traveling?'disabled':''}>
          <span class="ic">💸</span> Продать машину</button>`}
-  ${inst.lease?`<button class="big gold" id="btnBuyout"><span class="ic">🏦</span> Досрочно выкупить</button>`:''}
+   ${inst.lease?`<button class="big gold" id="btnBuyout"><span class="ic">🏦</span> Досрочно выкупить</button>`:''}
+  ${!inst.lease && (!S.loan || S.loan.vehicleId !== inst.id) ? 
+    `<button class="big gold" id="btnTakeLoan"><span class="ic">💼</span> Заложить · до ${fmt(loanMaxFor(inst))} ₽</button>` : ''}
+  ${S.loan && S.loan.vehicleId === inst.id ?
+    `<button class="big gold" id="btnRepayLoan2"><span class="ic">💼</span> Вернуть ${fmt(Math.round(S.loan.amount*1.1))} ₽</button>` : ''}
   ${inst.lease&&inst.lease.debt>0?`<button class="big bad" id="btnPayDebt"><span class="ic">💳</span> Погасить долг ${fmt(inst.lease.debt)} ₽</button>`:''}
   <h3 style="margin-top:10px">⚙️ Апгрейды</h3>`;
   for(const k in UPGRADES){
@@ -4950,31 +4956,7 @@ function renderWorld(){
   if(!p.classList.contains('active'))return;
   const sub=uiSubTab.world||'news';
   let html='';
-  if(sub==='news'){
-    if(S.loan){
-      const ln = S.loan;
-      const total = Math.round(ln.amount * (1 + LOAN_RATE));
-      const daysLeft = Math.max(0, Math.ceil((ln.dueAt - S.gameTime) / 1440));
-      const mdl = VEHICLES[ln.model];
-      const canPay = S.money >= total;
-      html += `<h3>💼 Долг у ребят</h3>
-        <div class="card ${daysLeft<=2?'bad':'warn'}">
-          <div class="row"><b>🔒 ${mdl?mdl.icon+' '+mdl.n:'Машина'} в залоге</b>
-            <b style="color:${daysLeft<=2?'#ff6b6b':'#ffb84d'}">через ${daysLeft} дн.</b></div>
-          <div class="row" style="margin-top:6px"><span class="muted">Занято</span><b>${fmt(ln.amount)} ₽</b></div>
-          <div class="row"><span class="muted">Вернуть</span><b style="color:#ff6b6b;font-size:14px">${fmt(total)} ₽</b></div>
-          <button class="wide ${canPay?'gold':''}" id="worldRepayLoan" style="margin-top:8px" ${canPay?'':'disabled'}>
-            💼 Вернуть ${fmt(total)} ₽
-          </button>
-          ${!canPay?`<div class="muted" style="font-size:10.5px;text-align:center;margin-top:4px">Не хватает ${fmt(total-S.money)} ₽</div>`:''}
-        </div>`;
-    } else {
-      html += `<h3>💼 Деньги у ребят</h3>
-        <div class="card hl">
-          <div class="muted" style="font-size:11.5px;line-height:1.5">Нужны деньги? «Ребята» дадут под залог текущей машины: 70% стоимости на ${LOAN_DAYS} дней. Вернёшь с +10%. Не вернёшь — заберут машину.</div>
-          <button class="wide gold" id="worldTakeLoan" style="margin-top:8px">💼 Обратиться к ребятам</button>
-        </div>`;
-    }
+ if(sub==='news'){
     html+=`<h3>📰 Лента новостей</h3><div class="news-panel" style="max-height:none">`;
     if(!S.news.items.length)html+=`<div class="empty">Пока ничего</div>`;
     else for(const n of S.news.items){
@@ -5071,8 +5053,6 @@ function renderWorld(){
     }
   }
   p.innerHTML=html;
-  const _wlTake = $('worldTakeLoan'); if(_wlTake) _wlTake.onclick = ()=>openLoanModal();
-  const _wlRepay = $('worldRepayLoan'); if(_wlRepay) _wlRepay.onclick = ()=>repayLoan();
   p.querySelectorAll('[data-buycomp]').forEach(b=>{b.onclick=()=>buyCompetitor(b.dataset.buycomp);});
   p.querySelectorAll('[data-tender]').forEach(b=>{b.onclick=()=>participateTender(b.dataset.tender);});
   p.querySelectorAll('[data-intl]').forEach(b=>{b.onclick=()=>intlBranch(+b.dataset.intl);});
@@ -5231,6 +5211,37 @@ function firmFinanceContent(){
   const obl=obligationsList();const totalObl=obl.reduce((s,o)=>s+o.sum,0);
   const passive=calcPassivePerWeek();
 
+  // === Блок «Ребята» — заём/возврат ===
+  let loanBlock = '';
+  if(S.loan){
+    const ln = S.loan;
+    const total = Math.round(ln.amount * (1 + LOAN_RATE));
+    const daysLeft = Math.max(0, Math.ceil((ln.dueAt - S.gameTime) / 1440));
+    const mdl = VEHICLES[ln.model];
+    const canPay = S.money >= total;
+    loanBlock = `<h3>💼 Люди в кожаных куртках</h3>
+      <div class="card ${daysLeft<=2?'bad':'warn'}">
+        <div class="row"><b>🔒 ${mdl?mdl.icon+' '+mdl.n:'Машина'} в залоге</b>
+          <b style="color:${daysLeft<=2?'#ff6b6b':'#ffb84d'}">через ${daysLeft} дн.</b></div>
+        <div class="row" style="margin-top:6px"><span class="muted">Занято</span><b>${fmt(ln.amount)} ₽</b></div>
+        <div class="row"><span class="muted">Вернуть (+10%)</span><b style="color:#ff6b6b;font-size:14px">${fmt(total)} ₽</b></div>
+        <button class="wide ${canPay?'gold':''}" id="firmRepayLoan" style="margin-top:8px" ${canPay?'':'disabled'}>
+          💼 Вернуть ${fmt(total)} ₽
+        </button>
+        ${!canPay?`<div class="muted" style="font-size:10.5px;text-align:center;margin-top:4px">Не хватает ${fmt(total-S.money)} ₽</div>`:''}
+        <div class="muted" style="font-size:10.5px;margin-top:8px;line-height:1.4">
+          ⚠️ Не вернёшь вовремя — заберут <b>${mdl?mdl.n:'машину'}</b>.
+        </div>
+      </div>`;
+  } else {
+    loanBlock = `<h3>💼 Люди в кожаных куртках</h3>
+      <div class="card hl">
+        <div class="muted" style="font-size:11.5px;line-height:1.5">
+          Нужны деньги? «Ребята» дадут под залог текущей машины: <b>70% стоимости</b> на <b>${LOAN_DAYS} дней</b>. Вернёшь с <b>+10%</b>. Не вернёшь — заберут машину.
+        </div>
+        <button class="wide gold" id="firmTakeLoan" style="margin-top:8px">💼 Обратиться к ребятам</button>
+      </div>`;
+  }
   // Категории расходов за 30 дней
   function catOf(desc){
     if(!desc) return '❓ Прочее';
@@ -5335,10 +5346,10 @@ function firmFinanceContent(){
           : '<div class="empty" style="padding:6px 0;font-size:10px">Пусто</div>'}
       </div>
 
-    </div>
+        </div>
   </div>`;
 
-  return html;
+  return loanBlock + html;
 }
 function firmLicensesContent(){
   let html=`<h3>📜 Лицензии</h3>`;
@@ -5459,6 +5470,8 @@ function renderFirm(){
     info.claimed=true;moneyAdd(q.reward,`Квест: ${q.n}`);
     S.reputation=clamp(S.reputation+3,0,100);
     toast(`✅ ${fmt(q.reward)} ₽`,'ok');renderFirm();};});
+	  const _ftTake = $('firmTakeLoan'); if(_ftTake) _ftTake.onclick = ()=>openLoanModal();
+  const _ftRepay = $('firmRepayLoan'); if(_ftRepay) _ftRepay.onclick = ()=>repayLoan();
 }
 /* ============ ЖУРНАЛ ============ */
 let journalTab='all';
