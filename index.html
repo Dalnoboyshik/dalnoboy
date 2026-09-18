@@ -1697,7 +1697,7 @@ w=Math.max(0.01, w); w=r3(w);
   let sMul=1;if(S.season==='autumn'&&['grain','food','milk'].includes(ct))sMul=1.3;
   if(S.season==='summer'&&['building','food'].includes(ct))sMul=1.2;
   if(S.season==='winter'&&ct==='fuel')sMul=1.5;
-  const rateBase=baseRatePerKm(km)*rm*wmul*repRateBonus(from, to)*(1+lic)*rMul*sMul;
+  const rateBase=baseRatePerKm(km)*rm*wmul*repRateBonus(from, to)*(1+lic)*rMul*sMul*routeBonusFor(from,to);
   const cashMul=(local?0.72:0.85)*ti.cashMul;const bankMul=(local?0.88:1.02)*firmLevelBonus()*ti.bankMul;
   const minC=local?1500:3000;const minB=local?1800:3500;
   return {id:++orderId,from,to,km,ctype:ct,weight:w,rating,local,orderType:otype,company:genCompany(),
@@ -2372,15 +2372,27 @@ function openLeaseModal(model){
   const leaseLimit=isOOO()?99:LEASE_MAX;
   if(S.leasesCount>=leaseLimit){toast(`Максимум ${leaseLimit}`,'bad');return;}
   if(!canBuyMoreOfClass(model)){toast('Лимит машин','bad');return;}
+  const cat=vehCategory(model);
+  const maxCount=Math.max(1,Math.min(10,
+    leaseLimit-S.leasesCount,
+    vehicleLimits()[cat]-countVehiclesByClass(model)
+  ));
   let selectedTerm=0;
+  let count=1;
   function render(){
+    if(count>maxCount)count=maxCount;
+    if(count<1)count=1;
     const t=LEASE_TERMS[selectedTerm];
-    const advance=Math.round(basePrice*t.advancePct);
-    const monthly=Math.round(basePrice*t.monthlyPct);
-    const totalPaid=advance+monthly*t.months;
-    const overpay=Math.round((totalPaid/basePrice-1)*100);
+    const advanceOne=Math.round(basePrice*t.advancePct);
+    const monthlyOne=Math.round(basePrice*t.monthlyPct);
+    const totalOne=advanceOne+monthlyOne;
+    const entryTotal=totalOne*count;
+    const monthlyTotal=monthlyOne*count;
+    const totalPaid=totalOne*t.months*count;
+    const overpay=Math.round((totalPaid/(basePrice*count)-1)*100);
+    const canAfford=S.money>=entryTotal;
     let html=`<h2>🏦 Лизинг ${v.icon} ${v.n}</h2>
-      <p>Стоимость: <b>${fmt(basePrice)} ₽</b></p>
+      <p>Цена за шт: <b>${fmt(basePrice)} ₽</b></p>
       <h3>Срок</h3>
       <div style="display:flex;flex-direction:column;gap:5px">`;
     LEASE_TERMS.forEach((tt,i)=>{
@@ -2391,44 +2403,68 @@ function openLeaseModal(model){
         <div class="s">Аванс ${fmt(a)} ₽ · ${fmt(m)} ₽/мес · +${ov}%</div></div>`;
     });
     html+=`</div>
+      <h3>Сколько машин</h3>
+      <div class="card" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;gap:8px">
+        <button id="lcMinus" class="warn" style="width:48px;height:48px;font-size:24px;padding:0;font-weight:700">−</button>
+        <div style="text-align:center;flex:1">
+          <div style="font-size:26px;font-weight:700;line-height:1">${count}</div>
+          <div class="muted" style="font-size:10px;margin-top:2px">максимум ${maxCount}</div>
+        </div>
+        <button id="lcPlus" class="ok" style="width:48px;height:48px;font-size:24px;padding:0;font-weight:700">+</button>
+      </div>
       <div class="card" style="margin-top:8px">
-        <div class="row"><span class="muted">Аванс</span><b>${fmt(advance)} ₽</b></div>
-        <div class="row"><span class="muted">Первый платёж</span><b style="color:#ff8d99">сразу +${fmt(monthly)} ₽</b></div>
-        <div class="row"><span class="muted">На входе итого</span><b style="color:#ff6b6b">${fmt(advance+monthly)} ₽</b></div>
-        <div class="row"><span class="muted">Далее каждые</span><b>${LEASE_PERIOD_DAYS} дн.</b></div>
-        <div class="row"><span class="muted">Платёж</span><b>${fmt(monthly)} ₽</b></div>
+        <div class="row"><span class="muted">Аванс за 1 шт</span><b>${fmt(advanceOne)} ₽</b></div>
+        <div class="row"><span class="muted">Первый платёж за 1 шт</span><b style="color:#ff8d99">${fmt(monthlyOne)} ₽</b></div>
+        <div class="row" style="margin-top:6px;padding-top:6px;border-top:1px solid #1e2c3f">
+          <span class="muted">💸 На входе за ${count} шт</span><b style="color:#ff6b6b;font-size:15px">${fmt(entryTotal)} ₽</b></div>
+        <div class="row"><span class="muted">Платёж каждые ${LEASE_PERIOD_DAYS} дн</span><b style="color:#ffb84d">${fmt(monthlyTotal)} ₽</b></div>
         <div class="row"><span class="muted">Итого выплат</span><b>${fmt(totalPaid)} ₽</b></div>
         <div class="row"><span class="muted">Переплата</span><b style="color:#ffb27a">+${overpay}%</b></div>
+      </div>
+      <div class="card ${canAfford?'':'bad'}" style="margin-top:6px">
+        <div class="row"><span class="muted">В кошельке</span><b style="color:${canAfford?'#5ef0a0':'#ff8d99'}">${fmt(S.money)} ₽</b></div>
+        ${!canAfford?`<div class="muted" style="font-size:10.5px;text-align:center;margin-top:4px;color:#ff8d99">Не хватает ${fmt(entryTotal-S.money)} ₽</div>`:''}
       </div>
       <div class="card warn" style="font-size:11px;margin-top:8px">
         ⚠️ 1-я просрочка: штраф ${Math.round(LEASE_FINE_PCT*100)}% в долг.<br>
         ⚠️ 2-я просрочка: <b style="color:#ff6b6b">конфискация без возврата аванса</b>.
       </div>
       <div style="display:flex;gap:8px;margin-top:8px">
-        <button id="lsYes" class="gold" style="flex:1">Взять за ${fmt(advance+monthly)} ₽</button>
+        <button id="lsYes" class="gold" style="flex:1" ${canAfford?'':'disabled'}>Взять ${count} шт · ${fmt(entryTotal)} ₽</button>
         <button id="lsNo" class="ok" style="flex:1">Отмена</button></div>`;
     Modal._render(html);
     $('modalBox').querySelectorAll('[data-term]').forEach(el=>{el.onclick=()=>{selectedTerm=+el.dataset.term;render();};});
+    const mn=$('lcMinus'); if(mn) mn.onclick=()=>{ if(count>1){count--; render();} };
+    const pl=$('lcPlus');  if(pl) pl.onclick=()=>{ if(count<maxCount){count++; render();} };
     $('lsNo').onclick=()=>Modal.next();
     $('lsYes').onclick=()=>{
-      const total=advance+monthly;
-      if(S.money<total){toast(`Нужно ${fmt(total)} ₽ на входе`,'bad');return;}
-      const id='v'+(++vehIdCounter);
-      const baseMax=v.maxKm||500000;
-      const rolledMax=Math.round(baseMax*rnd(0.85,1.15));
-      const newVeh={id,model,fuel:v.tank,wear:0,odometer:0,upgrades:{},
-        baseMaxKm:baseMax,maxKm:rolledMax,lastServiceOdometer:0,
-        insurance:{osago:false,osagoExpires:0,osagoRenew:false,kasko:false,kaskoExpires:0,kaskoRenew:false},
-        lease:{monthly,monthsLeft:t.months,monthsTotal:t.months,
-               nextPaymentAt:S.gameTime+LEASE_PERIOD_DAYS*1440,
-               missedPayments:0,debt:0,advance,basePrice,paid:advance+monthly}};
-      S.ownedVehicles.push(newVeh);S.leasesCount++;
-      moneySpend(total,`Лизинг ${v.n} (аванс+платёж)`);
-      if(truckLoad()===0){S.currentVehicleId=id;
-        if(v.cls==='tractor'&&!S.currentTrailerId&&S.ownedTrailers.length)S.currentTrailerId=S.ownedTrailers[0].id;}
+      if(S.money<entryTotal){toast(`Нужно ${fmt(entryTotal)} ₽ на входе`,'bad');return;}
+      if(S.leasesCount+count>leaseLimit){toast(`Максимум ${leaseLimit} в лизинге`,'bad');return;}
+      if(countVehiclesByClass(model)+count>vehicleLimits()[cat]){toast('Не хватает слотов в парке','bad');return;}
+      const wasEmpty = S.ownedVehicles.length === 0;
+      let firstNewId = null;
+      for(let i=0;i<count;i++){
+        const id='v'+(++vehIdCounter);
+        const baseMax=v.maxKm||500000;
+        const rolledMax=Math.round(baseMax*rnd(0.85,1.15));
+        const newVeh={id,model,fuel:v.tank,wear:0,odometer:0,upgrades:{},
+          baseMaxKm:baseMax,maxKm:rolledMax,lastServiceOdometer:0,
+          insurance:{osago:false,osagoExpires:0,osagoRenew:false,kasko:false,kaskoExpires:0,kaskoRenew:false},
+          lease:{monthly:monthlyOne,monthsLeft:t.months,monthsTotal:t.months,
+                 nextPaymentAt:S.gameTime+LEASE_PERIOD_DAYS*1440,
+                 missedPayments:0,debt:0,advance:advanceOne,basePrice,paid:advanceOne+monthlyOne}};
+        S.ownedVehicles.push(newVeh);S.leasesCount++;
+        if(!firstNewId)firstNewId=id;
+      }
+      moneySpend(entryTotal,`Лизинг ${count}× ${v.n}`);
+      if(wasEmpty && firstNewId){
+        S.currentVehicleId=firstNewId;
+        if(v.cls==='tractor'&&!S.currentTrailerId&&S.ownedTrailers.length)S.currentTrailerId=S.ownedTrailers[0].id;
+      }
       Modal.next();
-      toast(`🏦 ${v.n} в лизинге (${fmt(total)} ₽ на входе)`,'ok');
-      addNews(`🏦 В лизинг: ${v.n} · −${fmt(total)} ₽`,'warn','finance');updateUI();
+      toast(`🏦 ${count}× ${v.n} в лизинг (${fmt(entryTotal)} ₽ на входе)`,'ok');
+      addNews(`🏦 В лизинг: ${count}× ${v.n} · −${fmt(entryTotal)} ₽`,'warn','finance');
+      updateUI();
     };
   }
   render();
@@ -3620,7 +3656,9 @@ function driverTick(dt){
           const km=roadKm(from,j);if(km<=maxR)pool.push({idx:j,km});
         }
         if(!pool.length)continue;
-        const target=pick(pool);const cl=driverCargo(d);if(!cl.length)continue;
+                const filteredPool=applyDispatcherRules(d,pool);
+        if(!filteredPool.length)continue;
+        const target=pick(filteredPool);const cl=driverCargo(d);if(!cl.length)continue;
         const ct=pick(cl);const cap=driverCap(d);
        const w=r3(rnd(cap*0.4, cap*0.99));
 const wmul=weightMul(w);let rate=baseRatePerKm(target.km)*wmul*repRateBonus(from, target.idx);
@@ -3794,6 +3832,7 @@ if(currDay > prevDay){
     const news=['📻 Цены на топливо выросли','📻 Ставка по межгороду 100 ₽/км',`📻 ${SEASONS[S.season].n}`];
    const t=pick(news);toast(t,'info');addNews(t,'info','world');}
    processStolenQuests();processPendingEvents();checkAchievements();checkQuests();
+   megaContractTick();tenderRouteTick();
   const nd=Math.floor(S.gameTime/1440)+1;
   if(nd!==S.day){
     S.day=nd;S.laborMarket=[];refillLaborMarket();
@@ -4018,8 +4057,8 @@ function renderSubtabsBar(){
   const tabId=activeTab.dataset.tab;
   const bar=$('subtabsBar');
   let items=null,currentSub=null;
-  if(tabId==='orders'){
-    items=[{k:'ati',n:'📋 Биржа АТИ'},{k:'contracts',n:'📝 Контракты'}];
+   if(tabId==='orders'){
+    items=[{k:'ati',n:'📋 Биржа АТИ'},{k:'contracts',n:'📝 Контракты'},{k:'mega',n:'🏢 Корпорации'}];
     currentSub=uiSubTab.orders;
   } else if(tabId==='auto'){
     items=[{k:'current',n:'🚗 Текущий'},{k:'garage',n:'🏢 Гараж'},{k:'shop',n:'🏬 Салон'},{k:'insurance',n:'🛡️ Страховка'}];
@@ -4027,8 +4066,8 @@ function renderSubtabsBar(){
   } else if(tabId==='world'){
     items=[{k:'news',n:'📰 Новости'},{k:'comps',n:'🏢 Конкуренты'},{k:'tenders',n:'📢 Тендеры'},{k:'intl',n:'🌍 Филиалы'}];
     currentSub=uiSubTab.world;
-  } else if(tabId==='labor'){
-    items=[{k:'staff',n:'👷 Водители'},{k:'hire',n:'📋 Найм'},{k:'office',n:'💼 Офис'}];
+   } else if(tabId==='labor'){
+    items=[{k:'staff',n:'👷 Водители'},{k:'hire',n:'📋 Найм'},{k:'office',n:'💼 Офис'},{k:'dispatcher',n:'📞 Диспетчер'}];
     currentSub=uiSubTab.labor;
   } else if(tabId==='firm'){
     if(isIP()){
@@ -4055,6 +4094,7 @@ function renderSubtabsBar(){
 }
 function updateUI(){
   try{
+    ensureNewState();
     const fTab=document.querySelector('.tab[data-tab="firm"]');
     if(fTab){
       const hasClaimable=QUEST_DEFS.some(q=>{const i=S.activeQuests[q.id];return i&&i.done&&!i.claimed;});
@@ -4118,7 +4158,8 @@ function renderOrders(){
   const p=$('pane-orders');
   if(!p.classList.contains('active'))return;
   const sub=uiSubTab.orders;
-  if(sub==='contracts'){p.innerHTML=renderContractsContent();bindContractsHandlers(p);return;}
+   if(sub==='contracts'){p.innerHTML=renderContractsContent();bindContractsHandlers(p);return;}
+  if(sub==='mega'){p.innerHTML=renderMegaContractsContent();bindMegaContractsHandlers(p);return;}
   const here=S.truck.cityIndex;
   let list=applyRouteFilter(atiOrders.slice());
   list=sortOrders(list);
@@ -5227,8 +5268,10 @@ function renderLabor(){
   if(sub==='staff') html+=laborStaffContent();
   else if(sub==='hire') html+=laborHireContent();
   else if(sub==='office') html+=laborOfficeContent();
-  p.innerHTML=html;
+  else if(sub==='dispatcher') html+=renderDispatcherContent();
+   p.innerHTML=html;
   bindLaborHandlers(p);
+  if(sub==='dispatcher') bindDispatcherHandlers(p);
 }
 function laborStaffContent(){
   if(!isIP())return `<div class="card warn">📄 Для найма нужен ИП</div>`;
@@ -5460,8 +5503,9 @@ function renderWorld(){
       </div>`;
     }
   }
-  } else if(sub==='tenders'){
-    html+=`<h3>📢 Активные тендеры</h3>`;
+   } else if(sub==='tenders'){
+    html+=renderTenderRoutesContent();
+    html+=`<h3>📢 Разовые тендеры</h3>`;
     TENDERS=TENDERS.filter(t=>t.deadline>S.gameTime);
     if(!TENDERS.length)html+=`<div class="empty">Пока нет активных тендеров. Появятся каждые 7 игровых дней.</div>`;
     for(const t of TENDERS){
@@ -5492,6 +5536,7 @@ function renderWorld(){
   p.innerHTML=html;
   p.querySelectorAll('[data-buycomp]').forEach(b=>{b.onclick=()=>buyCompetitor(b.dataset.buycomp);});
   p.querySelectorAll('[data-tender]').forEach(b=>{b.onclick=()=>participateTender(b.dataset.tender);});
+	  p.querySelectorAll('[data-tender-route]').forEach(b=>{b.onclick=()=>participateTenderRoute(b.dataset.tenderRoute);});
   p.querySelectorAll('[data-intl]').forEach(b=>{b.onclick=()=>intlBranch(+b.dataset.intl);});
 }
 
@@ -6600,6 +6645,321 @@ function renderWizardStep(){
 window.addEventListener('resize',()=>{
   if(document.querySelector('.wiz-box'))renderWizardStep();
 });
+	/* ============ НОВЫЕ МЕХАНИКИ: Мега-контракты, Диспетчер, Тендеры маршрутов ============ */
+
+/* --- Инициализация новых полей S (совместимость с сейвами) --- */
+function ensureNewState(){
+  if(!S.megaContracts)S.megaContracts=[];
+  if(S.megaOffer===undefined)S.megaOffer=null;
+  if(!S.tenderRoutes)S.tenderRoutes=[];
+  if(!S.tenderRouteOffers)S.tenderRouteOffers=[];
+  if(!S.dispatchRules)S.dispatchRules={
+    enabled:false,
+    minRating:3.0,
+    minKm:0,
+    minPay:0,
+    excludeLocal:false
+  };
+  if(S._megaLastOffer===undefined)S._megaLastOffer=0;
+  if(S._tenderRouteLast===undefined)S._tenderRouteLast=0;
+}
+
+/* --- Список корпораций --- */
+const MEGA_CLIENTS=[
+  {id:'wildberries',n:'Wildberries',icon:'🛒',color:'#c026d3',minRep:75},
+  {id:'ozon',       n:'Ozon',       icon:'📦',color:'#2563eb',minRep:75},
+  {id:'x5',         n:'X5 Retail',  icon:'🏪',color:'#16a34a',minRep:70},
+  {id:'lukoil',     n:'Лукойл',     icon:'⛽',color:'#dc2626',minRep:70},
+  {id:'gazprom',    n:'Газпром',    icon:'🔥',color:'#0284c7',minRep:80},
+  {id:'rzhd',       n:'РЖД Логистика',icon:'🚂',color:'#b91c1c',minRep:80},
+];
+
+/* --- Множитель бонуса по маршруту (Мега-контракты + Тендеры маршрутов) --- */
+function routeBonusFor(from,to){
+  let mul=1;
+  if(S.megaContracts){
+    for(const mc of S.megaContracts){
+      if(mc.endAt>S.gameTime && mc.from===from && mc.to===to) mul*=mc.bonusMul;
+    }
+  }
+  if(S.tenderRoutes){
+    for(const tr of S.tenderRoutes){
+      if(tr.endAt>S.gameTime && tr.from===from && tr.to===to) mul*=tr.bonusMul;
+    }
+  }
+  return mul;
+}
+
+/* ============ МЕГА-КОНТРАКТЫ ============ */
+function megaContractTick(){
+  const nd=Math.floor(S.gameTime/1440);
+  const cd=30; // предложение раз в 30 дней
+  if(nd-S._megaLastOffer>=cd && !S.megaOffer && S.reputation>=70 && isIP()){
+    // Сгенерировать предложение
+    const c=pick(MEGA_CLIENTS.filter(x=>S.reputation>=x.minRep));
+    if(c){
+      const from=ri(0,CITIES.length-1);
+      let to=ri(0,CITIES.length-1);
+      while(to===from)to=ri(0,CITIES.length-1);
+      const km=roadKm(from,to);
+      const durationDays=ri(45,75);
+      const cost=Math.round(km*40000*rnd(0.7,1.2));
+      const bonusMul=Math.round((1.8+Math.random()*0.6)*10)/10; // 1.8..2.4
+      S.megaOffer={
+        clientId:c.id,clientName:c.n,clientIcon:c.icon,clientColor:c.color,
+        from,to,km,durationDays,cost,bonusMul,
+        expiresAt:S.gameTime+7*1440
+      };
+      S._megaLastOffer=nd;
+      addNews(`🏢 ${c.n}: предложение контракта на маршрут ${CITIES[from].n} → ${CITIES[to].n}`,'info','world');
+    }
+  }
+  // Убрать просроченное предложение
+  if(S.megaOffer && S.gameTime>S.megaOffer.expiresAt){
+    addNews(`🏢 ${S.megaOffer.clientName}: предложение истекло`,'warn','world');
+    S.megaOffer=null;
+  }
+  // Убрать просроченные контракты
+  S.megaContracts=S.megaContracts.filter(mc=>mc.endAt>S.gameTime);
+}
+
+function renderMegaContractsContent(){
+  let html='';
+  // Активное предложение
+  if(S.megaOffer){
+    const o=S.megaOffer;
+    const daysLeft=Math.max(0,Math.ceil((o.expiresAt-S.gameTime)/1440));
+    const canAfford=S.money>=o.cost;
+    html+=`<h3>🏢 Поступившее предложение</h3>
+      <div class="card" style="border-color:${o.clientColor};background:linear-gradient(135deg,#0c141e,#1a0f22)">
+        <div class="row">
+          <span style="font-size:15px;font-weight:700">${o.clientIcon} ${o.clientName}</span>
+          <span class="badge" style="background:${o.clientColor};color:#fff">${Math.round((o.bonusMul-1)*100)}% к ставке</span>
+        </div>
+        <div class="row" style="margin-top:6px"><span class="muted">Маршрут</span>
+          <b>${CITIES[o.from].n} → ${CITIES[o.to].n} · ${fmt(o.km)} км</b></div>
+        <div class="row"><span class="muted">Длительность</span><b>${o.durationDays} дней</b></div>
+        <div class="row"><span class="muted">Бонус к ставке</span><b style="color:#5ef0a0">×${o.bonusMul.toFixed(1)}</b></div>
+        <div class="row" style="margin-top:6px;padding-top:6px;border-top:1px solid #1e2c3f">
+          <span class="muted">Стоимость контракта</span><b style="color:#ff8d99;font-size:14px">−${fmt(o.cost)} ₽</b></div>
+        <div class="row"><span class="muted">Ждём ответа</span><b style="color:${daysLeft<=2?'#ff8d99':'#ffb84d'}">${daysLeft} дн.</b></div>
+        <div class="muted" style="font-size:10.5px;margin-top:8px;line-height:1.4">
+          Пока контракт активен, <b>все</b> заказы по маршруту (и твои, и водителей) получают повышенную ставку.
+          Окупается, если делаешь хотя бы ${Math.ceil(o.cost/(o.km*150*(o.bonusMul-1)))} рейсов.
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="gold" id="mcAccept" style="flex:1" ${canAfford?'':'disabled'}>Подписать · ${fmt(o.cost)} ₽</button>
+          <button class="bad" id="mcDecline" style="flex:0 0 auto">Отказ</button>
+        </div>
+      </div>`;
+  } else {
+    html+=`<div class="card hl" style="font-size:11.5px;line-height:1.5">
+      <b>🏢 Мега-контракты</b><br>
+      Крупные корпорации присылают предложения на маршруты. Подписываешь контракт — все заказы по маршруту (твои и водителей) идут с надбавкой.
+      <div class="muted" style="margin-top:6px;font-size:10.5px">Новое предложение появляется раз в 30 игровых дней, если репутация ≥ 70 и открыто ИП.</div>
+    </div>`;
+  }
+  // Активные контракты
+  if(S.megaContracts.length){
+    html+=`<h3 style="margin-top:12px">📄 Активные · ${S.megaContracts.length}</h3>`;
+    for(const mc of S.megaContracts){
+      const c=MEGA_CLIENTS.find(x=>x.id===mc.clientId);
+      const daysLeft=Math.max(0,Math.ceil((mc.endAt-S.gameTime)/1440));
+      html+=`<div class="card" style="border-left:3px solid ${c?c.color:'#4da3ff'};background:#0f1a2a">
+        <div class="row">
+          <span style="font-weight:700">${c?c.icon:''} ${c?c.n:mc.clientId}</span>
+          <span class="badge ok">×${mc.bonusMul.toFixed(1)}</span>
+        </div>
+        <div class="row" style="margin-top:4px"><span class="muted">Маршрут</span>
+          <b style="font-size:12.5px">${CITIES[mc.from].n} → ${CITIES[mc.to].n}</b></div>
+        <div class="row"><span class="muted">Осталось</span><b style="color:#ffb84d">${daysLeft} дн.</b></div>
+        <div class="bar" style="margin-top:6px"><i style="width:${Math.min(100,100-(daysLeft/Math.round((mc.endAt-mc.startAt)/1440))*100)}%;background:linear-gradient(90deg,${c?c.color:'#4da3ff'},#39d98a)"></i></div>
+      </div>`;
+    }
+  }
+  return html;
+}
+
+function bindMegaContractsHandlers(p){
+  const acc=p.querySelector('#mcAccept');
+  if(acc) acc.onclick=()=>{
+    const o=S.megaOffer; if(!o) return;
+    if(S.money<o.cost){toast(`Нужно ${fmt(o.cost)} ₽`,'bad');return;}
+    if(!confirm(`Подписать контракт с ${o.clientName}?\n\nМаршрут: ${CITIES[o.from].n} → ${CITIES[o.to].n}\nСтоимость: ${fmt(o.cost)} ₽\nБонус: ×${o.bonusMul.toFixed(1)} на ${o.durationDays} дней\n\nОкупается за ${Math.ceil(o.cost/(o.km*150*(o.bonusMul-1)))} рейсов.`)) return;
+    moneySpend(o.cost,`Контракт ${o.clientName}`);
+    S.megaContracts.push({
+      id:'mc'+(++tenderId),
+      clientId:o.clientId,
+      from:o.from,to:o.to,
+      bonusMul:o.bonusMul,
+      startAt:S.gameTime,
+      endAt:S.gameTime+o.durationDays*1440
+    });
+    addNews(`🏢 Подписан контракт: ${o.clientName} · ${CITIES[o.from].n} → ${CITIES[o.to].n}`,'ok','world');
+    toast(`🏢 Контракт подписан · −${fmt(o.cost)} ₽`,'ok');
+    S.megaOffer=null;
+    updateUI();
+  };
+  const dec=p.querySelector('#mcDecline');
+  if(dec) dec.onclick=()=>{
+    if(!S.megaOffer) return;
+    if(!confirm(`Отказаться от предложения ${S.megaOffer.clientName}?`)) return;
+    S.megaOffer=null;
+    toast('🏢 Предложение отклонено','warn');
+    updateUI();
+  };
+}
+
+/* ============ АВТОДИСПЕТЧЕР ============ */
+function applyDispatcherRules(d,pool){
+  const r=S.dispatchRules;
+  if(!r || !r.enabled) return pool;
+  const filtered=pool.filter(p=>{
+    if(p.km<r.minKm) return false;
+    if(r.excludeLocal && p.km<=35) return false;
+    return true;
+  });
+  return filtered.length?filtered:pool;
+}
+
+function renderDispatcherContent(){
+  const r=S.dispatchRules;
+  let html=`<h3>📞 Диспетчерская</h3>
+    <div class="card" style="font-size:11.5px;line-height:1.5">
+      Правила, по которым твои водители выбирают заказы.
+      Если фильтр слишком жёсткий, водители будут простаивать — это влияет на выручку.
+    </div>
+    <div class="card hl" style="margin-top:8px">
+      <label class="adm-check"><input type="checkbox" id="dspEnabled" ${r.enabled?'checked':''}> <b>Включить фильтр заказов</b></label>
+    </div>
+    ${r.enabled?`
+      <h3>Параметры</h3>
+      <div class="card">
+        <div class="row"><span class="muted">Мин. рейтинг клиента</span><b>${r.minRating.toFixed(1)}</b></div>
+        <div class="adm-row"><input type="range" id="dspRating" min="2" max="5" step="0.1" value="${r.minRating}" style="flex:1">
+        </div>
+        <div class="muted" style="font-size:10.5px;margin-top:4px">Клиенты с ★ ниже порога будут проигнорированы. Защита от кидков.</div>
+      </div>
+      <div class="card" style="margin-top:6px">
+        <div class="row"><span class="muted">Мин. расстояние рейса</span><b>${r.minKm} км</b></div>
+        <div class="adm-row"><input type="range" id="dspKm" min="0" max="500" step="25" value="${r.minKm}" style="flex:1">
+        </div>
+        <div class="muted" style="font-size:10.5px;margin-top:4px">Локальные короткие рейсы (до этого значения) не берутся.</div>
+      </div>
+      <div class="card" style="margin-top:6px">
+        <label class="adm-check"><input type="checkbox" id="dspNoLocal" ${r.excludeLocal?'checked':''}> Исключать локальные заказы полностью</label>
+        <div class="muted" style="font-size:10.5px;margin-top:4px">Водители не берут заказы «по городу».</div>
+      </div>
+    `:''}
+    <div class="card" style="margin-top:8px;background:#0a1119">
+      <div class="row"><span class="muted">Водителей с активным поиском</span>
+        <b>${S.drivers.filter(d=>d.status==='idle'&&d.vehicleId).length}</b></div>
+      <div class="row"><span class="muted">Простаивают (не могут найти)</span>
+        <b style="color:${S.drivers.filter(d=>d.waitingFunding).length>0?'#ff8d99':'#5ef0a0'}">${S.drivers.filter(d=>d.waitingFunding).length}</b></div>
+    </div>`;
+  return html;
+}
+
+function bindDispatcherHandlers(p){
+  const en=p.querySelector('#dspEnabled');
+  if(en) en.onchange=()=>{ S.dispatchRules.enabled=en.checked; renderLabor(); };
+  const rt=p.querySelector('#dspRating');
+  if(rt) rt.oninput=()=>{ S.dispatchRules.minRating=parseFloat(rt.value); renderLabor(); };
+  const km=p.querySelector('#dspKm');
+  if(km) km.oninput=()=>{ S.dispatchRules.minKm=parseInt(km.value); renderLabor(); };
+  const nl=p.querySelector('#dspNoLocal');
+  if(nl) nl.onchange=()=>{ S.dispatchRules.excludeLocal=nl.checked; renderLabor(); };
+}
+
+/* ============ ТЕНДЕРЫ НА МАРШРУТ ============ */
+function tenderRouteTick(){
+  const nd=Math.floor(S.gameTime/1440);
+  if(nd-S._tenderRouteLast>=90 && S.tenderRouteOffers.length<3 && S.reputation>=60){
+    S._tenderRouteLast=nd;
+    const from=ri(0,CITIES.length-1);
+    let to=ri(0,CITIES.length-1);
+    while(to===from)to=ri(0,CITIES.length-1);
+    const km=roadKm(from,to);
+    const baseChance=0.4+S.reputation/200+S.bases.length*0.02;
+    S.tenderRouteOffers.push({
+      id:'tr'+(++tenderId),
+      from,to,km,
+      bonusMul:1.4,
+      durationDays:45,
+      minRep:Math.round(clamp(rnd(50,80),50,80)),
+      expiresAt:S.gameTime+10*1440,
+      chance:clamp(baseChance,0.1,0.85)
+    });
+    addNews(`📢 Тендер на маршрут ${CITIES[from].n} → ${CITIES[to].n}`,'info','world');
+  }
+  // Убрать просроченные
+  S.tenderRouteOffers=S.tenderRouteOffers.filter(o=>o.expiresAt>S.gameTime);
+  S.tenderRoutes=S.tenderRoutes.filter(t=>t.endAt>S.gameTime);
+}
+
+function renderTenderRoutesContent(){
+  let html='';
+  if(S.tenderRouteOffers.length){
+    html+=`<h3>📢 Доступные тендеры на маршрут</h3>`;
+    for(const o of S.tenderRouteOffers){
+      const daysLeft=Math.max(0,Math.ceil((o.expiresAt-S.gameTime)/1440));
+      const canRep=S.reputation>=o.minRep;
+      const chancePct=Math.round(o.chance*100);
+      html+=`<div class="card tender">
+        <div class="row"><b>${CITIES[o.from].n} → ${CITIES[o.to].n}</b>
+          <span class="badge" style="background:#4a3a14;color:#ffd479">×${o.bonusMul.toFixed(1)}</span></div>
+        <div class="row" style="margin-top:4px"><span class="muted">Длительность</span><b>${o.durationDays} дней</b></div>
+        <div class="row"><span class="muted">Мин. репутация</span><b style="color:${canRep?'#5ef0a0':'#ff8d99'}">${o.minRep}</b></div>
+        <div class="row"><span class="muted">Шанс победы</span><b style="color:#7ad6ff">${chancePct}%</b></div>
+        <div class="row"><span class="muted">Осталось</span><b>${daysLeft} дн.</b></div>
+        <div class="muted" style="font-size:10.5px;margin-top:6px;line-height:1.4">
+          При победе: <b style="color:#5ef0a0">все заказы по маршруту идут с ×${o.bonusMul.toFixed(1)} к ставке</b> на ${o.durationDays} дней.
+        </div>
+        <button class="primary" data-tender-route="${o.id}" ${canRep?'':'disabled'} style="margin-top:8px;width:100%">
+          Участвовать${!canRep?' · нужно реп. '+o.minRep:''}</button>
+      </div>`;
+    }
+  } else {
+    html+=`<div class="card hl" style="font-size:11.5px;line-height:1.5">
+      <b>📢 Тендеры на маршрут</b><br>
+      Участвуешь — при победе получаешь монопольную надбавку на маршрут.
+      Новые тендеры появляются раз в 90 дней (нужна репутация ≥ 60).
+    </div>`;
+  }
+  if(S.tenderRoutes.length){
+    html+=`<h3 style="margin-top:12px">🏆 Выигранные маршруты · ${S.tenderRoutes.length}</h3>`;
+    for(const t of S.tenderRoutes){
+      const daysLeft=Math.max(0,Math.ceil((t.endAt-S.gameTime)/1440));
+      html+=`<div class="card ok" style="margin-top:6px">
+        <div class="row"><b>${CITIES[t.from].n} → ${CITIES[t.to].n}</b>
+          <span class="badge ok">×${t.bonusMul.toFixed(1)}</span></div>
+        <div class="row" style="margin-top:4px"><span class="muted">Осталось</span><b style="color:#ffb84d">${daysLeft} дн.</b></div>
+      </div>`;
+    }
+  }
+  return html;
+}
+
+function participateTenderRoute(id){
+  const o=S.tenderRouteOffers.find(x=>x.id===id);
+  if(!o) return;
+  if(S.reputation<o.minRep){toast(`Нужна репутация ≥ ${o.minRep}`,'bad');return;}
+  if(S.tenderRoutes.length>=3){toast('Максимум 3 активных тендера','bad');return;}
+  const win=Math.random()<o.chance;
+  S.tenderRouteOffers=S.tenderRouteOffers.filter(x=>x.id!==id);
+  if(win){
+    S.tenderRoutes.push({id:o.id,from:o.from,to:o.to,bonusMul:o.bonusMul,
+      startAt:S.gameTime,endAt:S.gameTime+o.durationDays*1440});
+    S.reputation=clamp(S.reputation+3,0,100);
+    toast(`🏆 Тендер выигран! Маршрут ${CITIES[o.from].n} → ${CITIES[o.to].n}`,'ok');
+    addNews(`🏆 Выигран тендер на маршрут ${CITIES[o.from].n} → ${CITIES[o.to].n}`,'ok','world');
+  } else {
+    toast(`😞 Тендер проигран`,'warn');
+    addNews(`😞 Проиграли тендер на маршрут`,'warn','world');
+  }
+  updateUI();
+}
+/* ============ /НОВЫЕ МЕХАНИКИ ============ */
 /* ============ СТАРТ ============ */
 const introEl=$('introOverlay');
 let _introDismissed=false;
