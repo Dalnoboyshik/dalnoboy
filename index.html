@@ -1895,9 +1895,8 @@ function resolveNomination(){
         <div class="row"><span class="muted">Потрачено на анкету</span><b style="color:#ff8d99">−${fmt(n.costPaid)} ₽</b></div>
         <div class="row"><span class="muted">Репутация</span><b style="color:#ff8d99">−15</b></div>
       </div>
-      <button class="wide primary" id="nomOk" style="margin-top:8px">Понятно</button>`;
+         <button class="wide primary" onclick="Modal.next()" style="margin-top:8px">Понятно</button>`;
     Modal.show(html, 1);
-    setTimeout(()=>{const b=$('nomOk');if(b)b.onclick=()=>Modal.next();}, 0);
     return;
   }
 
@@ -1916,9 +1915,8 @@ function resolveNomination(){
         <div class="row"><span class="muted">Репутация</span><b style="color:#39d98a">+8</b></div>
         <div class="row"><span class="muted">Ачивка</span><b>🏆 Логист года</b></div>
       </div>
-      <button class="wide primary" id="nomOk" style="margin-top:8px">Принять</button>`;
+          <button class="wide primary" onclick="Modal.next()" style="margin-top:8px">Принять</button>`;
     Modal.show(html, 1);
-    setTimeout(()=>{const b=$('nomOk');if(b)b.onclick=()=>Modal.next();}, 0);
     return;
   }
 
@@ -1934,9 +1932,8 @@ function resolveNomination(){
       <div class="row"><span class="muted">Возврат 20% от анкеты</span><b style="color:#39d98a">+${fmt(refund)} ₽</b></div>
       <div class="row"><span class="muted">Репутация</span><b style="color:#39d98a">+1</b></div>
     </div>
-    <button class="wide primary" id="nomOk" style="margin-top:8px">Ок</button>`;
+      <button class="wide primary" onclick="Modal.next()" style="margin-top:8px">Ок</button>`;
   Modal.show(html, 1);
-  setTimeout(()=>{const b=$('nomOk');if(b)b.onclick=()=>Modal.next();}, 0);
 }
 /* ============ УГОН ============ */
 function triggerTheft(cityIdx){
