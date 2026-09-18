@@ -1736,9 +1736,9 @@ function toast(msg,type){
 let lastWearWarn=0;
 function checkWearWarn(){
   const w=curWear();
-  if(w>=95&&lastWearWarn<95){lastWearWarn=95;toast('🔧 <b>Износ 95%</b>','bad');}
-  else if(w>=90&&lastWearWarn<90){lastWearWarn=90;toast('⚠️ Износ 90%','warn');}
-  else if(w>=80&&lastWearWarn<80){lastWearWarn=80;toast('🔧 Износ 80%','warn');}
+  if(w>=95&&lastWearWarn<95){lastWearWarn=95;toast('🛠 <b>До ремонта 5%</b> — срочно в сервис','bad');}
+  else if(w>=90&&lastWearWarn<90){lastWearWarn=90;toast('⚠️ <b>До ремонта 10%</b>','warn');}
+  else if(w>=80&&lastWearWarn<80){lastWearWarn=80;toast('🛠 <b>До ремонта 20%</b>','warn');}
 }
 
 /* ============ ПРИБЫЛЬ В НЕДЕЛЮ ============ */
@@ -2388,7 +2388,7 @@ function openLeaseModal(model){
     const totalOne=advanceOne+monthlyOne;
     const entryTotal=totalOne*count;
     const monthlyTotal=monthlyOne*count;
-    const totalPaid=totalOne*t.months*count;
+    const totalPaid=(advanceOne+monthlyOne*t.months)*count;
     const overpay=Math.round((totalPaid/(basePrice*count)-1)*100);
     const canAfford=S.money>=entryTotal;
     let html=`<h2>🏦 Лизинг ${v.icon} ${v.n}</h2>
@@ -3246,7 +3246,8 @@ function sellVehicle(id){
       <div class="row"><span class="muted">Множитель ресурса</span><b>×${resK.toFixed(2)}</b></div>
       <div class="row" style="margin-top:6px;padding-top:6px;border-top:1px solid #1e2c3f">
         <span class="muted">Цена по ресурсу</span><b>${fmt(bp)} × ${resK.toFixed(2)} = ${fmt(basePrice)} ₽</b></div>
-      <div class="row"><span class="muted">🔧 Ремонт (${Math.round(w)}% износа)</span><b style="color:#ff8d99">−${fmt(repairCost)} ₽</b></div>
+            <div class="row"><span class="muted">🛠 До ремонта</span><b style="color:${(100-w)<=20?'#ff8d99':'#5ef0a0'}">${Math.round(100-w)}%</b></div>
+      <div class="row"><span class="muted">🔧 Стоимость ремонта</span><b style="color:#ff8d99">−${fmt(repairCost)} ₽</b></div>
       <div class="row" style="margin-top:6px;padding-top:6px;border-top:1px solid #1e2c3f">
         <span class="muted">Итоговая выручка</span><b style="color:#39d98a;font-size:14px">${fmt(price)} ₽</b></div>
     </div>
@@ -3435,8 +3436,8 @@ function driverStatsBlock(d){
         <div class="bar" style="margin-top:2px"><i style="width:${odoPct}%;background:${odoPct>80?'#ff6b6b':odoPct>60?'#ffb84d':'#39d98a'}"></i></div>
         <div class="ln" style="margin-top:6px"><span>🛠 ТО</span><b style="color:${od2>0?'#ff8d99':(sinceS2>=interval2*0.7?'#ffb84d':'#5ef0a0')}">${fmt(sinceS2)} / ${fmt(interval2)} км</b></div>
         <div class="bar" style="margin-top:2px"><i style="width:${sPct}%;background:${od2>0?'#ff6b6b':sPct>80?'#ffb84d':'#39d98a'}"></i></div>
-        <div class="ln" style="margin-top:6px"><span>🔧 Износ</span><b style="color:${w2>=80?'#ff8d99':w2>=50?'#ffb84d':'#5ef0a0'}">${w2}%</b></div>
-        <div class="bar" style="margin-top:2px"><i style="width:${w2}%;background:${w2>=80?'#ff6b6b':w2>=50?'#ffb84d':'#39d98a'}"></i></div>
+              <div class="ln" style="margin-top:6px"><span>🛠 До ремонта</span><b style="color:${(100-w2)<=20?'#ff8d99':(100-w2)<=50?'#ffb84d':'#5ef0a0'}">${100-w2}%</b></div>
+        <div class="bar" style="margin-top:2px"><i style="width:${100-w2}%;background:${(100-w2)<=20?'#ff6b6b':(100-w2)<=50?'#ffb84d':'#39d98a'}"></i></div>
       </div>`;
   }
   html+=`</div>`;
@@ -4596,8 +4597,10 @@ function autoCurrentContent(){
   <div class="card">
     <div class="row"><span class="muted">⛽ Топливо</span><b>${Math.round(fuel)} / ${vehTank(inst)} л</b></div>
     <div class="bar"><i style="width:${(fuel/vehTank(inst)*100)}%;background:linear-gradient(90deg,#ffb84d,#39d98a)"></i></div>
-    <div class="row" style="margin-top:8px"><span class="muted">🔧 Износ</span><b style="${wear>=90?'color:#ff6b6b':wear>=80?'color:#ffb84d':''}">${Math.round(wear)}%</b></div>
-    <div class="bar"><i style="width:${wear}%;background:${wear>=90?'#ff6b6b':wear>=60?'#ffb84d':'#39d98a'}"></i></div>
+    ${(()=>{const c=Math.max(0,100-wear);
+      const col=c<=10?'#ff6b6b':c<=20?'#ffb84d':'#39d98a';
+      return `<div class="row" style="margin-top:8px"><span class="muted">🛠 До ремонта</span><b style="color:${col}">${Math.round(c)}%</b></div>
+      <div class="bar"><i style="width:${c}%;background:${col}"></i></div>`;})()}
   </div>
   <button class="big primary" id="btnRefuel2" ${S.truck.traveling?'disabled':''}>
     <span class="ic">⛽</span> Заправить <span class="sub">${fuelPrice().toFixed(0)} ₽/л</span></button>
@@ -4857,7 +4860,8 @@ function vehTileHTML(i, busy){
   const sPct = Math.min(100, (sinceS/interval)*100);
   const odoCol = odoPct>80?'#ff6b6b':odoPct>60?'#ffb84d':'#39d98a';
   const sCol = od>0?'#ff6b6b':sPct>80?'#ffb84d':'#39d98a';
-  const wCol = w>=90?'#ff6b6b':w>=50?'#ffb84d':'#39d98a';
+    const cond = 100 - w;
+  const wCol = cond<=10?'#ff6b6b':cond<=50?'#ffb84d':'#39d98a';
 
   const cat = vehCategory(i.model);
   const isPrem = (cat==='tractor') || (cat==='car' && ov.price>=1000000);
@@ -4987,9 +4991,9 @@ function vehTileHTML(i, busy){
         <div class="lbl"><span>🛠 ТО</span><b style="color:${sCol}">${od>0?'просрочка':Math.round(sPct)+'%'}</b></div>
         <div class="bar"><i style="width:${sPct}%;background:${sCol}"></i></div>
       </div>
-      <div class="vbar">
-        <div class="lbl"><span>🔧 Износ</span><b style="color:${wCol}">${w}%</b></div>
-        <div class="bar"><i style="width:${w}%;background:${wCol}"></i></div>
+           <div class="vbar">
+        <div class="lbl"><span>🛠 До ремонта</span><b style="color:${wCol}">${cond}%</b></div>
+        <div class="bar"><i style="width:${cond}%;background:${wCol}"></i></div>
       </div>
     </div>
     ${leaseRow}
@@ -6486,8 +6490,8 @@ const CODEX=[
   {id:'overloadHard',icon:'🚫',title:'Почти лимит',
    text:'Суммарный вес подходит к 150%. Следующий заказ может не взяться — следи за счётчиком тонн.',
    when:s=>hasVehicle()&&truckLoad()/Math.max(0.1,curCap())>1.35},
-  {id:'wear80',icon:'🔧',title:'Износ 80%',
-   text:'Машина скоро попросит ремонта. Загляни в «Авто» → «Ремонт».',
+   {id:'wear80',icon:'🛠',title:'До ремонта 20%',
+   text:'Машина скоро попросит сервиса. Загляни в «Авто» → «Ремонт», пока не поздно.',
    when:s=>hasVehicle()&&curWear()>=80},
   {id:'serviceOverdue',icon:'🛠',title:'ТО просрочено',
    text:'Ресурс и ТО — разные вещи. Просрочил ТО — износ идёт быстрее. Сделай ТО в «Авто».',
