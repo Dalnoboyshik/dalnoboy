@@ -4649,6 +4649,19 @@ function autoCurrentContent(){
 function massScrapVehicles(){
   const ids = Object.keys(massSelected).filter(k=>massSelected[k]);
   if(!ids.length){ toast('Ничего не выбрано','warn'); return; }
+
+  // Пересчитываем итог заранее для подтверждения
+  let preview = 0;
+  for(const id of ids){
+    const inst = getVeh(id); if(!inst) continue;
+    if(inst.lease) continue;
+    if(S.loan && S.loan.vehicleId===id) continue;
+    const v = VEHICLES[inst.model];
+    const bp = v.sellPrice || Math.round((v.price||50000)*0.7);
+    preview += Math.round(bp*0.05);
+  }
+  if(!confirm(`♻️ Списать ${ids.length} машин(ы) в утиль за ${fmt(preview)} ₽?\n\nВнимание: списание работает и на нормальные машины — они уйдут за 5% цены. Отменить будет нельзя.`)) return;
+
   let total=0, count=0;
   const skipped=[];
   for(const id of ids){
@@ -4719,12 +4732,13 @@ function autoGarageContent(){
   </div>`;
 // === Массовая панель ===
   if(S.ownedVehicles.length > 1){
-    if(massMode){
+        if(massMode){
       const selCount = Object.keys(massSelected).filter(k=>massSelected[k]).length;
       html += `<div class="mass-bar show">
         <div class="mass-toggle-row">
           <button class="ok" data-mass-all>Все свободные</button>
           <button data-mass-none>Снять</button>
+          <button class="bad" data-mass-toggle>✕ Выйти</button>
         </div>
         <div class="mass-actions">
           <button class="ok" data-mass-sell ${selCount?'':'disabled'}>💸 Продать (${selCount})</button>
@@ -4802,7 +4816,7 @@ function vehTileHTML(i, busy){
   const isPrem = (cat==='tractor') || (cat==='car' && ov.price>=1000000);
   const isDanger = w>=90 || odoPct>=95 || od>0;
   const isPicked = !!(massMode && massSelected[i.id]);
-  const canSelectForMass = !i.lease && !(S.loan && S.loan.vehicleId===i.id) && !isB && !isCur && w<95;
+   const canSelectForMass = !i.lease && !(S.loan && S.loan.vehicleId===i.id) && !isCur && w<95;
 
   let tileCls = 'vtile';
   if(isPrem) tileCls += ' prem';
