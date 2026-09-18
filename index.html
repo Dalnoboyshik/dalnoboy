@@ -1292,30 +1292,33 @@ let breakdownActive=false,currentCityEvent=null;
 const Modal = {
   queue: [],
   busy: false,
-  show(html, priority){
+  show(html, priority, onRender){
     priority = priority || 0;
     if(!this.busy && !$('modal').classList.contains('show')){
-      this._render(html);
+      this._render(html, onRender);
       return;
     }
     if(priority > 0){
-      this.queue.unshift(html);
+      this.queue.unshift({html, onRender});
     } else {
-      this.queue.push(html);
+      this.queue.push({html, onRender});
     }
   },
-  _render(html){
+  _render(html, onRender){
     this.busy = true;
     $('modalBox').innerHTML = html;
     $('modal').classList.add('show');
+    if(typeof onRender === 'function'){
+      setTimeout(()=>{ try{ onRender(); }catch(e){ console.error('Modal onRender error:', e); } }, 0);
+    }
   },
   next(){
     $('modal').classList.remove('show');
     setTimeout(()=>{
       this.busy = false;
       if(this.queue.length){
-        const nextHtml = this.queue.shift();
-        this._render(nextHtml);
+        const item = this.queue.shift();
+        this._render(item.html, item.onRender);
       }
     }, 250);
   },
@@ -1823,8 +1826,7 @@ function firePendingEvent(pe){
         <div class="row"><span class="muted">Репутация</span><b style="color:#ff8d99">−5</b></div>
       </div>
       <button class="wide primary" id="peOk" style="margin-top:8px">Понятно</button>`;
-    Modal.show(html, 1);
-    setTimeout(()=>{const b=$('peOk');if(b)b.onclick=()=>Modal.next();},0);
+       Modal.show(html, 1, ()=>{const b=$('peOk');if(b)b.onclick=()=>Modal.next();});
     return;
   }
   
@@ -1845,8 +1847,7 @@ function firePendingEvent(pe){
           <div class="row"><span class="muted">Репутация</span><b style="color:#ff8d99">−10</b></div>
         </div>
         <button class="wide primary" id="peOk" style="margin-top:8px">Понятно</button>`;
-      Modal.show(html, 1);
-      setTimeout(()=>{const b=$('peOk');if(b)b.onclick=()=>Modal.next();},0);
+      Modal.show(html, 1, ()=>{const b=$('peOk');if(b)b.onclick=()=>Modal.next();});
     } else {
       moneyAdd(200000, 'Нелегальный рейс');
       addNews('💰 Нелегальный груз доставлен · +200 000 ₽','ok','finance');
@@ -1857,8 +1858,7 @@ function firePendingEvent(pe){
           <div class="row"><span class="muted">Оплата</span><b style="color:#39d98a">+200 000 ₽</b></div>
         </div>
         <button class="wide primary" id="peOk" style="margin-top:8px">Забрать</button>`;
-      Modal.show(html, 1);
-      setTimeout(()=>{const b=$('peOk');if(b)b.onclick=()=>Modal.next();},0);
+            Modal.show(html, 1, ()=>{const b=$('peOk');if(b)b.onclick=()=>Modal.next();});
     }
     return;
   }
@@ -1908,8 +1908,7 @@ function showNominationModal(){
     <button class="wide primary" data-nom="self">📝 Заполнить самому · бесплатно<br><small style="font-size:11px;opacity:.8">Базовый шанс</small></button>
     <button class="wide gold" data-nom="pro" style="margin-top:6px">💼 Нанять специалиста · 300 000 ₽<br><small style="font-size:11px;opacity:.8">+15% к шансу победы</small></button>
     <button class="wide warn" data-nom="lie" style="margin-top:6px">🎭 Спец + приукрасить заслуги · 500 000 ₽<br><small style="font-size:11px;opacity:.8">+25% к шансу, но риск разоблачения</small></button>`;
-  Modal.show(html, 1);
-  setTimeout(()=>{
+ Modal.show(html, 1, ()=>{
     const box = $('modalBox');
     box.querySelectorAll('[data-nom]').forEach(b=>{
       b.onclick = ()=>{
@@ -1924,9 +1923,9 @@ function showNominationModal(){
         else if(t==='pro') toast(`💼 Спец готовит анкету`,'ok');
         else toast(`🎭 Анкета с приукрашениями. Риск есть...`,'warn');
         addNews('🏆 Номинация на Логиста года · анкета подана','info','world');
-      };
+     };
     });
-  }, 0);
+  });
 }
 
 function resolveNomination(){
@@ -1970,7 +1969,7 @@ function resolveNomination(){
         <div class="row"><span class="muted">Потрачено на анкету</span><b style="color:#ff8d99">−${fmt(n.costPaid)} ₽</b></div>
         <div class="row"><span class="muted">Репутация</span><b style="color:#ff8d99">−15</b></div>
       </div>
-         <button class="wide primary" onclick="Modal.next()" style="margin-top:8px">Понятно</button>`;
+                 <button class="wide primary" onclick="Modal.next()" style="margin-top:8px">Понятно</button>`;
     Modal.show(html, 1);
     return;
   }
@@ -1990,7 +1989,7 @@ function resolveNomination(){
         <div class="row"><span class="muted">Репутация</span><b style="color:#39d98a">+8</b></div>
         <div class="row"><span class="muted">Ачивка</span><b>🏆 Логист года</b></div>
       </div>
-          <button class="wide primary" onclick="Modal.next()" style="margin-top:8px">Принять</button>`;
+                  <button class="wide primary" onclick="Modal.next()" style="margin-top:8px">Принять</button>`;
     Modal.show(html, 1);
     return;
   }
@@ -2007,7 +2006,7 @@ function resolveNomination(){
       <div class="row"><span class="muted">Возврат 20% от анкеты</span><b style="color:#39d98a">+${fmt(refund)} ₽</b></div>
       <div class="row"><span class="muted">Репутация</span><b style="color:#39d98a">+1</b></div>
     </div>
-      <button class="wide primary" onclick="Modal.next()" style="margin-top:8px">Ок</button>`;
+          <button class="wide primary" onclick="Modal.next()" style="margin-top:8px">Ок</button>`;
   Modal.show(html, 1);
 }
 /* ============ УГОН ============ */
@@ -2022,8 +2021,7 @@ function triggerTheft(cityIdx){
     <button class="wide primary" data-theft="bandits">🕵️ К бандитам · 50 000 ₽</button>
     <button class="wide ok" data-theft="police" style="margin-top:6px">👮 В полицию</button>
     <button class="wide warn" data-theft="bribe" style="margin-top:6px">💰 Подкупить полицию · 30 000 ₽</button>`;
-  Modal.show(theftHtml, 1);
-  setTimeout(()=>{
+   Modal.show(theftHtml, 1, ()=>{
     $('modalBox').querySelectorAll('[data-theft]').forEach(b=>{
       b.onclick=()=>{
         const m=b.dataset.theft;
@@ -2037,7 +2035,7 @@ function triggerTheft(cityIdx){
         updateUI();
       };
     });
-  }, 0);
+  });
 }
 function processStolenQuests(){
   for(let i=S.stolenQuests.length-1;i>=0;i--){const q=S.stolenQuests[i];if(S.gameTime>=q.resolveAt){S.stolenQuests.splice(i,1);scammerCall(q);}}
@@ -2049,8 +2047,7 @@ function scammerCall(q){
       <p>«Ваша ${v.icon} ${v.n} у меня. <b>${fmt(r)} ₽</b> — и она вернётся.»</p></div>
     <button class="wide primary" data-ransom="pay">💸 Заплатить ${fmt(r)} ₽</button>
     <button class="wide bad" data-ransom="refuse" style="margin-top:6px">🚫 Отказать</button>`;
-  Modal.show(scamHtml, 1);
-  setTimeout(()=>{
+  Modal.show(scamHtml, 1, ()=>{
     $('modalBox').querySelectorAll('[data-ransom]').forEach(b=>{
       b.onclick=()=>{
         const a=b.dataset.ransom;
@@ -2064,7 +2061,7 @@ function scammerCall(q){
         }
       };
     });
-  }, 0);
+  });
 }
 
 /* ============ СТРАХОВАНИЕ ============ */
@@ -2715,9 +2712,7 @@ function renderCityEvent(ev){
     <div style="display:flex;flex-direction:column;gap:6px">`;
   ev.opts.forEach((o,i)=>{html+=`<button class="wide ${i===0?'primary':'ok'}" data-evopt="${i}">${o.t}</button>`;});
   html+=`</div>`;
-  Modal.show(html);
-  // ждём, когда Modal отрисует и навесим обработчики
-  setTimeout(()=>{
+   Modal.show(html, 0, ()=>{
     const box=$('modalBox');
     box.querySelectorAll('[data-evopt]').forEach(b=>{
       b.onclick=()=>{
@@ -2728,7 +2723,7 @@ function renderCityEvent(ev){
         updateUI();
       };
     });
-  }, 0);
+  });
 }
 
 /* ============ ПУТЕШЕСТВИЕ ============ */
@@ -2788,8 +2783,7 @@ function triggerBreakdown(){
     </div>
     <button class="wide primary" id="btnTow" ${S.money>=tc?'':'disabled'}>🚛 Эвакуатор · ${fmt(tc)} ₽</button>
     <button class="wide ok" id="btnHitch" ${S.money>=2000?'':'disabled'} style="margin-top:6px">👍 Голосовать · 2 000 ₽</button>`;
-  Modal.show(bdHtml, 1);
-  setTimeout(()=>{
+   Modal.show(bdHtml, 1, ()=>{
     const btnTow=$('btnTow');
     if(btnTow)btnTow.onclick=()=>{
       if(S.money<tc){toast('Мало денег','bad');return;}
@@ -2814,7 +2808,7 @@ function triggerBreakdown(){
         toast('😞 Никто','bad');
       }
     };
-  }, 0);
+  });
 }
 function takeOrder(id,payType){
   const o=atiOrders.find(x=>x.id===id);
