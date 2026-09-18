@@ -1177,9 +1177,9 @@ function rollPlateLevel(isReReg, isIntl){
 }
 
 function makeNiceDigits(){
-  const seq = ['123','234','345','456','567','678','789',
+  const seq = ['001','002','003','004','005','006','007','008','009',
+               '123','234','345','456','567','678','789',
                '987','876','765','654','543','432','321',
-               '002','003','004','005','006','007','008','009',
                '100','200','300','400','500','600','700','800','900',
                '101','202','303','404','505','606','707','808','909'];
   return seq[Math.floor(Math.random()*seq.length)];
@@ -1244,7 +1244,44 @@ function genPlateText(level, cityIdx){
   const b1 = isElite ? letters[0] : plateRndLetter();
   return `${b1}${digits}${letters} ${code}`;
 }
+function evaluatePlateLevel(text){
+  if(!text) return null;
+  const m = text.match(/^([А-Я])(\d{3})([А-Я]{2})\s(\d+)$/);
+  if(!m) return null;
+  const b1 = m[1];
+  const d  = m[2];
+  const b2 = m[3][0];
+  const b3 = m[3][1];
+  const region = m[4];
 
+  const tripleDigits  = (d[0]===d[1] && d[1]===d[2]);
+  const tripleLetters = (b1===b2 && b2===b3);
+
+  const mirrorDigits = (d[0]===d[2] && d[0]!==d[1]);
+  const circleSmall  = ['001','002','003','004','005','006','007','008','009'].includes(d);
+  const circleBig    = ['100','200','300','400','500','600','700','800','900'].includes(d);
+  const ladderUp     = ['123','234','345','456','567','678','789'].includes(d);
+  const ladderDown   = ['987','876','765','654','543','432','321'].includes(d);
+  const nicePattern  = mirrorDigits || circleSmall || circleBig || ladderUp || ladderDown;
+
+  const seq = b1+b2+b3;
+  const isBlatSeq = (seq === 'ВОР' || seq === 'ЕКХ');
+
+  // Легендарный: три одинаковые цифры + три одинаковые буквы + регион из той же цифры
+  if(tripleDigits && tripleLetters){
+    const regionIsRepeating = /^(\d)\1*$/.test(region) && region[0] === d[0];
+    if(regionIsRepeating) return 'legendary';
+    return 'super';
+  }
+
+  // Блатной
+  if(tripleDigits || tripleLetters || isBlatSeq) return 'elite';
+
+  // Красивый
+  if(nicePattern) return 'nice';
+
+  return 'normal';
+}
 function generatePlate(cityIdx, isReReg){
   const code = CITY_REGION_CODE[cityIdx];
   const isIntl = typeof code === 'string';
@@ -1260,25 +1297,16 @@ function generatePlate(cityIdx, isReReg){
     level = rollPlateLevel(isReReg, isIntl);
     text = genPlateText(level, cityIdx);
   }
-   // === Пересчёт уровня по тексту (upgrade-only) ===
+    // === Пересчёт уровня по тексту (только повышение) ===
   if(!isIntl){
-    const m = text.match(/^([А-Я])(\d{3})([А-Я]{2})\s/);
-    if(m){
-      const b1 = m[1];          // первая буква (перед цифрами)
-      const d  = m[2];          // три цифры
-      const l1 = m[3][0];       // вторая буква (первая в паре после цифр)
-      const l2 = m[3][1];       // третья буква (вторая в паре)
-      const tripleDigits  = (d[0]===d[1] && d[1]===d[2]);
-      const tripleLetters = (b1===l1 && l1===l2);   // ВСЕ ТРИ буквы одинаковы
-
-      if(tripleDigits && tripleLetters){
-        if(level !== 'legendary') level = 'super';
-      } else if(tripleDigits || tripleLetters){
-        if(level === 'normal' || level === 'nice') level = 'elite';
+    const textLevel = evaluatePlateLevel(text);
+    if(textLevel){
+      const order = {normal:0, nice:1, elite:2, super:3, legendary:4};
+      if((order[textLevel]||0) > (order[level]||0)){
+        level = textLevel;
       }
     }
   }
-
 
   return {text, level, regionCode: code, registeredAt: S.gameTime};
 }
