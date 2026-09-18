@@ -129,6 +129,92 @@
 .wb-btns .wb-next{background:#1a5ba0;border-color:#2b7bd4;color:#fff}
 .wb-btns .wb-next:hover{background:#256ec0}
 .wb-step{margin-top:8px;text-align:center;font-size:10px;color:#4d6080;letter-spacing:.05em}
+	/* ===== ГАРАЖ — ДАШБОРД ===== */
+.health{background:linear-gradient(135deg,#101c2f,#0c141e);border:1px solid #2f4a75;
+  border-radius:10px;padding:12px 14px;margin-bottom:10px}
+.health-title{font-size:11px;text-transform:uppercase;letter-spacing:.06em;
+  color:#4da3ff;font-weight:700;margin-bottom:10px}
+.health-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.health-cell{background:#0a1019;border:1px solid #1e2c3f;border-radius:6px;padding:8px 10px;text-align:center}
+.health-cell .n{font-size:20px;font-weight:700;line-height:1}
+.health-cell .l{font-size:9.5px;color:#8ba0bd;text-transform:uppercase;letter-spacing:.04em;margin-top:4px}
+
+.group{margin-bottom:12px}
+.group-head{display:flex;justify-content:space-between;align-items:center;
+  padding:6px 2px;cursor:pointer;user-select:none}
+.group-head .t{font-size:11px;text-transform:uppercase;letter-spacing:.06em;
+  color:#8ba0bd;font-weight:700}
+.group-head .c{font-size:10.5px;color:#8ba0bd}
+.group-body.collapsed{display:none}
+
+.vtile{background:#0c141e;border:1px solid #1e2c3f;border-radius:10px;
+  padding:10px 12px;margin-bottom:8px;position:relative;overflow:hidden}
+.vtile::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:#1e2c3f}
+.vtile.prem::before{background:linear-gradient(180deg,#ffd479,#c87a00)}
+.vtile.current::before{background:#4da3ff}
+.vtile.current{background:linear-gradient(135deg,#0f1a2a,#0c141e)}
+.vtile.danger::before{background:#ff6b6b}
+.vtile.picked{background:#0f1a2a;border-color:#4da3ff}
+.vtile.picked::before{background:#4da3ff}
+
+.vtile-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.vtile-id{flex:1;min-width:0}
+.vtile-name{font-size:13px;font-weight:700;line-height:1.2;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.vtile-name .veh-cat{font-size:9.5px;padding:1px 5px;border-radius:4px;
+  background:#1f2a3b;color:#8ba0bd;font-weight:400;text-transform:uppercase;letter-spacing:.04em}
+.vtile-meta{display:flex;flex-wrap:wrap;gap:4px 8px;margin-top:6px;font-size:11px;
+  color:#8ba0bd;align-items:center}
+.vtile-meta .dot{color:#3a5070}
+.vtile-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
+
+.vbars{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px;
+  padding:8px 0 2px;border-top:1px solid #16202f}
+.vbar{font-size:10px;min-width:0}
+.vbar .lbl{display:flex;justify-content:space-between;color:#8ba0bd;margin-bottom:4px;gap:4px}
+.vbar .lbl b{color:#cfe0f5;font-variant-numeric:tabular-nums;white-space:nowrap}
+.vbar .bar{height:4px;background:#000;border-radius:2px;overflow:hidden;margin-top:0}
+.vbar .bar i{display:block;height:100%}
+
+.lease-row{display:flex;align-items:center;gap:8px;margin-top:8px;
+  padding:6px 10px;background:#1e1a0e;border:1px solid #4a3a14;border-radius:7px;font-size:11px}
+.lease-row.debt{background:#1e0e12;border-color:#7a3040}
+.lease-row .ic{font-size:14px}
+.lease-row .info{flex:1;color:#ffd479;font-weight:600;font-size:11px;line-height:1.3;min-width:0}
+.lease-row .info .sub{color:#8ba0bd;font-weight:400;font-size:10px;margin-top:2px}
+.lease-row button{padding:4px 9px;font-size:10.5px;flex-shrink:0}
+
+.vactions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.vactions > button{flex:1 1 auto;min-width:64px}
+.vactions .detail-btn{flex:0 0 auto;min-width:0}
+
+.detail-btn{background:transparent;border:1px dashed #2f4a75;color:#8ba0bd;
+  padding:4px 10px;font-size:10.5px}
+.detail-btn:hover{color:#cfe0f5;border-color:#4da3ff}
+
+.vdetail{display:none;margin-top:10px;padding-top:10px;border-top:1px dashed #1e2c3f}
+.vdetail.open{display:block}
+.vdetail .kv{display:flex;justify-content:space-between;font-size:11px;padding:3px 0;color:#a9bdd8}
+.vdetail .kv b{color:#e8eef7}
+.vdetail .setting{display:flex;align-items:center;gap:6px;margin-top:8px;
+  background:#0a1119;border:1px solid #1e2c3f;border-radius:6px;padding:6px 8px;flex-wrap:wrap}
+.vdetail .setting input{width:80px;background:#0a1019;border:1px solid #1e2c3f;
+  border-radius:5px;color:#e8eef7;padding:4px 6px;font-size:11px;font-family:inherit;text-align:right}
+.vdetail .setting .lbl{font-size:10.5px;color:#8ba0bd;flex:1;min-width:0}
+
+.chk{width:18px;height:18px;accent-color:#4da3ff;cursor:pointer;flex-shrink:0}
+
+.mass-bar{position:sticky;bottom:0;background:#0f1722;border:1px solid #2f4a75;
+  border-radius:10px;padding:10px 12px;margin-top:10px;z-index:5;
+  box-shadow:0 -6px 20px rgba(0,0,0,.5);
+  display:none;flex-direction:column;gap:8px}
+.mass-bar.show{display:flex}
+.mass-toggle-row,.mass-actions{display:flex;gap:6px;width:100%}
+.mass-toggle-row button,.mass-actions button{flex:1}
+
+@media(max-width:520px){
+  .vbars{grid-template-columns:1fr;gap:6px}
+  .vbar .lbl{margin-bottom:2px}
+}
 :root{--bg:#0a1018;--panel:#0f1722;--line:#1e2c3f;--txt:#e8eef7;--dim:#8ba0bd;
   --acc:#4da3ff;--ok:#39d98a;--warn:#ffb84d;--bad:#ff6b6b}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -284,14 +370,14 @@ button.sm{font-size:10px;padding:3px 7px}
 .badge.lazy{background:#4a3a1a;color:#ffd479}
 .badge.thief{background:#3a1a3a;color:#d08ae0}
 	.plate-badge{display:inline-block;background:#fff;color:#000;font-family:ui-monospace,monospace;font-weight:700;
-  font-size:12px;padding:3px 8px;border-radius:4px;border:1px solid #000;letter-spacing:.5px;white-space:nowrap}
+  font-size:18px;padding:5px 12px;border-radius:5px;border:2px solid #000;letter-spacing:1px;white-space:nowrap;line-height:1.15}
 .plate-badge.lvl-nice{background:#fffacd;border-color:#c8b400}
 .plate-badge.lvl-elite{background:#d4edff;border-color:#2b7bd4}
 .plate-badge.lvl-super{background:#ffe4b5;border-color:#c87a00}
 .plate-badge.lvl-legendary{background:linear-gradient(90deg,#ffe066,#ffd700,#ffe066);
   border-color:#a07000;box-shadow:0 0 6px #ffd70099}
 .plate-badge.no-plate{background:#4a1b22;color:#ff8d99;border-color:#8a2f3e;font-style:italic}
-.plate-lvl-icon{margin-left:3px;font-size:14px;vertical-align:middle}
+.plate-lvl-icon{margin-left:4px;font-size:18px;vertical-align:middle}
 .bar{height:3px;background:#000;border-radius:2px;overflow:hidden;margin-top:5px}
 .bar i{display:block;height:100%;transition:width .3s}
 .modal{position:fixed;inset:0;background:#05080de6;display:none;align-items:center;
@@ -1335,6 +1421,9 @@ const Modal = {
 };
 let sortBy={field:'total',dir:-1};
 let oblExpanded=false;
+let massMode=false;
+let massSelected={};
+let vehGroupCollapsed={car:false,small:false,tractor:false};
 let uiSubTab={orders:'ati', auto:'current', world:'news', labor:'staff'};
 let firmSubTab='general';
 let openDropdown=null;
@@ -2098,7 +2187,7 @@ function ensureInsurance(inst){if(!inst.insurance)inst.insurance={osago:false,os
     const rHtml = `<h2>${lv.icon} ${lv.n} номер!</h2>
       <p>Ваш новый номер:</p>
       <div style="text-align:center;padding:16px 0">
-        <span class="plate-badge lvl-${newPlate.level}" style="font-size:20px;padding:8px 16px">${newPlate.text}</span>
+        <span class="plate-badge lvl-${newPlate.level}" style="font-size:28px;padding:12px 22px;letter-spacing:2px">${newPlate.text}</span>
       </div>
       <div class="card" style="font-size:12px">
         <div class="muted">Шанс остановки ГИБДД: <b style="color:#5ef0a0">×${lv.stopMul.toFixed(1)}</b></div>
@@ -2361,9 +2450,12 @@ function leasePaymentTick(){
       } else {
         toast(`🚨 ВТОРАЯ просрочка: ${VEHICLES[v.model].n} изъята!`,'bad');
         addNews(`🚨 Конфискация: ${VEHICLES[v.model].n}`,'bad','notify');
-        S.ownedVehicles=S.ownedVehicles.filter(x=>x.id!==v.id);
-        if(S.currentVehicleId===v.id)S.currentVehicleId=S.ownedVehicles[0]?S.ownedVehicles[0].id:null;
-        S.drivers=S.drivers.filter(d=>d.vehicleId!==v.id);S.leasesCount--;
+              S.ownedVehicles=S.ownedVehicles.filter(x=>x.id!==v.id);
+        if(S.currentVehicleId===v.id)S.currentVehicleId=S.ownedVehicles.length?S.ownedVehicles[0].id:null;
+        for(const d of S.drivers){
+          if(d.vehicleId===v.id){ d.vehicleId=null; d.trailerId=null; d.status='idle'; d.route=null; d.progress=0; }
+        }
+        S.leasesCount--;
       }
     }
   }
@@ -2509,8 +2601,10 @@ function checkLoan(){
   const loanAmount = S.loan.amount;
   const wasCurrent = (S.currentVehicleId === S.loan.vehicleId);
 
-  S.ownedVehicles = S.ownedVehicles.filter(v=>v.id !== S.loan.vehicleId);
-  S.drivers = S.drivers.filter(d=>d.vehicleId !== S.loan.vehicleId);
+   S.ownedVehicles = S.ownedVehicles.filter(v=>v.id !== S.loan.vehicleId);
+  for(const d of S.drivers){
+    if(d.vehicleId===S.loan.vehicleId){ d.vehicleId=null; d.trailerId=null; d.status='idle'; d.route=null; d.progress=0; }
+  }
 
   if(wasCurrent){
     const free = S.ownedVehicles.find(v=>!S.drivers.some(d=>d.vehicleId===v.id));
@@ -3070,7 +3164,6 @@ function refuelAllFleet(){
 function sellVehicle(id){
   const inst=getVeh(id);if(!inst)return;
   if(S.truck.traveling){toast('В пути нельзя','bad');return;}
-  if(S.drivers.some(d=>d.vehicleId===id)){toast('Занята','bad');return;}
   if(inst.lease){toast('Лизинг — сначала выкупите','bad');return;}
   if(S.loan && S.loan.vehicleId===id){toast('Машина под залогом','bad');return;}
    const v=VEHICLES[inst.model];
@@ -3113,6 +3206,9 @@ function sellVehicle(id){
   $('sellYes').onclick=()=>{
     moneyAdd(price,`Продажа ${v.n}`);
    addNews(`💸 Продажа: ${v.n} · +${fmt(price)} ₽`,'info','finance');
+    for(const d of S.drivers){
+      if(d.vehicleId===id){ d.vehicleId=null; d.trailerId=null; d.status='idle'; d.route=null; d.progress=0; }
+    }
     S.ownedVehicles=S.ownedVehicles.filter(x=>x.id!==id);
     if(S.currentVehicleId===id)S.currentVehicleId=S.ownedVehicles.length?S.ownedVehicles[0].id:null;
     Modal.next();toast(`💸 ${fmt(price)} ₽`,'ok');updateUI();
@@ -3121,7 +3217,6 @@ function sellVehicle(id){
 function scrapVehicle(id){
   const inst=getVeh(id);if(!inst)return;
   if(S.truck.traveling){toast('В пути нельзя','bad');return;}
-  if(S.drivers.some(d=>d.vehicleId===id)){toast('Занята','bad');return;}
   if(inst.lease){toast('Лизинг — сначала выкупите','bad');return;}
   if(S.loan && S.loan.vehicleId===id){toast('Машина под залогом','bad');return;}
   if(!resourceDepleted(inst)){toast('Ресурс ещё не исчерпан — продай обычным способом','bad');return;}
@@ -3131,6 +3226,9 @@ function scrapVehicle(id){
   if(!confirm(`Списать ${v.icon} ${v.n} в утиль за ${fmt(price)} ₽?`))return;
   moneyAdd(price,`Утиль ${v.n}`);
   addNews(`♻️ Утиль: ${v.n} · +${fmt(price)} ₽`,'info','finance');
+  for(const d of S.drivers){
+    if(d.vehicleId===id){ d.vehicleId=null; d.trailerId=null; d.status='idle'; d.route=null; d.progress=0; }
+  }
   S.ownedVehicles=S.ownedVehicles.filter(x=>x.id!==id);
   if(S.currentVehicleId===id)S.currentVehicleId=S.ownedVehicles.length?S.ownedVehicles[0].id:null;
   toast(`♻️ ${v.n} списана · +${fmt(price)} ₽`,'ok');
@@ -3463,8 +3561,16 @@ function driverForceRepair(driverId){
 function driverTick(dt){
   for(let i=S.drivers.length-1;i>=0;i--){
     const d=S.drivers[i];if(!d.stats)d.stats=newDriverStats();
+    if(!d.vehicleId){
+      d.status='idle'; d.route=null; d.progress=0; d.waitingFunding=false;
+      continue;
+    }
     const inst=getVeh(d.vehicleId);
-    if(!inst){toast(`👋 ${d.name}`,'warn');S.drivers.splice(i,1);continue;}
+    if(!inst){
+      // Машина уехала (продажа/утиль/конфискация) — водитель остаётся без техники
+      d.vehicleId=null; d.trailerId=null; d.status='idle'; d.route=null; d.progress=0;
+      continue;
+    }
     if(d.trailerId&&!getTrl(d.trailerId))d.trailerId=null;
     if(resourceDepleted(inst)){
       if(d.status==='trip'){d.status='idle';d.route=null;d.progress=0;}
@@ -4288,42 +4394,82 @@ function renderAuto(){
 	      const tl=$('btnTakeLoan');if(tl)tl.onclick=()=>openLoanModal();
     const rl=$('btnRepayLoan2');if(rl)rl.onclick=()=>repayLoan();
     p.querySelectorAll('[data-up]').forEach(b=>{b.onclick=()=>buyUpgrade(b.dataset.up);});
-  }
-       if(sub==='garage'){
+  }       if(sub==='garage'){
     p.querySelectorAll('[data-select-vehicle]').forEach(b=>{b.onclick=()=>selectVehicle(b.dataset.selectVehicle);});
     p.querySelectorAll('[data-select-trailer]').forEach(b=>{b.onclick=()=>selectTrailer(b.dataset.selectTrailer);});
     p.querySelectorAll('[data-buyout-fleet]').forEach(b=>{b.onclick=()=>buyoutLease(b.dataset.buyoutFleet);});
     p.querySelectorAll('[data-paydebt-fleet]').forEach(b=>{b.onclick=()=>payLeaseDebt(b.dataset.paydebtFleet);});
     p.querySelectorAll('[data-regplate]').forEach(b=>{b.onclick=()=>openPlateModal(b.dataset.regplate, false);});
     p.querySelectorAll('[data-replate]').forEach(b=>{b.onclick=()=>openPlateModal(b.dataset.replate, true);});
-   p.querySelectorAll('[data-saveint]').forEach(b=>{b.onclick=()=>{
-  const id=b.dataset.saveint;
-  const inp=p.querySelector(`[data-serviceint="${id}"]`);
-  const inst=getVeh(id);if(!inst||!inp)return;
-  const vBase=VEHICLES[inst.model].serviceInterval||10000;
-  const minInt=Math.round(vBase*0.5);
-  const maxInt=Math.round(vBase*1.5);
-  const v=parseInt(inp.value,10);
-  if(!v||v<minInt||v>maxInt){
-    inst.serviceIntervalOverride=null;
-    toast(`🛠 Допустимо ${fmt(minInt)}–${fmt(maxInt)} км. Сброшено к регламенту`,'warn');
-  } else if(v===vBase){
-    inst.serviceIntervalOverride=null;
-    toast(`🛠 ${VEHICLES[inst.model].n}: регламент ${fmt(vBase)} км`,'ok');
-  } else {
-    inst.serviceIntervalOverride=v;
-    const mult=(v/vBase).toFixed(2);
-    toast(`🛠 ${VEHICLES[inst.model].n}: ТО каждые ${fmt(v)} км (×${mult} от регламента)`,'ok');
-  }
-  updateUI();
-};});
+    // Новые обработчики дашборда
+    p.querySelectorAll('[data-group-toggle]').forEach(b=>{b.onclick=()=>{
+      const k = b.dataset.groupToggle;
+      vehGroupCollapsed[k] = !vehGroupCollapsed[k];
+      renderAuto();
+    };});
+    p.querySelectorAll('[data-toggle-detail]').forEach(b=>{b.onclick=()=>{
+      const id = b.dataset.toggleDetail;
+      if(!S.vehDetailOpen) S.vehDetailOpen = {};
+      S.vehDetailOpen[id] = !S.vehDetailOpen[id];
+      renderAuto();
+    };});
+    p.querySelectorAll('[data-mass-toggle]').forEach(b=>{b.onclick=()=>{
+      massMode = !massMode;
+      if(!massMode) massSelected = {};
+      renderAuto();
+    };});
+    p.querySelectorAll('[data-mass-all]').forEach(b=>{b.onclick=()=>{
+      const busy = busyVehicleIds();
+      S.ownedVehicles.forEach(v=>{
+        if(v.lease) return;
+        if(S.loan && S.loan.vehicleId===v.id) return;
+        if(busy.has(v.id)) return;
+        if(v.id === S.currentVehicleId) return;
+        if((v.wear||0) >= 95) return;
+        massSelected[v.id] = true;
+      });
+      renderAuto();
+    };});
+    p.querySelectorAll('[data-mass-none]').forEach(b=>{b.onclick=()=>{
+      massSelected = {};
+      renderAuto();
+    };});
+    p.querySelectorAll('[data-mass-sell]').forEach(b=>{b.onclick=massSellVehicles;});
+    p.querySelectorAll('[data-mass-scrap]').forEach(b=>{b.onclick=massScrapVehicles;});
+     p.querySelectorAll('[data-mass-check]').forEach(b=>{b.onchange=()=>{
+      const id = b.dataset.massCheck;
+      if(b.checked) massSelected[id] = true;
+      else delete massSelected[id];
+      renderAuto();
+    };});
+    p.querySelectorAll('[data-saveint]').forEach(b=>{b.onclick=()=>{
+      const id=b.dataset.saveint;
+      const inp=p.querySelector(`[data-serviceint="${id}"]`);
+      const inst=getVeh(id);if(!inst||!inp)return;
+      const vBase=VEHICLES[inst.model].serviceInterval||10000;
+      const minInt=Math.round(vBase*0.5);
+      const maxInt=Math.round(vBase*1.5);
+      const v=parseInt(inp.value,10);
+      if(!v||v<minInt||v>maxInt){
+        inst.serviceIntervalOverride=null;
+        toast(`🛠 Допустимо ${fmt(minInt)}–${fmt(maxInt)} км. Сброшено к регламенту`,'warn');
+      } else if(v===vBase){
+        inst.serviceIntervalOverride=null;
+        toast(`🛠 ${VEHICLES[inst.model].n}: регламент ${fmt(vBase)} км`,'ok');
+      } else {
+        inst.serviceIntervalOverride=v;
+        const mult=(v/vBase).toFixed(2);
+        toast(`🛠 ${VEHICLES[inst.model].n}: ТО каждые ${fmt(v)} км (×${mult} от регламента)`,'ok');
+      }
+      updateUI();
+    };});
     p.querySelectorAll('[data-resetint]').forEach(b=>{b.onclick=()=>{
       const inst=getVeh(b.dataset.resetint);if(!inst)return;
       inst.serviceIntervalOverride=null;
       toast('🛠 Сброшено к общему','ok');
       updateUI();
     };});
-  }
+  }          // ← вот это и есть закрытие if(sub==='garage')
   if(sub==='shop'){
     p.querySelectorAll('[data-buy-vehicle]').forEach(b=>{b.onclick=()=>buyVehicle(b.dataset.buyVehicle);});
     p.querySelectorAll('[data-lease-vehicle]').forEach(b=>{b.onclick=()=>openLeaseModal(b.dataset.leaseVehicle);});
@@ -4445,82 +4591,338 @@ function autoCurrentContent(){
   }
   return html;
 }
+	function massSellVehicles(){
+  const ids = Object.keys(massSelected).filter(k=>massSelected[k]);
+  if(!ids.length){ toast('Ничего не выбрано','warn'); return; }
+  let total=0, count=0;
+  const skipped=[];
+  for(const id of ids){
+    const inst = getVeh(id);
+    if(!inst){ delete massSelected[id]; continue; }
+    if(inst.lease){ skipped.push(VEHICLES[inst.model].n+' (лизинг)'); continue; }
+    if(S.loan && S.loan.vehicleId===id){ skipped.push(VEHICLES[inst.model].n+' (залог)'); continue; }
+    const v=VEHICLES[inst.model];
+    const w=inst.wear||0, odo=inst.odometer||0;
+    const maxKm=getInstMaxKm(inst);
+    const remainPct=Math.max(0, 1-odo/maxKm);
+    let resK;
+    if(remainPct>0.6)resK=1.0;
+    else if(remainPct>0.4)resK=0.85;
+    else if(remainPct>0.2)resK=0.6;
+    else if(remainPct>0.05)resK=0.3;
+    else resK=0.1;
+    const bp=v.sellPrice||Math.round((v.price||50000)*0.7);
+    const basePrice=Math.round(bp*resK);
+    const repairCost=Math.round(v.repairFull*(w/100));
+    const price=Math.max(0, basePrice-repairCost);
+    total+=price;
+    count++;
+    // Водителя НЕ увольняем — оставляем без машины
+    for(const d of S.drivers){
+      if(d.vehicleId===id){ d.vehicleId=null; d.trailerId=null; d.status='idle'; d.route=null; d.progress=0; }
+    }
+    S.ownedVehicles=S.ownedVehicles.filter(x=>x.id!==id);
+    delete massSelected[id];
+  }
+  if(total>0) moneyAdd(total, `Массовая продажа (${count})`);
+  if(S.currentVehicleId && !getVeh(S.currentVehicleId)){
+    S.currentVehicleId = S.ownedVehicles.length ? S.ownedVehicles[0].id : null;
+  }
+  massSelected={}; massMode=false;
+  toast(`💸 Продано ${count} машин за ${fmt(total)} ₽`,'ok');
+  addNews(`💸 Массовая продажа: ${count} машин · +${fmt(total)} ₽`,'info','finance');
+  if(skipped.length) toast(`Пропущено: ${skipped.join(', ')}`,'warn');
+  updateUI();
+}
+
+function massScrapVehicles(){
+  const ids = Object.keys(massSelected).filter(k=>massSelected[k]);
+  if(!ids.length){ toast('Ничего не выбрано','warn'); return; }
+  let total=0, count=0;
+  const skipped=[];
+  for(const id of ids){
+    const inst = getVeh(id);
+    if(!inst){ delete massSelected[id]; continue; }
+    if(inst.lease){ skipped.push(VEHICLES[inst.model].n+' (лизинг)'); continue; }
+    if(S.loan && S.loan.vehicleId===id){ skipped.push(VEHICLES[inst.model].n+' (залог)'); continue; }
+    const v=VEHICLES[inst.model];
+    const bp=v.sellPrice||Math.round((v.price||50000)*0.7);
+    const price=Math.round(bp*0.05);
+    total+=price;
+    count++;
+    for(const d of S.drivers){
+      if(d.vehicleId===id){ d.vehicleId=null; d.trailerId=null; d.status='idle'; d.route=null; d.progress=0; }
+    }
+    S.ownedVehicles=S.ownedVehicles.filter(x=>x.id!==id);
+    delete massSelected[id];
+  }
+  if(total>0) moneyAdd(total, `Массовый утиль (${count})`);
+  if(S.currentVehicleId && !getVeh(S.currentVehicleId)){
+    S.currentVehicleId = S.ownedVehicles.length ? S.ownedVehicles[0].id : null;
+  }
+  massSelected={}; massMode=false;
+  toast(`♻️ Списано ${count} машин за ${fmt(total)} ₽`,'ok');
+  addNews(`♻️ Массовый утиль: ${count} машин · +${fmt(total)} ₽`,'info','finance');
+  if(skipped.length) toast(`Пропущено: ${skipped.join(', ')}`,'warn');
+  updateUI();
+}
 function autoGarageContent(){
-  let html=`<h3>🏢 Гараж · ${S.ownedVehicles.length}</h3>`;
-  if(S.ownedVehicles.length<=1)html+=`<div class="empty">Одна машина</div>`;
-  else{
-    const busy=busyVehicleIds();
-      for(const i of S.ownedVehicles){
-      const ov=VEHICLES[i.model];const isB=busy.has(i.id);
-      const isCur=i.id===S.currentVehicleId;const w=Math.round(i.wear);
-      const odo3=i.odometer||0;
-      const maxK3=getInstMaxKm(i);
-            const sinceS3=(i.odometer||0)-(i.lastServiceOdometer||0);
-      const interval3=serviceIntervalOf(i)||30000;
-      const od3=serviceOverdue(i);
-      const odoPct3=Math.min(100,(odo3/maxK3)*100);
-      const sPct3=Math.min(100,(sinceS3/interval3)*100);
-      const odoCol3=odoPct3>80?'#ff6b6b':odoPct3>60?'#ffb84d':'#39d98a';
-      const sCol3=od3>0?'#ff6b6b':sPct3>80?'#ffb84d':'#39d98a';
-		  const vBase=VEHICLES[i.model].serviceInterval||10000;
-  const minInt=Math.round(vBase*0.5);
-  const maxInt=Math.round(vBase*1.5);
-  const curInt=i.serviceIntervalOverride||vBase;
-  const mult=(curInt/vBase).toFixed(2);
-  const bonusPct=((0.02-(curInt/vBase-1)*0.09)*100).toFixed(1);
-  const bonusColor=bonusPct>0?'#5ef0a0':bonusPct<0?'#ff8d99':'#cfe0f5';
-          html+=`<div class="card ${isCur?'hl':''}">
-        <div class="row">
-                   <span class="route">${ov.icon} ${ov.n} <span class="veh-cat">${catName(vehCategory(i.model))}</span>
-            ${i.plate?`<span class="plate-badge lvl-${i.plate.level}">${i.plate.text}</span><span class="plate-lvl-icon">${PLATE_LEVELS[i.plate.level].icon}</span>`:`<span class="plate-badge no-plate">без номера</span>`}
-            <small>${ov.radius} км · ${ov.cap} т · износ ${w}%${isB?' · 👷':''}${i.lease?' · 🏦':''}</small></span>
-          ${isCur?'<span class="badge ok">текущая</span>':`<button class="primary" data-select-vehicle="${i.id}" ${truckLoad()>0||isB||w>=95?'disabled':''}>Сесть</button>`}
+  const busy = busyVehicleIds();
+
+  // === Группировка ===
+  const groups = {car:[], small:[], tractor:[]};
+  for(const v of S.ownedVehicles){
+    groups[vehCategory(v.model)].push(v);
+  }
+  for(const k in groups){
+    groups[k].sort((a,b)=>{
+      if(a.id===S.currentVehicleId) return -1;
+      if(b.id===S.currentVehicleId) return 1;
+      return VEHICLES[a.model].n.localeCompare(VEHICLES[b.model].n);
+    });
+  }
+
+  // === Здоровье парка ===
+  let norm=0, repair=0, crit=0;
+  for(const v of S.ownedVehicles){
+    const w = v.wear||0;
+    const odo = v.odometer||0;
+    const maxK = getInstMaxKm(v);
+    const remain = 1 - odo/Math.max(1,maxK);
+    const od = serviceOverdue(v);
+    if(w >= 90 || remain < 0.05 || od > 0) crit++;
+    else if(w >= 50 || remain < 0.30) repair++;
+    else norm++;
+  }
+
+  let html = `<h3>🏢 Гараж · ${S.ownedVehicles.length}</h3>`;
+
+  // === Плашка здоровья ===
+  html += `<div class="health">
+    <div class="health-title">Парк</div>
+    <div class="health-grid">
+      <div class="health-cell"><div class="n" style="color:#5ef0a0">${norm}</div><div class="l">В норме</div></div>
+      <div class="health-cell"><div class="n" style="color:#ffb84d">${repair}</div><div class="l">Ремонт</div></div>
+      <div class="health-cell"><div class="n" style="color:#ff8d99">${crit}</div><div class="l">Критично</div></div>
+    </div>
+  </div>`;
+
+  // === Группы ===
+  if(S.ownedVehicles.length <= 1){
+    html += `<div class="empty">Одна машина</div>`;
+  } else {
+    for(const catKey of ['car','small','tractor']){
+      const list = groups[catKey];
+      if(!list.length) continue;
+      const catIcon = {car:'🚗', small:'🚚', tractor:'🚛'}[catKey];
+      const catLabel = catName(catKey);
+      const collapsed = !!vehGroupCollapsed[catKey];
+      html += `<div class="group">
+        <div class="group-head" data-group-toggle="${catKey}">
+          <span class="t">${catIcon} ${catLabel}</span>
+          <span class="c">${list.length} шт ${collapsed?'▼':'▲'}</span>
         </div>
-        <div class="drv-stats" style="margin-top:6px">
-          <div class="ln"><span>🚗 Ресурс</span><b style="color:${odoCol3}">${fmt(odo3)} / ${fmt(maxK3)} км</b></div>
-          <div class="ln"><span>🛠 ТО</span><b style="color:${sCol3}">${fmt(sinceS3)} / ${fmt(interval3)} км</b></div>
-          <div class="ln"><span>🔧 Износ</span><b style="color:${w>=80?'#ff8d99':w>=50?'#ffb84d':'#5ef0a0'}">${w}%</b></div>
+        <div class="group-body ${collapsed?'collapsed':''}">`;
+      for(const i of list){
+        html += vehTileHTML(i, busy);
+      }
+      html += `</div></div>`;
+    }
+  }
+
+  // === Массовая панель ===
+  if(S.ownedVehicles.length > 1){
+    if(massMode){
+      const selCount = Object.keys(massSelected).filter(k=>massSelected[k]).length;
+      html += `<div class="mass-bar show">
+        <div class="mass-toggle-row">
+          <button class="ok" data-mass-all>Все свободные</button>
+          <button data-mass-none>Снять</button>
         </div>
-               ${i.lease?`<div class="row" style="margin-top:6px;gap:5px">
-          <button class="gold" data-buyout-fleet="${i.id}" style="flex:1">🏦 Досрочно выкупить</button>
-          ${i.lease.debt>0?`<button class="bad" data-paydebt-fleet="${i.id}" style="flex:1">💳 Долг ${fmt(i.lease.debt)} ₽</button>`:''}
-        </div>`:''}
-             <div class="row" style="margin-top:6px;gap:5px">
-          ${i.plate
-            ? `<button class="gold" data-replate="${i.id}" style="flex:1">🔄 Сменить номер · 15 000 ₽</button>`
-            : `<button class="ok" data-regplate="${i.id}" style="flex:1">📋 Поставить на учёт · 15 000 ₽</button>`}
+        <div class="mass-actions">
+          <button class="ok" data-mass-sell ${selCount?'':'disabled'}>💸 Продать (${selCount})</button>
+          <button class="bad" data-mass-scrap ${selCount?'':'disabled'}>♻️ Списать (${selCount})</button>
         </div>
-             <div class="drv-stats" style="margin-top:6px">
-          <div class="ln"><span>🛠 Регламент ТО</span><b>${fmt(vBase)} км</b></div>
-          <div class="ln"><span>Допустимо</span><b>${fmt(minInt)} – ${fmt(maxInt)} км</b></div>
-          <div class="ln"><span>Твой интервал</span><b>${fmt(curInt)} км (×${mult})</b></div>
-          <div class="ln"><span>Бонус ресурса</span><b style="color:${bonusColor}">${bonusPct>0?'+':''}${bonusPct}% за ТО</b></div>
-        </div>
-        <div class="row" style="margin-top:6px;gap:5px;align-items:center">
-          <span class="muted" style="font-size:10.5px;flex:0 0 auto">🛠 ТО каждые</span>
-          <input type="number" data-serviceint="${i.id}" value="${curInt}" min="${minInt}" max="${maxInt}" step="500"
-            style="width:90px;background:#0a1119;border:1px solid #1e2c3f;border-radius:5px;color:#e8eef7;padding:4px 6px;font-size:11px;font-family:inherit">
-          <span class="muted" style="font-size:10.5px;flex:0 0 auto">км</span>
-          <button class="sm ok" data-saveint="${i.id}">OK</button>
-          ${i.serviceIntervalOverride?`<button class="sm warn" data-resetint="${i.id}">Сброс</button>`:''}
-        </div>
+      </div>`;
+    } else {
+      html += `<div style="display:flex;gap:6px;margin-top:8px">
+        <button class="primary" data-mass-toggle style="flex:1">☑️ Включить массовый режим</button>
       </div>`;
     }
   }
+
+  // === Прицепы ===
   if(S.ownedTrailers.length>1){
-    html+=`<h3 style="margin-top:8px">🎪 Сменить прицеп</h3>`;
-    const bt=busyTrailerIds();
+    html += `<h3 style="margin-top:12px">🎪 Сменить прицеп</h3>`;
+    const bt = busyTrailerIds();
     for(const i of S.ownedTrailers){
-      const ot=TRAILERS[i.model];const isB=bt.has(i.id);
-      const isCur=i.id===S.currentTrailerId;
-      html+=`<div class="card ${isCur?'hl':''}">
+      const ot = TRAILERS[i.model];
+      const isB = bt.has(i.id);
+      const isCur = i.id === S.currentTrailerId;
+      html += `<div class="card ${isCur?'hl':''}">
         <div class="row">
           <span class="route">${ot.icon} ${ot.n}<small>до ${ot.cap} т${isB?' · 👷':''}</small></span>
-          ${isCur?'<span class="badge ok">текущий</span>':`<button class="primary" data-select-trailer="${i.id}" ${truckLoad()>0||isB?'disabled':''}>Прицепить</button>`}
+          ${isCur?'<span class="badge ok">текущий</span>'
+            :`<button class="primary" data-select-trailer="${i.id}" ${truckLoad()>0||isB?'disabled':''}>Прицепить</button>`}
         </div></div>`;
     }
   }
+
   return html;
+}
+
+function vehTileHTML(i, busy){
+  const ov = VEHICLES[i.model];
+  const isB = busy.has(i.id);
+  const isCur = i.id === S.currentVehicleId;
+  const w = Math.round(i.wear||0);
+  const odo = i.odometer||0;
+  const maxK = getInstMaxKm(i);
+  const sinceS = (i.odometer||0) - (i.lastServiceOdometer||0);
+  const interval = serviceIntervalOf(i) || 30000;
+  const od = serviceOverdue(i);
+  const odoPct = Math.min(100, (odo/Math.max(1,maxK))*100);
+  const sPct = Math.min(100, (sinceS/interval)*100);
+  const odoCol = odoPct>80?'#ff6b6b':odoPct>60?'#ffb84d':'#39d98a';
+  const sCol = od>0?'#ff6b6b':sPct>80?'#ffb84d':'#39d98a';
+  const wCol = w>=90?'#ff6b6b':w>=50?'#ffb84d':'#39d98a';
+
+  const cat = vehCategory(i.model);
+  const isPrem = (cat==='tractor') || (cat==='car' && ov.price>=1000000);
+  const isDanger = w>=90 || odoPct>=95 || od>0;
+  const isPicked = !!(massMode && massSelected[i.id]);
+  const canSelectForMass = !i.lease && !(S.loan && S.loan.vehicleId===i.id) && !isB && !isCur && w<95;
+
+  let tileCls = 'vtile';
+  if(isPrem) tileCls += ' prem';
+  if(isCur) tileCls += ' current';
+  if(isDanger) tileCls += ' danger';
+  if(isPicked) tileCls += ' picked';
+
+  const detailOpen = !!(S.vehDetailOpen && S.vehDetailOpen[i.id]);
+
+  // Водитель на машине
+  let driverBadge = '';
+  if(isB){
+    const drv = S.drivers.find(d=>d.vehicleId===i.id);
+    if(drv) driverBadge = `<span class="badge">👷 ${drv.name.split(' ')[0]}</span>`;
+  }
+
+  // Лизинг
+  let leaseRow = '';
+  if(i.lease){
+    const isDebt = i.lease.debt>0;
+    const monthsLeft = i.lease.monthsLeft;
+    const monthsTotal = i.lease.monthsTotal;
+    const paid = i.lease.paid || i.lease.advance || 0;
+    leaseRow = `<div class="lease-row ${isDebt?'debt':''}">
+      <span class="ic">🏦</span>
+      <div class="info"${isDebt?' style="color:#ff8d99"':''}>
+        ${monthsTotal-monthsLeft} / ${monthsTotal} мес · ${fmt(i.lease.monthly)} ₽ / 15 дн.
+        <div class="sub"${isDebt?' style="color:#ff8d99"':''}>
+          ${isDebt
+            ? `Просрочка (${i.lease.missedPayments}/2) · долг ${fmt(i.lease.debt)} ₽`
+            : `Выплачено ${fmt(paid)} ₽`}
+        </div>
+      </div>
+      ${isDebt?`<button class="bad" data-paydebt-fleet="${i.id}">Погасить</button>`:''}
+      <button class="gold" data-buyout-fleet="${i.id}">Выкупить</button>
+    </div>`;
+  }
+
+  // Кнопки
+  let actions = '';
+  if(isCur){
+    actions += `<button class="primary" disabled>✓ Текущая</button>`;
+  } else {
+    const disabled = (truckLoad()>0 || isB || w>=95);
+    actions += `<button class="primary" data-select-vehicle="${i.id}" ${disabled?'disabled':''}>Сесть</button>`;
+  }
+  if(i.plate){
+    actions += `<button class="gold" data-replate="${i.id}">🔄 Номер</button>`;
+  } else {
+    actions += `<button class="ok" data-regplate="${i.id}">📋 Учёт</button>`;
+  }
+  actions += `<button class="detail-btn" data-toggle-detail="${i.id}">${detailOpen?'× Скрыть':'Детали'}</button>`;
+
+  // Детали
+  let detail = '';
+  if(detailOpen){
+    const vBase = VEHICLES[i.model].serviceInterval || 10000;
+    const minInt = Math.round(vBase*0.5);
+    const maxInt = Math.round(vBase*1.5);
+    const curInt = i.serviceIntervalOverride || vBase;
+    const mult = (curInt/vBase).toFixed(2);
+    const bonusPct = ((0.02-(curInt/vBase-1)*0.09)*100).toFixed(1);
+    const bonusColor = bonusPct>0?'#5ef0a0':bonusPct<0?'#ff8d99':'#cfe0f5';
+    detail = `<div class="vdetail open">
+      <div class="kv"><span>🛠 Регламент ТО</span><b>${fmt(vBase)} км</b></div>
+      <div class="kv"><span>Допустимо</span><b>${fmt(minInt)} – ${fmt(maxInt)} км</b></div>
+      <div class="kv"><span>Твой интервал</span><b>${fmt(curInt)} км (×${mult})</b></div>
+      <div class="kv"><span>Бонус ресурса</span><b style="color:${bonusColor}">${bonusPct>0?'+':''}${bonusPct}% за ТО</b></div>
+      <div class="setting">
+        <span class="lbl">🛠 ТО каждые</span>
+        <input type="number" data-serviceint="${i.id}" value="${curInt}" min="${minInt}" max="${maxInt}" step="500">
+        <span class="lbl" style="flex:0 0 auto">км</span>
+        <button class="ok" data-saveint="${i.id}">OK</button>
+        ${i.serviceIntervalOverride?`<button class="warn" data-resetint="${i.id}">Сброс</button>`:''}
+      </div>
+    </div>`;
+  }
+
+  // Чекбокс
+  let chk = '';
+  if(massMode){
+    const disabled = !canSelectForMass;
+    chk = `<div style="display:flex;align-items:center;margin-right:6px;flex-shrink:0">
+      <input type="checkbox" class="chk" data-mass-check="${i.id}" ${isPicked?'checked':''} ${disabled?'disabled':''}>
+    </div>`;
+  }
+
+  const plateStr = i.plate
+    ? `<span class="plate-badge lvl-${i.plate.level}">${i.plate.text}</span>`
+    : `<span class="plate-badge no-plate">без номера</span>`;
+
+  let statusBadge = '';
+  if(isCur) statusBadge = `<span class="badge current" style="background:#1a5ba0;color:#fff">Текущая</span>`;
+  else if(isDanger) statusBadge = `<span class="badge no">⚠️ Критично</span>`;
+  else if(i.lease && i.lease.debt>0) statusBadge = `<span class="badge no">⚠️ Просрочка</span>`;
+
+  return `<div class="${tileCls}">
+    <div class="vtile-top">
+      ${chk}
+      <div class="vtile-id">
+        <div class="vtile-name">
+          ${ov.icon} ${ov.n}
+          <span class="veh-cat">${cat==='car'?'Легк.':cat==='small'?'Мал.':'Тягач'}</span>
+          ${driverBadge}
+        </div>
+        <div class="vtile-meta">
+          ${plateStr}
+          <span class="dot">·</span><span>${ov.radius} км</span>
+          <span class="dot">·</span><span>${ov.cap} т</span>
+        </div>
+      </div>
+      <div class="vtile-right">${statusBadge}</div>
+    </div>
+    <div class="vbars">
+      <div class="vbar">
+        <div class="lbl"><span>🚗 Ресурс</span><b style="color:${odoCol}">${Math.round(odoPct)}%</b></div>
+        <div class="bar"><i style="width:${odoPct}%;background:${odoCol}"></i></div>
+      </div>
+      <div class="vbar">
+        <div class="lbl"><span>🛠 ТО</span><b style="color:${sCol}">${od>0?'просрочка':Math.round(sPct)+'%'}</b></div>
+        <div class="bar"><i style="width:${sPct}%;background:${sCol}"></i></div>
+      </div>
+      <div class="vbar">
+        <div class="lbl"><span>🔧 Износ</span><b style="color:${wCol}">${w}%</b></div>
+        <div class="bar"><i style="width:${w}%;background:${wCol}"></i></div>
+      </div>
+    </div>
+    ${leaseRow}
+    <div class="vactions">${actions}</div>
+    ${detail}
+  </div>`;
 }
 function autoShopContent(){
   const lim=vehicleLimits();
@@ -4588,7 +4990,7 @@ function autoInsuranceContent(){
       <div class="row">
         <span style="display:flex;gap:6px;align-items:center;min-width:0">
           <b>${mdl.icon} ${mdl.n}</b>
-          ${v.plate?`<span class="plate-badge lvl-${v.plate.level}" style="font-size:10px;padding:1px 5px">${v.plate.text}</span>`:''}
+              ${v.plate?`<span class="plate-badge lvl-${v.plate.level}">${v.plate.text}</span>`:''}
         </span>
       </div>
       <div class="row" style="margin-top:5px"><span class="muted">ОСАГО</span>
@@ -4816,7 +5218,12 @@ function laborStaffContent(){
   for(const d of sorted){
     const v=getVeh(d.vehicleId);const w=v?Math.round(v.wear):0;
     const vl=v?`${VEHICLES[v.model].icon} ${VEHICLES[v.model].n} (${w}%)`:'—';
-    const st=d.sick>0?'🤒 болеет':(d.status==='trip'?'🚚 в рейсе':(d.waitingFunding?'⏸ ждёт денег':(d.needsReplacement?'⚠️ ресурс':`🏙️ ${CITIES[d.cityIdx].n}`)));
+        const st = !d.vehicleId ? '<span style="color:#ff8d99">🚫 без машины</span>'
+      : d.sick>0?'🤒 болеет'
+      : d.status==='trip'?'🚚 в рейсе'
+      : d.waitingFunding?'⏸ ждёт денег'
+      : d.needsReplacement?'⚠️ ресурс'
+      : `🏙️ ${CITIES[d.cityIdx].n}`;
     const s=d.stats||newDriverStats();
     const perDay=driverProfitPerDay(d);
     const traitsHtml=(d.traits||[]).map(t=>`<span class="badge ${DRIVER_TRAITS[t].cls}">${DRIVER_TRAITS[t].icon}</span>`).join('');
@@ -5891,7 +6298,10 @@ function loadGame(){
     if(!S.pendingEvents)S.pendingEvents=[];
     if(S.lastCityEventDay===undefined)S.lastCityEventDay=0;
     if(S.rateBonusUntil===undefined)S.rateBonusUntil=0;
+       if(S.loan===undefined)S.loan=null;
     if(S.loan===undefined)S.loan=null;
+    if(!S.vehDetailOpen)S.vehDetailOpen={};
+    if(!S.vehGroupCollapsed)S.vehGroupCollapsed={car:false,small:false,tractor:false};
     if(!S.stats)S.stats={};
     if(S.stats.logistWins===undefined)S.stats.logistWins=0;
     if(S.stats.scandals===undefined)S.stats.scandals=0;
