@@ -6399,12 +6399,31 @@ function renderLabor(){
 function laborStaffContent(){
   if(!isIP())return `<div class="card warn">📄 Для найма нужен ИП</div>`;
   if(!S.drivers.length)return `<h3>👷 Мои водители</h3><div class="empty">Нет нанятых. Перейдите в «📋 Найм»</div>`;
+	// Считаем, сколько водителей без машины
+const idleNoVeh = S.drivers.filter(d => !d.vehicleId && d.status !== 'trip').length;
+const freeSlotCount = (function(){
+  const freeV = vehiclesForHire();
+  const freeT = freeTrailers();
+  let pool = freeT.length;
+  let n = 0;
+  for(const id of freeV){
+    const v = VEHICLES[getVeh(id).model];
+    if(v.cls === 'tractor'){ if(pool > 0){ pool--; n++; } }
+    else n++;
+  }
+  return n;
+})();
   const SORT_FIELDS=[
     {k:'profit',n:'Прибыль'},{k:'perDay',n:'₽/день'},{k:'perMonth',n:'₽/мес'},
     {k:'rating',n:'Рейтинг'},{k:'salary',n:'Оклад'},{k:'wear',n:'Износ'},
     {k:'name',n:'Имя'},{k:'trips',n:'Рейсы'},{k:'accidents',n:'💥 ДТП'},
   ];
   let html=`<h3>👷 Мои водители · ${S.drivers.length}</h3>`;
+	if(idleNoVeh > 0){
+  html += `<button class="wide ok" id="autoAssignBtn" style="margin-bottom:8px">
+    🚗 Посадить всех свободных · ${idleNoVeh} вод. / ${freeSlotCount} мест
+  </button>`;
+}
   html+=`<div class="sort-row"><span class="lbl">Сортировка:</span>`;
   for(const sf of SORT_FIELDS){
     const on=S.driverSort.field===sf.k;
@@ -6508,6 +6527,8 @@ function laborOfficeContent(){
 }
 function bindLaborHandlers(p){
   p.querySelectorAll('[data-hire]').forEach(b=>{b.onclick=()=>{const c=S.laborMarket.find(x=>x.id===b.dataset.hire);if(c)openDriverHireModal(c);};});
+	const aaBtn = p.querySelector('#autoAssignBtn');
+if(aaBtn) aaBtn.onclick = ()=>openAutoAssignDriversModal();
   p.querySelectorAll('[data-fire]').forEach(b=>{b.onclick=()=>fireDriver(b.dataset.fire);});
 	  p.querySelectorAll('[data-assign]').forEach(b=>{b.onclick=()=>openAssignVehicleModal(b.dataset.assign);});
   p.querySelectorAll('[data-train]').forEach(b=>{b.onclick=()=>openTrainModal(b.dataset.train);});
@@ -6537,7 +6558,118 @@ function bindLaborHandlers(p){
 	const bh=$('bulkHire'); if(bh) bh.onclick = ()=>openBulkHireModal();
   const rl=$('refreshLabor');if(rl)rl.onclick=refreshLaborMarket;
 }
+function openAutoAssignDriversModal(){
+  // 1) Водители без машины, которые не в рейсе
+  const idleDrivers = S.drivers.filter(d =>
+    !d.vehicleId && d.status !== 'trip'
+  );
+  if(!idleDrivers.length){ toast('Все водители уже на машинах','ok'); return; }
 
+  // 2) Свободные слоты (тот же алгоритм, что в массовом найме)
+  const freeV = vehiclesForHire();
+  const freeT = freeTrailers();
+  const trailerPool = [...freeT];
+  const slots = [];
+  for(const id of freeV){
+    const inst = getVeh(id);
+    const v = VEHICLES[inst.model];
+    if(v.cls === 'tractor'){
+      if(trailerPool.length > 0){
+        slots.push({vehId: id, trailerId: trailerPool.shift()});
+      }
+    } else {
+      slots.push({vehId: id, trailerId: null});
+    }
+  }
+  if(!slots.length){ toast('Нет свободных машин (или нет прицепов под тягачи)','bad'); return; }
+
+  // 3) Сортируем слоты: сначала тягачи (им — лучших)
+  const rank = {tractor:0, truck_small:1, van:2, car:3};
+  slots.sort((a,b)=>{
+    const va = VEHICLES[getVeh(a.vehId).model];
+    const vb = VEHICLES[getVeh(b.vehId).model];
+    return (rank[va.cls]??3) - (rank[vb.cls]??3);
+  });
+
+  // 4) Сортируем водителей по рейтингу — лучших первыми
+  const sortedDrivers = idleDrivers.slice().sort((a,b)=>b.rating - a.rating);
+
+  // 5) Сколько поместится
+  const pairs = [];
+  const limit = Math.min(slots.length, sortedDrivers.length);
+  for(let i=0; i<limit; i++){
+    pairs.push({ driver: sortedDrivers[i], slot: slots[i] });
+  }
+
+  // 6) Отрисовка превью
+  let html = `<h2>🚗 Автопосадка водителей</h2>
+    <p>Свободных водителей: <b>${idleDrivers.length}</b> · свободных слотов: <b>${slots.length}</b></p>`;
+
+  if(idleDrivers.length > slots.length){
+    html += `<div class="card warn" style="font-size:11px">
+      ⚠️ Мест меньше, чем водителей. Сядут лучшие по ★, остальные останутся без техники.
+    </div>`;
+  }
+
+  html += `<h3>Распределение (${pairs.length})</h3>`;
+  for(const p of pairs){
+    const inst = getVeh(p.slot.vehId);
+    const v = VEHICLES[inst.model];
+    const trl = p.slot.trailerId ? TRAILERS[getTrl(p.slot.trailerId).model] : null;
+    const w = Math.round(inst.wear||0);
+    const cond = 100 - w;
+    const condColor = cond<=10?'#ff8d99':cond<=20?'#ffb84d':'#5ef0a0';
+    html += `<div class="card hl">
+      <div class="row">
+        <span>${p.driver.avatar||'👤'} <b>${p.driver.name}</b></span>
+        <span class="rt ${ratingCls(p.driver.rating)}">★${p.driver.rating.toFixed(1)}</span>
+      </div>
+      <div class="muted" style="font-size:11px;margin-top:3px">
+        ${v.icon} ${v.n}${trl?' + '+trl.icon+' '+trl.n:''} · 🛠 <b style="color:${condColor}">${cond}%</b>
+      </div>
+    </div>`;
+  }
+
+  html += `<div style="display:flex;gap:8px;margin-top:10px">
+      <button id="aaYes" class="ok" style="flex:1">Посадить (${pairs.length})</button>
+      <button id="aaNo" class="primary" style="flex:1">Отмена</button>
+    </div>`;
+
+  Modal.show(html, 1, ()=>{
+    const y = $('aaYes'), n = $('aaNo');
+    if(n) n.onclick = ()=>Modal.next();
+    if(y) y.onclick = ()=>{
+      // Перепроверяем на свежих данных
+      let seated = 0;
+      for(const p of pairs){
+        const d = S.drivers.find(x=>x.id === p.driver.id);
+        const inst = getVeh(p.slot.vehId);
+        if(!d || !inst) continue;
+        if(d.vehicleId) continue;                                        // уже на машине
+        if(S.drivers.some(o=>o.id!==d.id && o.vehicleId===p.slot.vehId)) continue;  // машина занята
+        const needTrailer = VEHICLES[inst.model].cls === 'tractor';
+        if(needTrailer && !p.slot.trailerId) continue;
+        if(needTrailer && S.drivers.some(o=>o.id!==d.id && o.trailerId===p.slot.trailerId)) continue;
+
+        d.vehicleId  = p.slot.vehId;
+        d.trailerId  = needTrailer ? p.slot.trailerId : null;
+        d.status     = 'idle';
+        d.route      = null;
+        d.progress   = 0;
+        d.duration   = 0;
+        seated++;
+      }
+      Modal.next();
+      if(seated > 0){
+        toast(`🚗 Посажено водителей: ${seated}`,'ok');
+        addNews(`🚗 Автопосадка: ${seated} водителей`,'info','activity');
+      } else {
+        toast('Никого не удалось посадить — проверь машины','warn');
+      }
+      updateUI();
+    };
+  });
+}
 /* ============ ПОСАДИТЬ ВОДИТЕЛЯ НА МАШИНУ ============ */
 function openAssignVehicleModal(driverId){
   const d = S.drivers.find(x=>x.id===driverId);
