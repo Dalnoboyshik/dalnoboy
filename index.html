@@ -3329,20 +3329,46 @@ function openAssignModal(tenderId){
   if(!t) return;
   const suitable = S.drivers.filter(d=>!d.sick && d.vehicleId);
   if(!suitable.length){ toast('Нет доступных водителей','bad'); return; }
+
+  // === Сортировка: ближайшие к городу отправки — наверху ===
+  suitable.sort((a,b)=>{
+    const da = roadKm(a.cityIdx, t.from);
+    const db = roadKm(b.cityIdx, t.from);
+    if(da !== db) return da - db;        // ближе — выше
+    return b.rating - a.rating;          // при равной дистанции — по рейтингу
+  });
+
+  const tenderDist = roadKm(t.from, t.to);
   let sel = new Set(t.assignedDrivers);
+
   function render(){
     let html = `<h2>👷 Назначить водителей</h2>
-      <p>${CITIES[t.from].n} → ${CITIES[t.to].n} · осталось ${t.trips - t.progress} рейсов</p>`;
+      <p>${CITIES[t.from].n} → ${CITIES[t.to].n} · ${fmt(tenderDist)} км · осталось ${t.trips - t.progress} рейсов</p>`;
+    html += `<div class="muted" style="font-size:10.5px;margin-bottom:6px">Сортировка: сначала те, кто уже в ${CITIES[t.from].n}, затем — по расстоянию до него</div>`;
+
     for(const d of suitable){
       const has = sel.has(d.id);
       const inCity = d.cityIdx === t.from;
+      const dist = roadKm(d.cityIdx, t.from);
       const stuck = d.mission && d.mission.tenderId !== t.id;
-      html += `<div class="vpick ${has?'sel':''}" data-drv="${d.id}" style="${stuck?'opacity:.5':''}">
+      const inst = getVeh(d.vehicleId);
+      const radius = VEHICLES[inst.model].radius;
+      const canReach = radius >= tenderDist;
+      // Подсветка: сверху зелёным тех, кто в городе
+      const cardStyle = stuck ? 'opacity:.4' : (inCity ? 'border-color:#1f8a58' : '');
+      html += `<div class="vpick ${has?'sel':''}" data-drv="${d.id}" style="${cardStyle}">
         <div class="row">
-          <span>${has?'☑️':'☐'} ${d.avatar||'👤'} <b>${d.name}</b></span>
+          <span>${has?'☑️':'☐'} ${d.avatar||'👤'} <b>${d.name}</b>
+            <span class="veh-cat">${VEHICLES[inst.model].icon} ${VEHICLES[inst.model].n}</span>
+          </span>
           <span class="rt ${ratingCls(d.rating)}">★${d.rating.toFixed(1)}</span>
         </div>
-        <div class="s">🏙️ ${CITIES[d.cityIdx].n}${inCity?' ✅ (в городе отправки)':' ⚠️ не в городе'}</div>
+        <div class="s">
+          ${inCity
+            ? `<span style="color:#5ef0a0">✅ в городе отправки</span>`
+            : `📍 ${CITIES[d.cityIdx].n} · <b>${fmt(dist)} км</b> до старта`}
+          ${!canReach?` · <span style="color:#ff8d99">⚠️ радиус ${fmt(radius)} км — не дотянет</span>`:''}
+        </div>
         ${stuck?`<div class="s" style="color:#ff8d99">Уже на другой миссии</div>`:''}
       </div>`;
     }
@@ -3350,8 +3376,9 @@ function openAssignModal(tenderId){
       <button id="assignOk" class="ok" style="flex:1">Назначить (${sel.size})</button>
       <button id="assignCancel" class="primary" style="flex:1">Отмена</button>
     </div>`;
-       $('modalBox').innerHTML = html;
-    $('modal').classList.add('show');
+
+    $('modalBox').innerHTML = html;
+    $('modal').classList.add('show');   // ← фикс того самого бага
     $('modalBox').querySelectorAll('[data-drv]').forEach(el=>{
       el.onclick = ()=>{
         const id = el.dataset.drv;
@@ -3362,11 +3389,9 @@ function openAssignModal(tenderId){
       };
     });
     $('assignOk').onclick = ()=>{
-      // Снять тех, кого убрали
       for(const did of t.assignedDrivers.slice()){
         if(!sel.has(did)) unassignDriverFromTender(did);
       }
-      // Назначить новых
       let ok = 0;
       for(const did of sel){
         if(t.assignedDrivers.includes(did)) continue;
@@ -3377,99 +3402,6 @@ function openAssignModal(tenderId){
     $('assignCancel').onclick = ()=>Modal.next();
   }
   render();
-}
-
-function openTenderDetail(tenderId){
-  const t = TENDERS.find(x=>x.id===tenderId);
-  if(!t) return;
-  const L = TENDER_LEVELS[t.level];
-  const left = Math.max(0, t.deadline - S.gameTime);
-  const days = Math.floor(left/1440);
-  const pct = Math.round(t.progress / t.trips * 100);
-
-  // Список водителей
-  let drvHtml = '';
-  if(t.assignedDrivers.length){
-    for(const did of t.assignedDrivers){
-      const d = S.drivers.find(x=>x.id===did);
-      if(!d){ continue; }
-      const inFrom = d.cityIdx === t.from;
-      const inTo = d.cityIdx === t.to;
-      let where = CITIES[d.cityIdx].n;
-      let cls = '';
-      let note = '';
-      if(d.mission && d.mission.stuck){
-        cls = 'bad'; note = `🚨 застрял в ${CITIES[d.cityIdx].n}`;
-      } else if(d.status==='trip'){
-        cls = 'hl'; note = `🚚 едет ${CITIES[d.route.from].n} → ${CITIES[d.route.to].n}`;
-      } else if(inFrom){
-        cls = 'ok'; note = '✅ в городе отправки';
-      } else if(inTo){
-        cls = 'warn'; note = '⏳ в городе доставки';
-      } else {
-        cls = ''; note = `📍 ${where}`;
-      }
-      drvHtml += `<div class="card ${cls}" style="margin-top:5px">
-        <div class="row">
-          <span>${d.avatar||'👤'} <b>${d.name}</b></span>
-          <span class="rt ${ratingCls(d.rating)}">★${d.rating.toFixed(1)}</span>
-        </div>
-        <div class="muted" style="font-size:10.5px;margin-top:2px">${note}</div>
-        <div class="row" style="margin-top:4px;gap:5px">
-          ${d.mission && d.mission.stuck ? `<button class="warn sm" data-move="${d.id}">🚀 Перегнать</button>`:''}
-          <button class="bad sm" data-unsign="${d.id}">Снять</button>
-        </div>
-      </div>`;
-    }
-  } else {
-    drvHtml = '<div class="muted" style="padding:8px;text-align:center">Водители не назначены</div>';
-  }
-
-  let html = `<h2>${L.icon} ${L.n} тендер</h2>
-    <p>${t.client}</p>
-    <div class="card hl">
-      <div class="row"><b>${CITIES[t.from].n} → ${CITIES[t.to].n}</b><b>${fmt(t.km)} км</b></div>
-      <div class="row" style="margin-top:6px"><span class="muted">Прогресс</span><b>${t.progress}/${t.trips}</b></div>
-      <div class="bar" style="height:6px"><i style="width:${pct}%;background:linear-gradient(90deg,#4da3ff,#39d98a)"></i></div>
-      <div class="row" style="margin-top:6px"><span class="muted">Твой вклад</span><b>${t.progressMy}</b></div>
-      <div class="row"><span class="muted">Водители</span><b>${t.progressDrivers}</b></div>
-    </div>
-    <div class="card">
-      <div class="row"><span class="muted">Ставка</span><b>${t.rate} ₽/км</b></div>
-      <div class="row"><span class="muted">Бюджет</span><b>${fmt(t.budget)} ₽</b></div>
-      <div class="row"><span class="muted">Аванс</span><b>${fmt(t.advancePaid)} ₽</b></div>
-      <div class="row"><span class="muted">Осталось</span><b style="color:${days<=3?'#ff8d99':'#ffb84d'}">${days} дн.</b></div>
-    </div>
-    <h3>Водители · ${t.assignedDrivers.length}</h3>
-    ${drvHtml}
-    <div style="display:flex;gap:8px;margin-top:10px">
-      <button class="ok" id="assignMore" style="flex:1">👷 Назначить</button>
-      <button class="primary" id="toggleRide" style="flex:1">${S.tenderRideMode?'🎯 Режим ВКЛ':'🎯 Возить самому'}</button>
-    </div>
-    <button class="wide" id="detailClose" style="margin-top:8px">Закрыть</button>`;
-
-  Modal.show(html, 1, ()=>{
-    $('modalBox').querySelectorAll('[data-unsign]').forEach(b=>{
-      b.onclick = ()=>{ unassignDriverFromTender(b.dataset.unsign); Modal.next(); openTenderDetail(tenderId); updateUI(); };
-    });
-    $('modalBox').querySelectorAll('[data-move]').forEach(b=>{
-      b.onclick = ()=>{
-        const d = S.drivers.find(x=>x.id===b.dataset.move);
-        if(!d) return;
-        const cost = roadKm(d.cityIdx, t.from) * 55;
-        if(S.money < cost){ toast(`Нужно ${fmt(cost)} ₽`,'bad'); return; }
-        moneySpend(cost, `Перегон ${d.name}`);
-        d.cityIdx = t.from; d.mission.stuck = false; d.mission.stuckSince = 0;
-        d.status = 'idle'; d.route = null; d.progress = 0;
-        Modal.next(); openTenderDetail(tenderId); updateUI();
-        toast(`🚀 ${d.name} перегнан за ${fmt(cost)} ₽`,'ok');
-      };
-    });
-    $('assignMore').onclick = ()=>{ Modal.next(); setTimeout(()=>openAssignModal(tenderId), 300); };
-    $('toggleRide').onclick = ()=>{ S.tenderRideMode = !S.tenderRideMode;
-      Modal.next(); openTenderDetail(tenderId); updateUI(); };
-       $('detailClose').onclick = ()=>Modal.next();
-  });
 }
 function intlBranch(cityIdx){
   if(!isOOO()){toast('После ООО','bad');return;}
