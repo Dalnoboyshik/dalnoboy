@@ -4190,6 +4190,167 @@ function driverStatsBlock(d){
   return html;
 }
 function hasTrait(d,t){return d.traits&&d.traits.includes(t);}
+function openBulkHireModal(){
+  if(!isIP()){toast('Нужно ИП','bad');return;}
+  if(S.truck.cityIndex===null){toast('Вы в пути','bad');return;}
+  if(!S.laborMarket.length){toast('Рынок пуст — обнови','bad');return;}
+
+  // ===== Собираем свободные машины =====
+  // Тягачи — только если есть свободный прицеп
+  function buildSlots(){
+    const freeV = vehiclesForHire();
+    const freeT = freeTrailers();
+    const trailerPool = [...freeT];
+    const slots = [];
+    for(const id of freeV){
+      const inst = getVeh(id);
+      const v = VEHICLES[inst.model];
+      if(v.cls === 'tractor'){
+        if(trailerPool.length > 0){
+          slots.push({vehId: id, trailerId: trailerPool.shift()});
+        }
+        // без прицепа — пропускаем
+      } else {
+        slots.push({vehId: id, trailerId: null});
+      }
+    }
+    // Сортируем: сначала тягачи (им лучших водителей), потом малые, потом легковые
+    const rank = {tractor:0, truck_small:1, van:2, car:3};
+    slots.sort((a,b)=>{
+      const va = VEHICLES[getVeh(a.vehId).model];
+      const vb = VEHICLES[getVeh(b.vehId).model];
+      return (rank[va.cls]??3) - (rank[vb.cls]??3);
+    });
+    return slots;
+  }
+
+  let slots = buildSlots();
+  if(!slots.length){toast('Нет свободных машин (или нет прицепов под тягачи)','bad');return;}
+
+  // ===== Сортируем кандидатов по рейтингу =====
+  const sortedCand = S.laborMarket.slice().sort((a,b)=>b.rating - a.rating);
+
+  const maxHire = Math.min(slots.length, sortedCand.length);
+  let count = Math.min(3, maxHire);
+
+  function render(){
+    if(count > maxHire) count = maxHire;
+    if(count < 1) count = 1;
+
+    const picked = sortedCand.slice(0, count);
+    const totalCost = picked.reduce((s,c)=>s+c.hireCost, 0);
+    const totalSalary = picked.reduce((s,c)=>s+c.salary, 0);
+    const canAfford = S.money >= totalCost;
+
+    let html = `<h2>👥 Массовый найм</h2>
+      <p>Свободных мест: <b>${slots.length}</b> · кандидатов: <b>${S.laborMarket.length}</b></p>
+      <h3>Сколько нанять</h3>
+      <div class="card" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;gap:8px">
+        <button id="bhMinus" class="warn" style="width:48px;height:48px;font-size:24px;padding:0;font-weight:700">−</button>
+        <div style="text-align:center;flex:1">
+          <div style="font-size:26px;font-weight:700;line-height:1">${count}</div>
+          <div class="muted" style="font-size:10px;margin-top:2px">максимум ${maxHire}</div>
+        </div>
+        <button id="bhPlus" class="ok" style="width:48px;height:48px;font-size:24px;padding:0;font-weight:700">+</button>
+      </div>
+      <h3>Распределение (лучшие — на тягачи)</h3>`;
+
+    for(let i=0; i<count; i++){
+      const c = picked[i];
+      const slot = slots[i];
+      const inst = getVeh(slot.vehId);
+      const v = VEHICLES[inst.model];
+      const trl = slot.trailerId ? TRAILERS[getTrl(slot.trailerId).model] : null;
+      html += `<div class="card">
+        <div class="row">
+          <span>${c.avatar||'👤'} <b>${c.name}</b></span>
+          <span class="rt ${ratingCls(c.rating)}">★${c.rating.toFixed(1)}</span>
+        </div>
+        <div class="muted" style="font-size:11px;margin-top:3px">
+          ${v.icon} ${v.n}${trl?' + '+trl.icon+' '+trl.n:''}
+        </div>
+        <div class="muted" style="font-size:10.5px;margin-top:2px">
+          Найм: ${fmt(c.hireCost)} ₽ · оклад: ${fmt(c.salary)} ₽/мес · доля ${Math.round(c.share*100)}%
+        </div>
+      </div>`;
+    }
+
+    html += `<div class="card" style="margin-top:8px">
+        <div class="row"><span class="muted">💸 Найм (разово)</span><b style="color:#ff6b6b;font-size:15px">${fmt(totalCost)} ₽</b></div>
+        <div class="row"><span class="muted">💰 Оклады (в мес.)</span><b style="color:#ffb84d">${fmt(totalSalary)} ₽</b></div>
+      </div>
+      <div class="card ${canAfford?'':'bad'}" style="margin-top:6px">
+        <div class="row"><span class="muted">В кошельке</span>
+          <b style="color:${canAfford?'#5ef0a0':'#ff8d99'}">${fmt(S.money)} ₽</b></div>
+        ${!canAfford?`<div class="muted" style="font-size:10.5px;text-align:center;margin-top:4px;color:#ff8d99">Не хватает ${fmt(totalCost-S.money)} ₽</div>`:''}
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button id="bhYes" class="ok" style="flex:1" ${canAfford?'':'disabled'}>Нанять ${count} · ${fmt(totalCost)} ₽</button>
+        <button id="bhNo" class="primary" style="flex:1">Отмена</button>
+      </div>`;
+
+    Modal._render(html);
+
+    $('bhMinus').onclick = ()=>{ if(count>1){ count--; render(); } };
+    $('bhPlus').onclick  = ()=>{ if(count<maxHire){ count++; render(); } };
+    $('bhNo').onclick    = ()=>Modal.next();
+    $('bhYes').onclick   = ()=>confirmHire(picked, count);
+  }
+
+  function confirmHire(picked, wantCount){
+    // Пересобираем на свежих данных (вдруг что-то изменилось)
+    const freshSlots = buildSlots();
+    const realCount = Math.min(wantCount, freshSlots.length, picked.length);
+
+    if(realCount < wantCount){
+      toast(`Можно нанять только ${realCount} из ${wantCount}`,'warn');
+    }
+
+    let totalPaid = 0, hired = 0;
+    for(let i=0; i<realCount; i++){
+      const c = S.laborMarket.find(x=>x.id === picked[i].id);
+      if(!c) continue;
+      if(S.money < c.hireCost) break;
+
+      moneySpend(c.hireCost, `Найм ${c.name}`);
+      totalPaid += c.hireCost;
+
+      const slot = freshSlots[i];
+      const needTrailer = VEHICLES[getVeh(slot.vehId).model].cls === 'tractor';
+
+      S.drivers.push({
+        id:'drv_'+(++drvIdCounter),
+        name:c.name, avatar:c.avatar,
+        rating:c.rating, share:c.share, salary:c.salary,
+        spec:c.spec, exp:c.exp, traits:c.traits||[],
+        vehicleId: slot.vehId,
+        trailerId: needTrailer ? slot.trailerId : null,
+        cityIdx: S.truck.cityIndex,
+        status:'idle', progress:0, duration:0, route:null,
+        hiredAt:S.gameTime, trips:0, hoursDriven:0, sick:0,
+        serviceIntervalOverride:null, repairThresholdOverride:null,
+        stats:newDriverStats(), mission:null
+      });
+
+      S.laborMarket = S.laborMarket.filter(x=>x.id !== c.id);
+      hired++;
+    }
+
+    refillLaborMarket();
+    Modal.next();
+
+    if(hired > 0){
+      toast(`👷 Нанято ${hired} водителей за ${fmt(totalPaid)} ₽`,'ok');
+      addNews(`👷 Массовый найм: ${hired} водителей · −${fmt(totalPaid)} ₽`,'info','finance');
+    } else {
+      toast('Никого не удалось нанять','warn');
+    }
+    updateUI();
+  }
+
+  render();
+}
+	
 function openDriverHireModal(c){
   if(!isIP()){toast('Нужно ИП','bad');return;}
   if(S.truck.cityIndex===null){toast('Вы в пути','bad');return;}
@@ -6298,8 +6459,9 @@ function laborStaffContent(){
 function laborHireContent(){
   let html='';
   if(!isIP())html+=`<div class="card warn">📄 Для найма нужен ИП</div>`;
-  html+=`<h3>👥 Кандидаты водителей · ${S.laborMarket.length}</h3>
+ html+=`<h3>👥 Кандидаты водителей · ${S.laborMarket.length}</h3>
   <div class="card"><div class="row"><span class="muted">Средняя зарплата</span><b>${fmt(avgMarketSalary())} ₽/мес</b></div></div>
+  <button class="gold wide" id="bulkHire" style="margin-bottom:6px">👥 Массовый найм (авто-распределение)</button>
   <button class="warn wide" id="refreshLabor">🔄 Обновить за 5 000 ₽</button>`;
   for(const c of S.laborMarket){
     const can=isIP()&&S.money>=c.hireCost;
@@ -6372,6 +6534,7 @@ function bindLaborHandlers(p){
     S.staff.push({id:'st_'+(++drvIdCounter),type:k,salary:STAFF_TYPES[k].salary,hiredAt:S.gameTime});
     toast(`✅ ${STAFF_TYPES[k].n}`,'ok');updateUI();};});
   p.querySelectorAll('[data-firestaff]').forEach(b=>{b.onclick=()=>{S.staff=S.staff.filter(s=>s.id!==b.dataset.firestaff);updateUI();};});
+	const bh=$('bulkHire'); if(bh) bh.onclick = ()=>openBulkHireModal();
   const rl=$('refreshLabor');if(rl)rl.onclick=refreshLaborMarket;
 }
 
