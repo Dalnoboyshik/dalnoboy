@@ -4409,14 +4409,16 @@ function driverTick(dt){
               const km=roadKm(from,j);
               if(km<=maxR) pool.push({idx:j,km});
             }
-            if(pool.length){
-              // Сортируем: те что ближе к mt.from — приоритетнее
-              const distToFrom = (idx)=> roadKm(idx, mt.from);
-              pool.sort((a,b)=> distToFrom(a.idx) - distToFrom(b.idx));
-              // Берём одного из топ-3 с шансом 70%
-              if(Math.random() < 0.7) target = pool[ri(0, Math.min(2, pool.length-1))];
-              else target = pick(pool);
-            }
+                  if(pool.length){
+          const distToFrom = (idx)=> roadKm(idx, mt.from);
+          const curDist = roadKm(from, mt.from);
+          // Оставляем только те города, что СТРОГО ближе к mt.from, чем текущий
+          const better = pool.filter(p => distToFrom(p.idx) < curDist);
+          const usePool = better.length ? better : pool;
+          usePool.sort((a,b)=> distToFrom(a.idx) - distToFrom(b.idx));
+          // Берём один из топ-3, случайного выбора больше нет
+          target = usePool[ri(0, Math.min(2, usePool.length-1))];
+        }
           }
           // Ничего не нашли
           if(!target){
