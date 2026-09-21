@@ -5167,11 +5167,21 @@ function sigOrders(){
     S.money>200000?1:0].join('|');
 }
 function sigAuto(){
-  const c=curVehInst();
-  return [uiSubTab.auto, S.currentVehicleId,
-    c?Math.round(c.fuel):0, c?Math.round(c.wear):0,
-    c?Math.round((c.odometer||0)/100):0,
-    S.ownedVehicles.length, S.money>100000?1:0].join('|');
+  const c = curVehInst();
+  const plates = S.ownedVehicles.map(v => v.plate ? v.plate.text : '—').join(',');
+  return [
+    uiSubTab.auto,
+    S.currentVehicleId,
+    S.currentTrailerId,
+    c ? Math.round(c.fuel) : 0,
+    c ? Math.round(c.wear) : 0,
+    c ? Math.round((c.odometer||0)/100) : 0,
+    S.ownedVehicles.length,
+    S.ownedTrailers.length,
+    S.leasesCount || 0,
+    plates,
+    S.money > 100000 ? 1 : 0
+  ].join('|');
 }
 function sigFirm(){
   return [S.firmLevel, S.firmName||'', firmSubTab,
@@ -5274,7 +5284,7 @@ function updateUI(){
     const paneMap = {
   'pane-orders': { key:'orders', fn: renderOrders, sigFn: sigOrders,    ms:  2500 },
   'pane-trips':  { key:'trips',  fn: renderTrips,  sigFn: sigTrips,     ms:  2000 },
-  'pane-auto':   { key:'auto',   fn: renderAuto,   sigFn: sigAuto,      ms: 15000 },
+  'pane-auto':   { key:'auto',   fn: renderAuto,   sigFn: sigAuto,      ms: 3000 },
   'pane-bases':  { key:'bases',  fn: renderBases,  sigFn: sigBases,     ms: 15000 },
   'pane-labor':  { key:'labor',  fn: renderLabor,  sigFn: sigLaborPane, ms: 15000 },
   'pane-world':  { key:'world',  fn: renderWorld,  sigFn: sigWorld,     ms: 15000 },
@@ -6135,14 +6145,13 @@ function vehTileHTML(i, busy){
 
   // Детали
   let detail = '';
-  if(detailOpen){
+   if(detailOpen){
     const vBase = VEHICLES[i.model].serviceInterval || 10000;
+    const curInt = serviceIntervalOf(i);   // ← единая логика, как везде
     const minInt = Math.round(vBase*0.5);
     const maxInt = Math.round(vBase*1.5);
-    const curInt = i.serviceIntervalOverride || vBase;
     const mult = (curInt/vBase).toFixed(2);
     const bonusPct = ((0.02-(curInt/vBase-1)*0.09)*100).toFixed(1);
-    const bonusColor = bonusPct>0?'#5ef0a0':bonusPct<0?'#ff8d99':'#cfe0f5';
    detail = `<div class="vdetail open">
       <div class="kv"><span>🚗 Ресурс</span><b style="color:${odoCol}">${fmt(odo)} / ${fmt(maxK)} км</b></div>
       <div class="kv"><span>🛠 Регламент ТО</span><b>${fmt(vBase)} км</b></div>
