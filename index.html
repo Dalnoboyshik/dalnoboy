@@ -5183,6 +5183,7 @@ function sigOrders(){
 function sigAuto(){
   const c = curVehInst();
   const plates = S.ownedVehicles.map(v => v.plate ? v.plate.text : '—').join(',');
+  const sc = S.shopCollapsed ? Object.entries(S.shopCollapsed).filter(([k,v])=>v).map(([k])=>k).join(',') : '';
   return [
     uiSubTab.auto,
     S.currentVehicleId,
@@ -5194,6 +5195,7 @@ function sigAuto(){
     S.ownedTrailers.length,
     S.leasesCount || 0,
     plates,
+    sc,
     S.money > 100000 ? 1 : 0
   ].join('|');
 }
@@ -5759,8 +5761,14 @@ function renderAuto(){
       toast('🛠 Сброшено к общему','ok');
       updateUI();
     };});
-  }          // ← вот это и есть закрытие if(sub==='garage')
+   }          // ← закрытие if(sub==='garage')
   if(sub==='shop'){
+    p.querySelectorAll('[data-shop-toggle]').forEach(b=>{b.onclick=()=>{
+      const k = b.dataset.shopToggle;
+      if(!S.shopCollapsed) S.shopCollapsed = {};
+      S.shopCollapsed[k] = !S.shopCollapsed[k];
+      renderAuto();
+    };});
     p.querySelectorAll('[data-buy-vehicle]').forEach(b=>{b.onclick=()=>buyVehicle(b.dataset.buyVehicle);});
     p.querySelectorAll('[data-lease-vehicle]').forEach(b=>{b.onclick=()=>openLeaseModal(b.dataset.leaseVehicle);});
     p.querySelectorAll('[data-bulk-vehicle]').forEach(b=>{b.onclick=()=>openBulkBuyModal(b.dataset.bulkVehicle);});
@@ -6238,47 +6246,87 @@ function vehTileHTML(i, busy){
   </div>`;
 }
 function autoShopContent(){
-  const lim=vehicleLimits();
-  let html=`<h3>🏬 Автосалон</h3>
+  const lim = vehicleLimits();
+  let html = `<h3>🏬 Автосалон</h3>
   <div class="card" style="font-size:11px">
     <div class="row"><span class="muted">Лимит</span>
       <b>🚗 ${countVehiclesByClass('granta')}/${lim.car} · 🚚 ${countVehiclesByClass('gazelle')}/${lim.small} · 🚛 ${countVehiclesByClass('kamaz')}/${lim.tractor}</b></div>
     <div class="muted" style="margin-top:4px;font-size:10px">🚗 ${catName('car')} · 🚚 ${catName('small')} · 🚛 ${catName('tractor')}</div>
     ${isIP()?`<div class="muted" style="margin-top:4px">Лизинг: ${S.leasesCount}/${isOOO()?'∞':LEASE_MAX}</div>`:''}
   </div>`;
-   let lastGroup=null;
+
+  // === Собираем все машины в 4 группы по логике, а не по порядку объявления ===
+  const groups = { car_base:[], car_prem:[], small:[], tractor:[] };
   for(const id in VEHICLES){
-    const v=VEHICLES[id];const cat=vehCategory(id);
-    // Определяем группу: базовые car / премиум car / small / tractor
-    let group;
-    if(cat==='car')      group = v.price >= 1000000 ? 'car_prem' : 'car_base';
-    else if(cat==='small') group = 'small';
-    else                   group = 'tractor';
-    if(group!==lastGroup){
-      if(group==='car_base')      html+=`<h3 style="margin-top:8px">🚗 Легковые — базовые</h3>`;
-      else if(group==='car_prem') html+=`<h3 style="margin-top:8px">💎 Легковые — премиум</h3>`;
-      else if(group==='small')    html+=`<h3 style="margin-top:8px">🚚 ${catName('small')}</h3>`;
-      else                        html+=`<h3 style="margin-top:8px">🚛 ${catName('tractor')}</h3>`;
-      lastGroup=group;
-    }
-    let price=v.price;
-    if(v.price>0)price=Math.round(price*baseBuffMult('dealer')*(1-S.achEffects.buy));
-    const cm=S.money>=price,cl=canBuyMoreOfClass(id);const can=cm&&cl;
-    let label='Купить';if(!cl)label='Лимит';else if(!cm)label='Не хватает';
-    html+=`<div class="card"><div class="row"><span class="route">${v.icon} ${v.n}
-      <small>${v.radius} км · ${v.cap} т · ${v.speed} км/ч</small></span></div>
-      <div class="row"><span class="muted" style="font-size:10.5px">${v.desc}</span></div>
-           <div class="row" style="margin-top:6px;gap:5px"><span class="money">${fmt(price)} ₽</span>
-      <button class="${can?'ok':''}" data-buy-vehicle="${id}" ${can?'':'disabled'}>${label}</button>
-      ${isIP()&&v.price>0?`<button class="gold" data-lease-vehicle="${id}">🏦</button>`:''}
-      ${v.price>0?`<button class="primary" data-bulk-vehicle="${id}">📦 Опт</button>`:''}</div></div>`;
+    const v = VEHICLES[id];
+    const cat = vehCategory(id);
+    let g;
+    if(cat==='car')        g = v.price >= 1000000 ? 'car_prem' : 'car_base';
+    else if(cat==='small') g = 'small';
+    else                   g = 'tractor';
+    groups[g].push(id);
   }
-  html+=`<h3 style="margin-top:8px">🎪 Прицепы</h3>`;
+  // сортируем внутри группы по цене
+  for(const k in groups){
+    groups[k].sort((a,b)=>VEHICLES[a].price - VEHICLES[b].price);
+  }
+
+  const groupMeta = {
+    car_base: {icon:'🚗', label:'Легковые — базовые'},
+    car_prem: {icon:'💎', label:'Легковые — премиум'},
+    small:    {icon:'🚚', label:catName('small')},
+    tractor:  {icon:'🚛', label:catName('tractor')},
+  };
+
+  if(!S.shopCollapsed) S.shopCollapsed = {};
+
+  for(const gkey of ['car_base','car_prem','small','tractor']){
+    const ids = groups[gkey];
+    if(!ids.length) continue;
+    const meta = groupMeta[gkey];
+    const collapsed = !!S.shopCollapsed[gkey];
+
+    html += `<div class="group">
+      <div class="group-head" data-shop-toggle="${gkey}">
+        <span class="t">${meta.icon} ${meta.label}</span>
+        <span class="c">${ids.length} шт ${collapsed?'▼':'▲'}</span>
+      </div>
+      <div class="group-body ${collapsed?'collapsed':''}">`;
+
+    for(const id of ids){
+      const v = VEHICLES[id];
+      let price = v.price;
+      if(v.price>0) price = Math.round(price * baseBuffMult('dealer') * (1-S.achEffects.buy));
+      const cm = S.money >= price;
+      const cl = canBuyMoreOfClass(id);
+      const can = cm && cl;
+      let label = 'Купить';
+      if(!cl) label = 'Лимит';
+      else if(!cm) label = 'Не хватает';
+
+      html += `<div class="card">
+        <div class="row"><span class="route">${v.icon} ${v.n}
+          <small>${v.radius} км · ${v.cap} т · ${v.speed} км/ч</small></span></div>
+        <div class="row"><span class="muted" style="font-size:10.5px">${v.desc}</span></div>
+        <div class="row" style="margin-top:6px;gap:5px"><span class="money">${fmt(price)} ₽</span>
+          <button class="${can?'ok':''}" data-buy-vehicle="${id}" ${can?'':'disabled'}>${label}</button>
+          ${isIP()&&v.price>0?`<button class="gold" data-lease-vehicle="${id}">🏦</button>`:''}
+          ${v.price>0?`<button class="primary" data-bulk-vehicle="${id}">📦 Опт</button>`:''}
+        </div>
+      </div>`;
+    }
+    html += `</div></div>`;
+  }
+
+  html += `<h3 style="margin-top:8px">🎪 Прицепы</h3>`;
   for(const id in TRAILERS){
-    const t=TRAILERS[id];
-    if(t.price===0){html+=`<div class="card hl"><div class="row"><span class="route">${t.icon} ${t.n} <small>Стартовый</small></span><span class="badge ok">есть</span></div></div>`;continue;}
-    const can=S.money>=t.price;
-    html+=`<div class="card"><div class="row"><span class="route">${t.icon} ${t.n}<small>до ${t.cap} т · ${t.cargo.map(c=>CARGO[c].icon).join(' ')}</small></span></div>
+    const t = TRAILERS[id];
+    if(t.price===0){
+      html += `<div class="card hl"><div class="row"><span class="route">${t.icon} ${t.n} <small>Стартовый</small></span><span class="badge ok">есть</span></div></div>`;
+      continue;
+    }
+    const can = S.money >= t.price;
+    html += `<div class="card"><div class="row"><span class="route">${t.icon} ${t.n}<small>до ${t.cap} т · ${t.cargo.map(c=>CARGO[c].icon).join(' ')}</small></span></div>
       <div class="row" style="margin-top:6px"><span class="money">${fmt(t.price)} ₽</span>
       <button class="${can?'ok':''}" data-buy-trailer="${id}" ${can?'':'disabled'}>Купить</button></div></div>`;
   }
@@ -7880,6 +7928,7 @@ function loadGame(){
     if(S.loan===undefined)S.loan=null;
     if(!S.vehDetailOpen)S.vehDetailOpen={};
     if(!S.vehGroupCollapsed)S.vehGroupCollapsed={car:false,small:false,tractor:false};
+	      if(!S.shopCollapsed)S.shopCollapsed={};
     if(!S.stats)S.stats={};
     if(S.stats.logistWins===undefined)S.stats.logistWins=0;
     if(S.stats.scandals===undefined)S.stats.scandals=0;
