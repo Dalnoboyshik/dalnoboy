@@ -4426,6 +4426,22 @@ function fireDriver(id){
   const d=S.drivers[i];if(d.status==='trip'){toast('В рейсе','bad');return;}
   S.drivers.splice(i,1);toast(`👋 ${d.name}`,'warn');updateUI();
 }
+	function unsitDriver(id){
+  const d = S.drivers.find(x=>x.id===id);
+  if(!d){ toast('Водитель не найден','bad'); return; }
+  if(!d.vehicleId){ toast('Уже без машины','ok'); return; }
+  if(d.status === 'trip'){ toast('В рейсе — сначала дождись возвращения','bad'); return; }
+  const v = getVeh(d.vehicleId);
+  d.vehicleId = null;
+  d.trailerId = null;
+  d.status = 'idle';
+  d.route = null;
+  d.progress = 0;
+  d.duration = 0;
+  toast(`🅿️ ${d.name} снят с ${v?VEHICLES[v.model].n:'машины'}`,'ok');
+  addNews(`🅿️ ${d.name} снят с машины`,'info','activity');
+  updateUI();
+}
 function driverVehModel(d){const v=getVeh(d.vehicleId);return v?VEHICLES[v.model]:null;}
 function driverTrlModel(d){const t=getTrl(d.trailerId);return t?TRAILERS[t.model]:null;}
 function driverCap(d){
@@ -6630,8 +6646,9 @@ const freeSlotCount = (function(){
       ${d.unpaidService?`<div class="card warn" style="margin-top:5px;font-size:11px">⚠️ ТО просрочено, нет денег</div>`:''}
       <button class="wide" data-drvstat="${d.id}" style="margin-top:6px;background:${isOpen?'#1a5ba0':'#16202f'};border-color:${isOpen?'#2b7bd4':'#2f4a75'}">${isOpen?'× Скрыть статистику':'📈 Показать статистику'}</button>
       ${isOpen?driverStatsBlock(d):''}
-            <div class="row" style="margin-top:5px;gap:4px;flex-wrap:wrap">
+                       <div class="row" style="margin-top:5px;gap:4px;flex-wrap:wrap">
         ${!d.vehicleId?`<button class="ok sm" data-assign="${d.id}">🚗 Посадить на машину</button>`:''}
+        ${d.vehicleId && d.status!=='trip' ? `<button class="warn sm" data-unsit="${d.id}">🅿️ Снять с машины</button>` : ''}
         <button class="warn sm" data-service="${d.id}" ${d.status==='trip'||!d.vehicleId?'disabled':''}>🛠 ТО сейчас</button>
         <button class="warn sm" data-repair="${d.id}" ${d.status==='trip'||!d.vehicleId?'disabled':''}>🔧 Ремонт сейчас</button>
         <button class="primary sm" data-train="${d.id}">🎓 Курсы</button>
@@ -6696,6 +6713,7 @@ function bindLaborHandlers(p){
 	const aaBtn = p.querySelector('#autoAssignBtn');
 if(aaBtn) aaBtn.onclick = ()=>openAutoAssignDriversModal();
   p.querySelectorAll('[data-fire]').forEach(b=>{b.onclick=()=>fireDriver(b.dataset.fire);});
+	  p.querySelectorAll('[data-unsit]').forEach(b=>{b.onclick=()=>unsitDriver(b.dataset.unsit);});
 	  p.querySelectorAll('[data-assign]').forEach(b=>{b.onclick=()=>openAssignVehicleModal(b.dataset.assign);});
   p.querySelectorAll('[data-train]').forEach(b=>{b.onclick=()=>openTrainModal(b.dataset.train);});
   p.querySelectorAll('[data-service]').forEach(b=>{b.onclick=()=>driverForceService(b.dataset.service);});
