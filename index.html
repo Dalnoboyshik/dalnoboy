@@ -5126,6 +5126,7 @@ bar.innerHTML=items.map(it=>`<button class="subtab ${it.k===currentSub?'on':''}"
 let _paneFreezeUntil = 0;
 let _paneFreezeId = null;
 let _paneSigs = {};
+let _paneForceRenderNext = null;
 
 /* ===== Кэш сигнатур для анти-мигания панелей ===== */
 const _paneSigCache = {
@@ -5147,6 +5148,13 @@ document.querySelectorAll('.pane').forEach(pane=>{
     if(e.target.closest('button')){
       _paneFreezeUntil = Math.max(_paneFreezeUntil, performance.now() + 400);
       _paneFreezeId = pane.id;
+    }
+  }, true);
+  pane.addEventListener('pointerup', (e)=>{
+    if(e.target.closest('button')){
+      _paneFreezeUntil = 0;
+      _paneFreezeId = null;
+      _paneForceRenderNext = pane.id;
     }
   }, true);
 });
