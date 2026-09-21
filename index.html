@@ -976,6 +976,9 @@ gazon:{n:'ГАЗон Next',icon:'🚚',cls:'truck_small',cap:5,speed:95,tank:200
   k5:{n:'КамАЗ К5',icon:'🚛',cls:'tractor',cap:22,speed:85,tank:1000,cons:25,radius:10000,price:11000000,sellPrice:7300000,wearRate:0.015,repairFull:350000,cargo:[],desc:'Новое поколение.',maxKm:1800000,serviceInterval:30000},
   volvo:{n:'Volvo FH 460',icon:'🚚',cls:'tractor',cap:22,speed:90,tank:1300,cons:24,radius:15000,price:17000000,sellPrice:11500000,wearRate:0.012,repairFull:500000,cargo:[],desc:'Шведский флагман.',maxKm:2500000,serviceInterval:30000},
   scania:{n:'Scania R450',icon:'🚚',cls:'tractor',cap:22,speed:92,tank:1300,cons:23,radius:15000,price:22000000,sellPrice:15000000,wearRate:0.011,repairFull:600000,cargo:[],desc:'Самый быстрый.',maxKm:2800000,serviceInterval:30000},
+	  porsche911:{n:'Porsche 911 Turbo S',icon:'🐸',cls:'car',cap:0.35,speed:340,tank:67,cons:12,radius:1600,price:25000000,sellPrice:17000000,wearRate:0.04,repairFull:500000,cargo:['docs','parcel','small'],desc:'Икона. Быстрая как чёрт, злая как тёща.',maxKm:600000,serviceInterval:20000},
+  bentley:{n:'Bentley Continental GT',icon:'🦢',cls:'car',cap:0.5,speed:330,tank:90,cons:12,radius:1800,price:32000000,sellPrice:22000000,wearRate:0.035,repairFull:700000,cargo:['docs','parcel','small','food_small'],desc:'Английский люкс. W12 под капотом, чай в подстаканнике.',maxKm:750000,serviceInterval:25000},
+  urus:{n:'Lamborghini Urus',icon:'🐂',cls:'car',cap:0.8,speed:305,tank:85,cons:18,radius:1500,price:55000000,sellPrice:38000000,wearRate:0.04,repairFull:900000,cargo:['parcel','small','furniture','appliances','food_small','textile'],desc:'Спортивный SUV. Быстрый как лань, злой как бык.',maxKm:700000,serviceInterval:20000},
 };
 function vehCategory(model){const c=VEHICLES[model].cls;if(c==='car'||c==='van')return 'car';if(c==='truck_small')return 'small';return 'tractor';}
 function catName(k){return {car:'Легковые и фургоны',small:'Малые грузовики',tractor:'Седельные тягачи'}[k];}
@@ -1008,15 +1011,26 @@ const LICENSES = {
   live:{n:'Животные',full:'Животные',icon:'🐄',price:100000,cargo:['livestock'],bonus:0.15},
 };
 const BUSINESSES = {
+  /* ===== ОСТАВЛЯЕМ РАБОЧИЕ ===== */
   fuel:{n:'АЗС',icon:'⛽',price:3600000,income:12000,buff:'fuel',buffDesc:'−25% на топливо',desc:'Собственная заправка — экономия на топливе для всего парка'},
   garage:{n:'Автосервис',icon:'🔧',price:3000000,income:10000,buff:'repair',buffDesc:'−40% на ремонт',desc:'Ремонт своей техники и подработка для чужих'},
-  canteen:{n:'Столовая',icon:'🍔',price:1800000,income:6000,buff:'food',buffDesc:'Бонус к работе',desc:'Горячие обеды для водителей — меньше устают'},
-  motel:{n:'Мотель',icon:'🏨',price:3000000,income:8000,buff:'sleep',buffDesc:'Отдых водителей',desc:'Ночлег для дальнобойщиков — восстановление сил'},
   office:{n:'Офис',icon:'🏢',price:6000000,income:18000,buff:'staff',buffDesc:'+2 слота персонала',desc:'Управление, бухгалтерия, приём на работу'},
   hub:{n:'Хаб',icon:'🏬',price:9600000,income:28000,buff:'hub',buffDesc:'+4 слота персонала',desc:'Крупный перевалочный узел, максимальная эффективность'},
   warehouse:{n:'Склад',icon:'📦',price:3600000,income:9000,buff:'extra',buffDesc:'+10% к ставкам',desc:'Хранение грузов, переговоры с крупными клиентами'},
-  clinic:{n:'Медпункт',icon:'💊',price:2400000,income:7000,buff:'health',buffDesc:'Страховка водителей',desc:'Медосмотры, вакцинация, страховка от болезней'},
   dealer:{n:'Автосалон',icon:'🚗',price:9600000,income:22000,buff:'dealer',buffDesc:'−15% на авто',desc:'Собственный салон — скидки на покупку машин'},
+
+  /* ===== ЗАМЕНА: было canteen — стало kvassnaya ===== */
+  kvassnaya:{n:'Квасная точка «Холодок»',icon:'🥤',price:1600000,income:5500,buff:'none',buffDesc:'Пассивный доход',desc:'Настоящий квас из бочки. Дед разливает и улыбается.'},
+
+  /* ===== ЗАМЕНА: было motel — стало massage ===== */
+  massage:{n:'Массажный салон «Рукодельница»',icon:'💆',price:6000000,income:20000,buff:'none',buffDesc:'Пассивный доход',desc:'Массаж для уставших шофёров. Спина развяжется, мысли выпрямятся.'},
+
+  /* ===== ЗАМЕНА: было clinic — стало sportzal ===== */
+  sportzal:{n:'Качалка «Дальнобой»',icon:'🏋️',price:4200000,income:14000,buff:'none',buffDesc:'Пассивный доход',desc:'Штанги, гантели, груша с лицом инспектора ГИБДД.'},
+
+  /* ===== НОВЫЕ ===== */
+  shinomontazh:{n:'Шиномонтаж «Только не в субботу»',icon:'🛞',price:2800000,income:9500,buff:'none',buffDesc:'Пассивный доход',desc:'Работаем 24/7, но в субботу — не трогай, у мастера выходной.'},
+  avtoshkola:{n:'Автошкола «Права за неделю»',icon:'🚦',price:8500000,income:28000,buff:'none',buffDesc:'Пассивный доход',desc:'Учим всех: от школьников до бабушек. Права гарантируем — если не сдашь, вернём деньги. Шутка. Не вернём.'},
 };
 const BASE_TYPES = {
   open:{n:'Открытая стоянка',slots:2,price:1000000,upgradeTo:'covered',upgradeCost:1200000,
@@ -7840,6 +7854,7 @@ function loadGame(){
     if(S.rank===undefined)S.rank=getRankIndex();
     if(!S.intlBranches)S.intlBranches=[];
     if(S.bases)for(const b of S.bases)if(!b.id)b.id='b'+(++baseIdCounter);
+	      if(S.bases)for(const b of S.bases)if(b.businesses)b.businesses=b.businesses.filter(k=>BUSINESSES[k]);
 	      if(COMPETITORS)for(const c of COMPETITORS)if(c.bases)c.bases=[...new Set(c.bases)];
       if(S.drivers)for(const dr of S.drivers){
       if(!dr.stats)dr.stats=newDriverStats();
