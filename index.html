@@ -3350,7 +3350,8 @@ function openAssignModal(tenderId){
       <button id="assignOk" class="ok" style="flex:1">Назначить (${sel.size})</button>
       <button id="assignCancel" class="primary" style="flex:1">Отмена</button>
     </div>`;
-    $('modalBox').innerHTML = html;
+       $('modalBox').innerHTML = html;
+    $('modal').classList.add('show');
     $('modalBox').querySelectorAll('[data-drv]').forEach(el=>{
       el.onclick = ()=>{
         const id = el.dataset.drv;
