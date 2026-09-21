@@ -5262,39 +5262,34 @@ function updateUI(){
       const busy = editing && activePane.contains(ae);
       const frozen = performance.now() < _paneFreezeUntil && _paneFreezeId === activeId;
 
-    if(!busy && !frozen){
-  const paneMap = {
-    'pane-orders': { key:'orders', fn: renderOrders, sigFn: sigOrders     },
-    'pane-trips':  { key:'trips',  fn: renderTrips,  sigFn: sigTrips      },
-    'pane-auto':   { key:'auto',   fn: renderAuto,   sigFn: sigAuto       },
-    'pane-bases':  { key:'bases',  fn: renderBases,  sigFn: sigBases      },
-    'pane-labor':  { key:'labor',  fn: renderLabor,  sigFn: sigLaborPane  },
-    'pane-world':  { key:'world',  fn: renderWorld,  sigFn: sigWorld      },
-    'pane-firm':   { key:'firm',   fn: renderFirm,   sigFn: sigFirm       },
-  };
-  const entry = paneMap[activeId];
-  if(entry){
-    const slot = _paneSigCache[entry.key];
-    const sig = entry.sigFn();
-    const now = performance.now();
-    const changed = (sig !== slot.sig);
-    const forced  = (now - slot.at) > _PANE_FORCE_MS;
-    if(changed || forced){
-      slot.sig = sig;
-      slot.at = now;
-      entry.fn();
-    }
-  }
-}
-}
-else if(activeId === 'pane-world')   renderWorld();
-else if(activeId === 'pane-firm')    renderFirm();
+        if(!busy && !frozen){
+        const paneMap = {
+          'pane-orders': { key:'orders', fn: renderOrders, sigFn: sigOrders     },
+          'pane-trips':  { key:'trips',  fn: renderTrips,  sigFn: sigTrips      },
+          'pane-auto':   { key:'auto',   fn: renderAuto,   sigFn: sigAuto       },
+          'pane-bases':  { key:'bases',  fn: renderBases,  sigFn: sigBases      },
+          'pane-labor':  { key:'labor',  fn: renderLabor,  sigFn: sigLaborPane  },
+          'pane-world':  { key:'world',  fn: renderWorld,  sigFn: sigWorld      },
+          'pane-firm':   { key:'firm',   fn: renderFirm,   sigFn: sigFirm       },
+        };
+        const entry = paneMap[activeId];
+        if(entry){
+          const slot = _paneSigCache[entry.key];
+          const sig = entry.sigFn();
+          const now = performance.now();
+          const changed = (sig !== slot.sig);
+          const forced  = (now - slot.at) > _PANE_FORCE_MS;
+          if(changed || forced){
+            slot.sig = sig;
+            slot.at = now;
+            entry.fn();
+          }
+        }
       }
     }
 	updateTicker();
   }catch(e){console.error('updateUI fail:',e);throw e;}
 }
-
 /* ============ БИРЖА ============ */
 const SORT_FIELDS=[
   {k:'total',n:'Сумма'},{k:'km',n:'Расстояние'},{k:'rate',n:'₽/км'},
