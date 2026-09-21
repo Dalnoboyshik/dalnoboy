@@ -3195,11 +3195,14 @@ function completeTender(t){
     S.tenderRideMode = false;
   }
   addNews(`✅ Тендер ${t.client} выполнен · +${fmt(payout)} ₽`, 'ok', 'notify');
-  Modal.show(`<h2>✅ Тендер выполнен</h2>
+   Modal.show(`<h2>✅ Тендер выполнен</h2>
     <div class="big-event"><h3>${t.client}</h3>
       <p>${CITIES[t.from].n} → ${CITIES[t.to].n} · ${t.trips} рейсов</p></div>
     <div class="card">
-      <div class="row"><span class="muted">Выплата</span><b style="color:#39d98a">+${fmt(payout)} ₽</b></div>
+      <div class="row"><span class="muted">Премия за контракт</span><b style="color:#39d98a">+${fmt(payout)} ₽</b></div>
+      <div class="muted" style="font-size:10.5px;margin-top:6px;line-height:1.4;padding-top:6px;border-top:1px solid #1e2c3f">
+        💡 Это премия поверх ставки за рейсы, которую ты уже получал по ходу выполнения.
+      </div>
       <div class="row"><span class="muted">Репутация</span><b style="color:#39d98a">+${R.rep}</b></div>
       <div class="row"><span class="muted">Надёжность</span><b style="color:#39d98a">+${R.rel}</b></div>
     </div>
@@ -3378,11 +3381,14 @@ function openTenderDetail(tenderId){
       <div class="row"><span class="muted">Водители задействованы</span><b>${t.assignedDrivers.length} чел.</b></div>
       <div class="row"><span class="muted">Перевезено рейсов</span><b>${t.progressDrivers}</b></div>
     </div>
-    <div class="card">
-      <div class="row"><span class="muted">Ставка</span><b>${t.rate} ₽/км</b></div>
-      <div class="row"><span class="muted">Бюджет</span><b>${fmt(t.budget)} ₽</b></div>
+        <div class="card">
+      <div class="row"><span class="muted">Ставка за рейс</span><b>${t.rate} ₽/км</b></div>
+      <div class="row"><span class="muted">Премия за контракт</span><b style="color:#5ef0a0">${fmt(t.budget)} ₽</b></div>
       <div class="row"><span class="muted">Аванс</span><b>${fmt(t.advancePaid)} ₽</b></div>
       <div class="row"><span class="muted">Осталось</span><b style="color:${days<=3?'#ff8d99':'#ffb84d'}">${days} дн.</b></div>
+      <div class="muted" style="font-size:10.5px;margin-top:6px;line-height:1.4;padding-top:6px;border-top:1px solid #1e2c3f">
+        💡 Ставка платится за каждый рейс (сразу), премия — в конце, когда все ${t.trips} рейсов сделаны в срок.
+      </div>
     </div>
     <h3>Водители · ${t.assignedDrivers.length}</h3>
     ${drvHtml}
@@ -7729,10 +7735,15 @@ window.addEventListener('resize',()=>{
 });
 	function renderTendersContent(){
   let html='';
-  html += `<div class="card hl" style="font-size:11.5px;line-height:1.5">
+   html += `<div class="card hl" style="font-size:11.5px;line-height:1.5">
     <b>🎯 Тендерная работа</b><br>
     Тендер — обязательство перед клиентом: сделать N рейсов за срок.
-    Можно возить самому, назначить водителей или совмещать.
+    Можно возить самому, назначать водителей или совмещать.
+    <div class="muted" style="margin-top:8px;font-size:10.5px;line-height:1.5;padding-top:6px;border-top:1px solid #1e2c3f">
+      <b style="color:#7ad6ff">💰 Как платят:</b><br>
+      • За каждый рейс — по ставке тендера (обычная работа, деньги сразу)<br>
+      • В конце — <b>премия за выполнение всего контракта</b> (одной суммой)
+    </div>
     <div class="muted" style="margin-top:6px;font-size:10.5px">
       Надёжность: <b>${Math.round(S.reliability||50)}/100</b> · 
       Ваш уровень: <b>${TENDER_LEVELS[playerTenderLevel()].icon} ${TENDER_LEVELS[playerTenderLevel()].n}</b>
@@ -7784,10 +7795,10 @@ window.addEventListener('resize',()=>{
         <span class="badge" style="background:#4a3a14;color:#ffd479">${t.trips} рейсов</span>
       </div>
       <div class="row" style="margin-top:5px"><b>${CITIES[t.from].n} → ${CITIES[t.to].n}</b><b>${fmt(t.km)} км</b></div>
-      <div class="row" style="margin-top:3px;font-size:11px">
-        <span class="muted">${t.client}</span>
-        <span class="muted">до ${fmt(t.budget)} ₽</span>
-      </div>
+              <div class="row" style="margin-top:3px;font-size:11px">
+          <span class="muted">${t.client}</span>
+          <span class="muted">премия до ${fmt(t.budget)} ₽</span>
+        </div>
       <div class="row" style="margin-top:3px;font-size:10.5px">
         <span class="muted">Мин. реп. ${L.minRep} · Надёж. ${L.minRel}</span>
         <span class="muted" style="color:${ttlDays<=2?'#ff8d99':'#ffb84d'}">до конца ${ttlDays} дн.</span>
