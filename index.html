@@ -4102,7 +4102,7 @@ function genLaborCandidate(){
     spec:spec.key,specName:spec.n,avatar:pick(avatars),traits:genTraits(),
     hireCost:Math.round(rnd(40000,150000)/1000)*1000};
 }
-function refillLaborMarket(){while(S.laborMarket.length<8)S.laborMarket.push(genLaborCandidate());}
+function refillLaborMarket(){while(S.laborMarket.length<25)S.laborMarket.push(genLaborCandidate());}
 function avgMarketSalary(){return 65000;}
 
 /* ============ ВОДИТЕЛИ ============ */
