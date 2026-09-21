@@ -5113,6 +5113,11 @@ function renderSubtabsBar(){
 let _paneFreezeUntil = 0;
 let _paneFreezeId = null;
 let _paneSigs = {};
+
+/* ===== Сигнатура labor-панели (анти-мигание) ===== */
+let _lastLaborSig = null;
+let _lastLaborRenderAt = 0;
+const _LABOR_FORCE_MS = 15000;
 document.querySelectorAll('.pane').forEach(pane=>{
   pane.addEventListener('pointerdown', ()=>{
     _paneFreezeUntil = performance.now() + 800;
@@ -5157,6 +5162,51 @@ function sigLabor(){
   return [uiSubTab.labor, S.drivers.length, S.laborMarket.length,
     S.staff.length, staffSlots()].join('|');
 }
+
+/* Сигнатура всего, что видно на панели «Водители».
+   Всё, что меняется скачком (статусы, машины, флаги, карточки,
+   сортировка) — ловится. Плавные изменения (зарплата-накопитель,
+   износ, рейтинг) догоняет форс-рендер раз в 15 секунд. */
+function sigLaborPane(){
+  const openIds = Object.keys(S.driverStatsOpen||{})
+    .filter(k=>S.driverStatsOpen[k]).sort().join(',');
+
+  const parts = [
+    uiSubTab.labor || '',
+    S.drivers.length,
+    S.laborMarket.length,
+    S.staff.length,
+    staffSlots(),
+    (S.driverSort && S.driverSort.field) || '',
+    (S.driverSort && S.driverSort.dir) || 0,
+    Math.round(S.money / 1000),
+    S.autoRepair ? 1 : 0,
+    S.autoServiceInterval || 0,
+    openIds
+  ];
+
+  const dp = [];
+  for(const d of S.drivers){
+    const v = getVeh(d.vehicleId);
+    const w = v ? Math.round((v.wear||0) / 5) : 0;
+    dp.push(
+      d.id + ':' +
+      (d.status || '') + ':' +
+      (d.vehicleId || '') + ':' +
+      (d.sick > 0 ? 1 : 0) + ':' +
+      (d.waitingFunding ? 1 : 0) + ':' +
+      (d.needsReplacement ? 1 : 0) + ':' +
+      (d.unpaidService ? 1 : 0) + ':' +
+      ((d.mission && d.mission.tenderId) || '') + ':' +
+      ((d.mission && d.mission.stuck) ? 1 : 0) + ':' +
+      (d.rating ? d.rating.toFixed(1) : '0') + ':' +
+      w
+    );
+  }
+  parts.push(dp.join('|'));
+
+  return parts.join(';');
+}
 function sigWorld(){
   return [uiSubTab.world, S.news.items.length,
     COMPETITORS.filter(c=>!c.dead).length,
@@ -5193,13 +5243,23 @@ function updateUI(){
       const frozen = performance.now() < _paneFreezeUntil && _paneFreezeId === activeId;
 
       if(!busy && !frozen){
-        if(activeId === 'pane-orders')       renderOrders();
-        else if(activeId === 'pane-trips')   renderTrips();
-        else if(activeId === 'pane-auto')    renderAuto();
-        else if(activeId === 'pane-bases')   renderBases();
-        else if(activeId === 'pane-labor')   renderLabor();
-        else if(activeId === 'pane-world')   renderWorld();
-        else if(activeId === 'pane-firm')    renderFirm();
+      if(activeId === 'pane-orders')       renderOrders();
+else if(activeId === 'pane-trips')   renderTrips();
+else if(activeId === 'pane-auto')    renderAuto();
+else if(activeId === 'pane-bases')   renderBases();
+else if(activeId === 'pane-labor'){
+  const sig = sigLaborPane();
+  const now = performance.now();
+  const changed = (sig !== _lastLaborSig);
+  const forced  = (now - _lastLaborRenderAt) > _LABOR_FORCE_MS;
+  if(changed || forced){
+    _lastLaborSig = sig;
+    _lastLaborRenderAt = now;
+    renderLabor();
+  }
+}
+else if(activeId === 'pane-world')   renderWorld();
+else if(activeId === 'pane-firm')    renderFirm();
       }
     }
 	updateTicker();
