@@ -4124,7 +4124,15 @@ function busyVehicleIds(){return new Set(S.drivers.map(d=>d.vehicleId).filter(Bo
 function busyTrailerIds(){return new Set(S.drivers.map(d=>d.trailerId).filter(Boolean));}
 function freeVehicles(){const busy=busyVehicleIds();return S.ownedVehicles.filter(v=>v.id!==S.currentVehicleId&&!busy.has(v.id)).map(v=>v.id);}
 function freeTrailers(){const busy=busyTrailerIds();return S.ownedTrailers.filter(t=>t.id!==S.currentTrailerId&&!busy.has(t.id)).map(t=>t.id);}
-function vehiclesForHire(){return freeVehicles().filter(id=>(getVeh(id).wear||0)<90);}
+function vehiclesForHire(){
+  return freeVehicles().filter(id=>{
+    const v = getVeh(id);
+    if(!v) return false;
+    if(v.wear >= 90) return false;
+    if(v.isFavorite) return false;   // ← избранные не отдаём водителям
+    return true;
+  });
+}
 function newDriverStats(){return {trips:0,km:0,earned:0,spentFuel:0,spentRepair:0,spentService:0,spentSalary:0,spentOther:0,hours:0,courses:[],accidents:0};}
 function driverProfit(d){const s=d.stats||newDriverStats();return s.earned-(s.spentFuel+s.spentRepair+(s.spentService||0)+s.spentSalary+s.spentOther);}
 	function driverProfitPerDay(d){
@@ -5709,6 +5717,12 @@ function renderAuto(){
     p.querySelectorAll('[data-paydebt-fleet]').forEach(b=>{b.onclick=()=>payLeaseDebt(b.dataset.paydebtFleet);});
     p.querySelectorAll('[data-regplate]').forEach(b=>{b.onclick=()=>openPlateModal(b.dataset.regplate, false);});
     p.querySelectorAll('[data-replate]').forEach(b=>{b.onclick=()=>openPlateModal(b.dataset.replate, true);});
+	 p.querySelectorAll('[data-fav]').forEach(b=>{b.onclick=()=>{
+  const inst=getVeh(b.dataset.fav);if(!inst)return;
+  inst.isFavorite = !inst.isFavorite;
+  toast(inst.isFavorite?'⭐ Добавлена в избранное':'☆ Убрана из избранного','ok');
+  renderAuto();
+};});
     // Новые обработчики дашборда
     p.querySelectorAll('[data-group-toggle]').forEach(b=>{b.onclick=()=>{
       const k = b.dataset.groupToggle;
@@ -6004,10 +6018,15 @@ function autoGarageContent(){
   for(const v of S.ownedVehicles){
     groups[vehCategory(v.model)].push(v);
   }
-  for(const k in groups){
+   for(const k in groups){
     groups[k].sort((a,b)=>{
+      // 1) текущая — самая верхняя
       if(a.id===S.currentVehicleId) return -1;
       if(b.id===S.currentVehicleId) return 1;
+      // 2) избранные — сразу под ней
+      if(a.isFavorite && !b.isFavorite) return -1;
+      if(b.isFavorite && !a.isFavorite) return 1;
+      // 3) внутри группы — по названию
       return VEHICLES[a.model].n.localeCompare(VEHICLES[b.model].n);
     });
   }
@@ -6179,6 +6198,7 @@ function vehTileHTML(i, busy){
   } else {
     actions += `<button class="ok" data-regplate="${i.id}">📋 Учёт</button>`;
   }
+   actions += `<button class="${i.isFavorite?'gold':'detail-btn'}" data-fav="${i.id}">${i.isFavorite?'⭐':'☆'}</button>`;
   actions += `<button class="detail-btn" data-toggle-detail="${i.id}">${detailOpen?'× Скрыть':'Детали'}</button>`;
 
   // Детали
@@ -6224,6 +6244,7 @@ function vehTileHTML(i, busy){
   if(isCur) statusBadge = `<span class="badge current" style="background:#1a5ba0;color:#fff">Текущая</span>`;
   else if(isDanger) statusBadge = `<span class="badge no">⚠️ Критично</span>`;
   else if(i.lease && i.lease.debt>0) statusBadge = `<span class="badge no">⚠️ Просрочка</span>`;
+	  if(i.isFavorite) statusBadge = `<span class="badge gold">⭐ Избранная</span>` + statusBadge;
 
   return `<div class="${tileCls}">
     <div class="vtile-top">
@@ -7956,6 +7977,7 @@ function loadGame(){
     if(S.autoRepairThreshold===undefined)S.autoRepairThreshold=70;
    if(S.ownedVehicles)for(const v of S.ownedVehicles){
   if(!v.insurance)v.insurance={osago:false,osagoExpires:0,osagoRenew:false,kasko:false,kaskoExpires:0,kaskoRenew:false};
+	     if(v.isFavorite===undefined)v.isFavorite=false;
 	     if(v.serviceIntervalOverride===undefined)v.serviceIntervalOverride=null;
    if(v.lease&&v.lease.paid===undefined)v.lease.paid=v.lease.advance;
   if(v.lease&&v.lease.debt===undefined)v.lease.debt=0;
