@@ -3374,8 +3374,9 @@ function openTenderDetail(tenderId){
       <div class="row"><b>${CITIES[t.from].n} → ${CITIES[t.to].n}</b><b>${fmt(t.km)} км</b></div>
       <div class="row" style="margin-top:6px"><span class="muted">Прогресс</span><b>${t.progress}/${t.trips}</b></div>
       <div class="bar" style="height:6px"><i style="width:${pct}%;background:linear-gradient(90deg,#4da3ff,#39d98a)"></i></div>
-      <div class="row" style="margin-top:6px"><span class="muted">Твой вклад</span><b>${t.progressMy}</b></div>
-      <div class="row"><span class="muted">Водители</span><b>${t.progressDrivers}</b></div>
+           <div class="row" style="margin-top:6px"><span class="muted">Мои рейсы</span><b>${t.progressMy}</b></div>
+      <div class="row"><span class="muted">Водители задействованы</span><b>${t.assignedDrivers.length} чел.</b></div>
+      <div class="row"><span class="muted">Перевезено рейсов</span><b>${t.progressDrivers}</b></div>
     </div>
     <div class="card">
       <div class="row"><span class="muted">Ставка</span><b>${t.rate} ₽/км</b></div>
@@ -7759,7 +7760,7 @@ window.addEventListener('resize',()=>{
           <span class="muted" style="color:${days<=3?'#ff8d99':'#ffb84d'}">${days} дн.</span>
         </div>
         <div class="row" style="margin-top:4px;font-size:10.5px">
-          <span class="muted">Мои: ${t.progressMy} · Водители: ${t.progressDrivers} (${t.assignedDrivers.length})</span>
+                <span class="muted">Мои рейсы: ${t.progressMy} · Водители задействованы: ${t.assignedDrivers.length} · Перевезено рейсов: ${t.progressDrivers}</span>
           <span class="muted">${fmt(t.budget)} ₽</span>
         </div>
       </div>`;
