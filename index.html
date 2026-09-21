@@ -7191,6 +7191,7 @@ function loadGame(){
     if(d.sortBy)sortBy=d.sortBy;
     if(d.firmSubTab)firmSubTab=d.firmSubTab;
     if(d.uiSubTab)uiSubTab=Object.assign(uiSubTab,d.uiSubTab);
+	  if(uiSubTab.world==='tenders') uiSubTab.world='news';
     if(!S.achEffects)S.achEffects={rate:0,fuel:0,buy:0,biz:0,income:0,hrBonus:0};
     if(!S.regionRep)S.regionRep={NW:30,C:30,S:30,V:30,U:30,SIB:30,FE:30,N:30};
     if(!S.leasesCount)S.leasesCount=0;
