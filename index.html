@@ -2902,11 +2902,22 @@ function genTender(forceLevel){
   if(S.reputation < L.minRep || (S.reliability||50) < L.minRel) lv = 'local';
   const LL = TENDER_LEVELS[lv];
 
-  const from = ri(0, CITIES.length-1);
-  let to = ri(0, CITIES.length-1);
-  let attempts = 0;
-  while(to === from && attempts++ < 20) to = ri(0, CITIES.length-1);
-  const km = roadKm(from, to);
+const allowIntl = (lv === 'intl');
+const minKm = {local:50, regional:200, inter:600, federal:1000, intl:800}[lv] || 100;
+const maxKm = {local:600, regional:2000, inter:4000, federal:8000, intl:12000}[lv] || 4000;
+let from, to, km, attempts = 0;
+while(attempts++ < 200){
+  from = ri(0, CITIES.length-1);
+  to = ri(0, CITIES.length-1);
+  if(from === to) continue;
+  const fromIntl = !!CITIES[from].intl;
+  const toIntl   = !!CITIES[to].intl;
+  if(!allowIntl && (fromIntl || toIntl)) continue;         // обычный тендер — без intl городов
+  if(allowIntl && !fromIntl && !toIntl)  continue;         // междунар. — обязательно один intl
+  km = roadKm(from, to);
+  if(km >= minKm && km <= maxKm) break;
+}
+if(attempts >= 200){ from = 4; to = 5; km = roadKm(from, to); }  // fallback: Москва → НН
   const trips = ri(LL.tripsMin, LL.tripsMax);
   const rate = LL.rate * reliabilityMul();
   const budget = Math.round(rate * km * trips);
@@ -4672,6 +4683,7 @@ document.querySelectorAll('.tab').forEach(t=>{
     document.querySelectorAll('.pane').forEach(x=>x.classList.remove('active'));
     t.classList.add('active');
     $('pane-'+t.dataset.tab).classList.add('active');
+    _paneSigs = {};  // ← сброс, чтобы панель перерисовалась
     updateUI();
 	  showPaneHint(t.dataset.tab);
   };
@@ -4722,19 +4734,17 @@ let _paneFreezeUntil = 0;
 let _paneFreezeId = null;
 let _paneSigs = {};
 
-document.addEventListener('DOMContentLoaded', ()=>{
-  document.querySelectorAll('.pane').forEach(pane=>{
-    pane.addEventListener('pointerdown', ()=>{
-      _paneFreezeUntil = performance.now() + 800;
+document.querySelectorAll('.pane').forEach(pane=>{
+  pane.addEventListener('pointerdown', ()=>{
+    _paneFreezeUntil = performance.now() + 800;
+    _paneFreezeId = pane.id;
+  }, true);
+  pane.addEventListener('pointerover', (e)=>{
+    if(e.target.closest('button')){
+      _paneFreezeUntil = Math.max(_paneFreezeUntil, performance.now() + 400);
       _paneFreezeId = pane.id;
-    }, true);
-    pane.addEventListener('pointerover', (e)=>{
-      if(e.target.closest('button')){
-        _paneFreezeUntil = Math.max(_paneFreezeUntil, performance.now() + 400);
-        _paneFreezeId = pane.id;
-      }
-    }, true);
-  });
+    }
+  }, true);
 });
 
 function sigOrders(){
@@ -7675,7 +7685,7 @@ function megaContractTick(){
       while(to===from)to=ri(0,CITIES.length-1);
       const km=roadKm(from,to);
       const durationDays=ri(45,75);
-      const cost=Math.round(km*40000*rnd(0.7,1.2));
+    const cost=Math.round(km*4000*rnd(0.7,1.2));
       const bonusMul=Math.round((1.8+Math.random()*0.6)*10)/10; // 1.8..2.4
       S.megaOffer={
         clientId:c.id,clientName:c.n,clientIcon:c.icon,clientColor:c.color,
