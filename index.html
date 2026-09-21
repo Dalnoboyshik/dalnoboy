@@ -4683,7 +4683,8 @@ document.querySelectorAll('.tab').forEach(t=>{
     document.querySelectorAll('.pane').forEach(x=>x.classList.remove('active'));
     t.classList.add('active');
     $('pane-'+t.dataset.tab).classList.add('active');
-    _paneSigs = {};  // ← сброс, чтобы панель перерисовалась
+        _paneFreezeUntil = 0;   // ← сброс заморозки, чтобы новая панель сразу отрисовалась
+    _paneFreezeId = null;
     updateUI();
 	  showPaneHint(t.dataset.tab);
   };
@@ -4805,40 +4806,23 @@ function updateUI(){
     renderSubtabsBar();
     /* Не перерисовываем панель ТОЛЬКО если в ней активен input/textarea/select
        (пользователь печатает). Клик по кнопке — не блокирует обновление. */
-    const ae=document.activeElement;
-    const editing=ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'||ae.tagName==='SELECT');
-    const busy=(id)=>editing&&$(id).contains(ae);
-       const now = performance.now();
-    const frozen = now < _paneFreezeUntil;
-    const skip = (id) => frozen && _paneFreezeId === id;
+     const activePane = document.querySelector('.pane.active');
+    if(activePane){
+      const activeId = activePane.id;
+      const ae = document.activeElement;
+      const editing = ae && (ae.tagName==='INPUT' || ae.tagName==='TEXTAREA' || ae.tagName==='SELECT');
+      const busy = editing && activePane.contains(ae);
+      const frozen = performance.now() < _paneFreezeUntil && _paneFreezeId === activeId;
 
-    const s1=sigOrders();
-    if(!busy('pane-orders') && !skip('pane-orders') && _paneSigs.orders!==s1){
-      _paneSigs.orders=s1; renderOrders();
-    }
-    const s2=sigTrips();
-    if(!busy('pane-trips') && !skip('pane-trips') && _paneSigs.trips!==s2){
-      _paneSigs.trips=s2; renderTrips();
-    }
-    const s3=sigAuto();
-    if(!busy('pane-auto') && !skip('pane-auto') && _paneSigs.auto!==s3){
-      _paneSigs.auto=s3; renderAuto();
-    }
-    const s4=sigBases();
-    if(!busy('pane-bases') && !skip('pane-bases') && _paneSigs.bases!==s4){
-      _paneSigs.bases=s4; renderBases();
-    }
-    const s5=sigLabor();
-    if(!busy('pane-labor') && !skip('pane-labor') && _paneSigs.labor!==s5){
-      _paneSigs.labor=s5; renderLabor();
-    }
-    const s6=sigWorld();
-    if(!busy('pane-world') && !skip('pane-world') && _paneSigs.world!==s6){
-      _paneSigs.world=s6; renderWorld();
-    }
-    const s7=sigFirm();
-    if(!busy('pane-firm') && !skip('pane-firm') && _paneSigs.firm!==s7){
-      _paneSigs.firm=s7; renderFirm();
+      if(!busy && !frozen){
+        if(activeId === 'pane-orders')       renderOrders();
+        else if(activeId === 'pane-trips')   renderTrips();
+        else if(activeId === 'pane-auto')    renderAuto();
+        else if(activeId === 'pane-bases')   renderBases();
+        else if(activeId === 'pane-labor')   renderLabor();
+        else if(activeId === 'pane-world')   renderWorld();
+        else if(activeId === 'pane-firm')    renderFirm();
+      }
     }
 	updateTicker();
   }catch(e){console.error('updateUI fail:',e);throw e;}
