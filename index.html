@@ -3323,7 +3323,97 @@ function unassignDriverFromTender(driverId){
   d.mission = null;
   if(d.status === 'idle') d.route = null;
 }
+function openTenderDetail(tenderId){
+  const t = TENDERS.find(x=>x.id===tenderId);
+  if(!t) return;
+  const L = TENDER_LEVELS[t.level];
+  const left = Math.max(0, t.deadline - S.gameTime);
+  const days = Math.floor(left/1440);
+  const pct = Math.round(t.progress / t.trips * 100);
 
+  let drvHtml = '';
+  if(t.assignedDrivers.length){
+    for(const did of t.assignedDrivers){
+      const d = S.drivers.find(x=>x.id===did);
+      if(!d){ continue; }
+      const inFrom = d.cityIdx === t.from;
+      const inTo = d.cityIdx === t.to;
+      let where = CITIES[d.cityIdx].n;
+      let cls = '';
+      let note = '';
+      if(d.mission && d.mission.stuck){
+        cls = 'bad'; note = `🚨 застрял в ${CITIES[d.cityIdx].n}`;
+      } else if(d.status==='trip'){
+        cls = 'hl'; note = `🚚 едет ${CITIES[d.route.from].n} → ${CITIES[d.route.to].n}`;
+      } else if(inFrom){
+        cls = 'ok'; note = '✅ в городе отправки';
+      } else if(inTo){
+        cls = 'warn'; note = '⏳ в городе доставки';
+      } else {
+        cls = ''; note = `📍 ${where}`;
+      }
+      drvHtml += `<div class="card ${cls}" style="margin-top:5px">
+        <div class="row">
+          <span>${d.avatar||'👤'} <b>${d.name}</b></span>
+          <span class="rt ${ratingCls(d.rating)}">★${d.rating.toFixed(1)}</span>
+        </div>
+        <div class="muted" style="font-size:10.5px;margin-top:2px">${note}</div>
+        <div class="row" style="margin-top:4px;gap:5px">
+          ${d.mission && d.mission.stuck ? `<button class="warn sm" data-move="${d.id}">🚀 Перегнать</button>`:''}
+          <button class="bad sm" data-unsign="${d.id}">Снять</button>
+        </div>
+      </div>`;
+    }
+  } else {
+    drvHtml = '<div class="muted" style="padding:8px;text-align:center">Водители не назначены</div>';
+  }
+
+  let html = `<h2>${L.icon} ${L.n} тендер</h2>
+    <p>${t.client}</p>
+    <div class="card hl">
+      <div class="row"><b>${CITIES[t.from].n} → ${CITIES[t.to].n}</b><b>${fmt(t.km)} км</b></div>
+      <div class="row" style="margin-top:6px"><span class="muted">Прогресс</span><b>${t.progress}/${t.trips}</b></div>
+      <div class="bar" style="height:6px"><i style="width:${pct}%;background:linear-gradient(90deg,#4da3ff,#39d98a)"></i></div>
+      <div class="row" style="margin-top:6px"><span class="muted">Твой вклад</span><b>${t.progressMy}</b></div>
+      <div class="row"><span class="muted">Водители</span><b>${t.progressDrivers}</b></div>
+    </div>
+    <div class="card">
+      <div class="row"><span class="muted">Ставка</span><b>${t.rate} ₽/км</b></div>
+      <div class="row"><span class="muted">Бюджет</span><b>${fmt(t.budget)} ₽</b></div>
+      <div class="row"><span class="muted">Аванс</span><b>${fmt(t.advancePaid)} ₽</b></div>
+      <div class="row"><span class="muted">Осталось</span><b style="color:${days<=3?'#ff8d99':'#ffb84d'}">${days} дн.</b></div>
+    </div>
+    <h3>Водители · ${t.assignedDrivers.length}</h3>
+    ${drvHtml}
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="ok" id="assignMore" style="flex:1">👷 Назначить</button>
+      <button class="primary" id="toggleRide" style="flex:1">${S.tenderRideMode?'🎯 Режим ВКЛ':'🎯 Возить самому'}</button>
+    </div>
+    <button class="wide" id="detailClose" style="margin-top:8px">Закрыть</button>`;
+
+  Modal.show(html, 1, ()=>{
+    $('modalBox').querySelectorAll('[data-unsign]').forEach(b=>{
+      b.onclick = ()=>{ unassignDriverFromTender(b.dataset.unsign); Modal.next(); openTenderDetail(tenderId); updateUI(); };
+    });
+    $('modalBox').querySelectorAll('[data-move]').forEach(b=>{
+      b.onclick = ()=>{
+        const d = S.drivers.find(x=>x.id===b.dataset.move);
+        if(!d) return;
+        const cost = roadKm(d.cityIdx, t.from) * 55;
+        if(S.money < cost){ toast(`Нужно ${fmt(cost)} ₽`,'bad'); return; }
+        moneySpend(cost, `Перегон ${d.name}`);
+        d.cityIdx = t.from; d.mission.stuck = false; d.mission.stuckSince = 0;
+        d.status = 'idle'; d.route = null; d.progress = 0;
+        Modal.next(); openTenderDetail(tenderId); updateUI();
+        toast(`🚀 ${d.name} перегнан за ${fmt(cost)} ₽`,'ok');
+      };
+    });
+    $('assignMore').onclick = ()=>{ Modal.next(); setTimeout(()=>openAssignModal(tenderId), 300); };
+    $('toggleRide').onclick = ()=>{ S.tenderRideMode = !S.tenderRideMode;
+      Modal.next(); openTenderDetail(tenderId); updateUI(); };
+    $('detailClose').onclick = ()=>Modal.next();
+  });
+}
 function openAssignModal(tenderId){
   const t = TENDERS.find(x=>x.id===tenderId);
   if(!t) return;
