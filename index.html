@@ -4734,7 +4734,6 @@ function renderSubtabsBar(){
 let _paneFreezeUntil = 0;
 let _paneFreezeId = null;
 let _paneSigs = {};
-document.addEventListener('DOMContentLoaded', ()=>{
 document.querySelectorAll('.pane').forEach(pane=>{
   pane.addEventListener('pointerdown', ()=>{
     _paneFreezeUntil = performance.now() + 800;
