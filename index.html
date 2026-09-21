@@ -1787,10 +1787,10 @@ w=Math.max(0.01, w); w=r3(w);
     rateCash:Math.max(20,Math.round(rateBase*cashMul)),rateBank:Math.max(25,Math.round(rateBase*bankMul)),
      totalCash:Math.max(minC,Math.round(rateBase*cashMul*km*(
       special==='express'?2.0:special==='fragile'?1.8:special==='vip'?2.5:
-      special==='multi'?1.6:special==='danger'?1.9:special==='kid'?1.4:1)),
+      special==='multi'?1.6:special==='danger'?1.9:special==='kid'?1.4:1))),
     totalBank:Math.max(minB,Math.round(rateBase*bankMul*km*(
       special==='express'?2.0:special==='fragile'?1.8:special==='vip'?2.5:
-      special==='multi'?1.6:special==='danger'?1.9:special==='kid'?1.4:1)),
+      special==='multi'?1.6:special==='danger'?1.9:special==='kid'?1.4:1))),
     expires:S.gameTime+rnd(300,700)};
 }
 function refillATI(){
