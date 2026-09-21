@@ -2593,6 +2593,169 @@ function openLeaseModal(model){
   }
   render();
 }
+	function openBulkBuyModal(model){
+  const v = VEHICLES[model];
+  if(v.price <= 0){ toast('Нельзя','bad'); return; }
+  if(!canBuyMoreOfClass(model)){ toast('Лимит машин этого класса','bad'); return; }
+  const cat = vehCategory(model);
+  const maxCount = Math.max(1, vehicleLimits()[cat] - countVehiclesByClass(model));
+  if(maxCount < 1){ toast('Нет слотов','bad'); return; }
+
+  let basePrice = v.price * (1 - S.achEffects.buy);
+  if(S.bases.some(b=>b.businesses.includes('dealer'))) basePrice *= 0.85;
+  basePrice = Math.round(basePrice);
+
+  function bulkDiscount(n){
+    if(n <= 1) return 0;
+    if(n <= 3) return 0.03;
+    if(n <= 5) return 0.05;
+    if(n <= 9) return 0.08;
+    return 0.12;
+  }
+
+  let count = 1;
+  let doIns = false;
+  let doPlate = false;
+
+  // Стоимость ОСАГО+КАСКО за 1 шт
+  const insPerUnit = (()=>{
+    const fakeInst = { model };
+    return osagoCost(fakeInst) + kaskoCost(fakeInst);
+  })();
+  const platePerUnit = 15000;
+
+  function render(){
+    if(count > maxCount) count = maxCount;
+    if(count < 1) count = 1;
+    const disc = bulkDiscount(count);
+    const perUnit = Math.round(basePrice * (1 - disc));
+    const carsTotal = perUnit * count;
+    const insTotal = doIns ? insPerUnit * count : 0;
+    const plateTotal = doPlate ? platePerUnit * count : 0;
+    const total = carsTotal + insTotal + plateTotal;
+    const saved = (basePrice - perUnit) * count;
+    const canAfford = S.money >= total;
+    const discPct = Math.round(disc * 100);
+    const canDoPlate = S.truck.cityIndex !== null;
+
+    const html = `<h2>📦 Оптовая закупка ${v.icon} ${v.n}</h2>
+      <p>Обычная цена: <b>${fmt(basePrice)} ₽</b></p>
+      <div class="card" style="font-size:11px">
+        <div class="row"><span class="muted">1 шт</span><b>без скидки</b></div>
+        <div class="row"><span class="muted">2–3 шт</span><b style="color:#5ef0a0">−3%</b></div>
+        <div class="row"><span class="muted">4–5 шт</span><b style="color:#5ef0a0">−5%</b></div>
+        <div class="row"><span class="muted">6–9 шт</span><b style="color:#5ef0a0">−8%</b></div>
+        <div class="row"><span class="muted">10+ шт</span><b style="color:#5ef0a0">−12%</b></div>
+      </div>
+      <h3>Сколько машин</h3>
+      <div class="card" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;gap:8px">
+        <button id="bbMinus" class="warn" style="width:48px;height:48px;font-size:24px;padding:0;font-weight:700">−</button>
+        <div style="text-align:center;flex:1">
+          <div style="font-size:26px;font-weight:700;line-height:1">${count}</div>
+          <div class="muted" style="font-size:10px;margin-top:2px">максимум ${maxCount}</div>
+        </div>
+        <button id="bbPlus" class="ok" style="width:48px;height:48px;font-size:24px;padding:0;font-weight:700">+</button>
+      </div>
+
+      <h3>Сразу оформить</h3>
+      <div class="card">
+        <label class="adm-check"><input type="checkbox" id="bbIns" ${doIns?'checked':''}> 🛡️ Застраховать (ОСАГО + КАСКО)
+          <span class="muted" style="font-size:10.5px;margin-left:4px">${fmt(insPerUnit)} ₽ / шт</span></label>
+        <label class="adm-check" style="margin-top:6px"><input type="checkbox" id="bbPlate" ${doPlate?'checked':''} ${canDoPlate?'':'disabled'}> 📋 Поставить на учёт
+          <span class="muted" style="font-size:10.5px;margin-left:4px">${fmt(platePerUnit)} ₽ / шт</span></label>
+        ${!canDoPlate?`<div class="muted" style="font-size:10.5px;color:#ff8d99;margin-top:4px">📍 Нужно быть в городе</div>`:''}
+      </div>
+
+      <div class="card" style="margin-top:8px">
+        <div class="row"><span class="muted">Цена за штуку</span>
+          <b>${fmt(basePrice)} → <span style="color:#5ef0a0">${fmt(perUnit)} ₽</span></b></div>
+        ${disc>0?`<div class="row"><span class="muted">Скидка за опт</span><b style="color:#5ef0a0">−${discPct}%</b></div>`:''}
+        <div class="row"><span class="muted">Машины ×${count}</span><b>${fmt(carsTotal)} ₽</b></div>
+        ${doIns?`<div class="row"><span class="muted">🛡️ Страховка ×${count}</span><b>${fmt(insTotal)} ₽</b></div>`:''}
+        ${doPlate?`<div class="row"><span class="muted">📋 Учёт ×${count}</span><b>${fmt(plateTotal)} ₽</b></div>`:''}
+        <div class="row" style="margin-top:6px;padding-top:6px;border-top:1px solid #1e2c3f">
+          <span class="muted">💸 Итого</span>
+          <b style="color:#ff6b6b;font-size:15px">${fmt(total)} ₽</b></div>
+        ${saved>0?`<div class="row"><span class="muted">Экономия на опте</span><b style="color:#5ef0a0">${fmt(saved)} ₽</b></div>`:''}
+      </div>
+
+      <div class="card ${canAfford?'':'bad'}">
+        <div class="row"><span class="muted">В кошельке</span>
+          <b style="color:${canAfford?'#5ef0a0':'#ff8d99'}">${fmt(S.money)} ₽</b></div>
+        ${!canAfford?`<div class="muted" style="font-size:10.5px;text-align:center;margin-top:4px;color:#ff8d99">Не хватает ${fmt(total - S.money)} ₽</div>`:''}
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button id="bbYes" class="ok" style="flex:1" ${canAfford?'':'disabled'}>Купить ${count} шт · ${fmt(total)} ₽</button>
+        <button id="bbNo" class="primary" style="flex:1">Отмена</button>
+      </div>`;
+
+    Modal._render(html);
+    $('bbMinus').onclick = ()=>{ if(count>1){ count--; render(); } };
+    $('bbPlus').onclick  = ()=>{ if(count<maxCount){ count++; render(); } };
+    $('bbIns').onchange  = ()=>{ doIns = $('bbIns').checked; render(); };
+    $('bbPlate').onchange= ()=>{ doPlate = $('bbPlate').checked; render(); };
+    $('bbNo').onclick    = ()=>Modal.next();
+    $('bbYes').onclick   = ()=>confirmBuy();
+  }
+
+  function confirmBuy(){
+    const freshMax = vehicleLimits()[cat] - countVehiclesByClass(model);
+    if(count > freshMax){ toast('Не хватает слотов','bad'); Modal.next(); updateUI(); return; }
+    const disc = bulkDiscount(count);
+    const perUnit = Math.round(basePrice * (1 - disc));
+    const carsTotal = perUnit * count;
+    const insTotal = doIns ? insPerUnit * count : 0;
+    const plateTotal = doPlate ? platePerUnit * count : 0;
+    const total = carsTotal + insTotal + plateTotal;
+    if(S.money < total){ toast(`Нужно ${fmt(total)} ₽`,'bad'); return; }
+
+    // Определяем город для номеров
+    const cityForPlate = (S.truck.cityIndex !== null) ? S.truck.cityIndex
+                       : (S.startCity !== null && S.startCity !== undefined) ? S.startCity
+                       : 4;
+
+    moneySpend(total, `Опт: ${count}× ${v.n}${doIns?' +страх':''}${doPlate?' +учёт':''}`);
+
+    const wasEmpty = S.ownedVehicles.length === 0;
+    let firstNewId = null;
+    for(let i=0;i<count;i++){
+      const id = 'v'+(++vehIdCounter);
+      const baseMax = v.maxKm || 500000;
+      const rolledMax = Math.round(baseMax * rnd(0.85,1.15));
+      const newVeh = {
+        id, model, fuel: v.tank, wear:0, odometer:0, upgrades:{},
+        baseMaxKm: baseMax, maxKm: rolledMax, lastServiceOdometer: 0,
+        insurance:{osago:false,osagoExpires:0,osagoRenew:false,kasko:false,kaskoExpires:0,kaskoRenew:false}
+      };
+      if(doIns){
+        newVeh.insurance.osago = true;
+        newVeh.insurance.osagoExpires = S.gameTime + INS_YEAR;
+        newVeh.insurance.osagoRenew = true;
+        newVeh.insurance.kasko = true;
+        newVeh.insurance.kaskoExpires = S.gameTime + INS_YEAR;
+        newVeh.insurance.kaskoRenew = true;
+      }
+      if(doPlate){
+        try{ newVeh.plate = generatePlate(cityForPlate, false); }catch(e){ console.warn('plate gen fail', e); }
+      }
+      S.ownedVehicles.push(newVeh);
+      if(!firstNewId) firstNewId = id;
+    }
+    if(wasEmpty && firstNewId) S.currentVehicleId = firstNewId;
+
+    const finalSaved = (basePrice - perUnit) * count;
+    Modal.next();
+    const extras = [];
+    if(doIns) extras.push('страховка');
+    if(doPlate) extras.push('номера');
+    toast(`🚛 Куплено ${count}× ${v.n} за ${fmt(total)} ₽${finalSaved>0?' · экономия '+fmt(finalSaved)+' ₽':''}${extras.length?' · '+extras.join(', '):''}`,'ok');
+    addNews(`🚛 Опт: ${count}× ${v.n} · −${fmt(total)} ₽`, 'info', 'finance');
+    updateUI();
+  }
+
+  render();
+}
 function leasePaymentTick(){
   for(const v of S.ownedVehicles.slice()){
     if(!v.lease)continue;if(S.gameTime<v.lease.nextPaymentAt)continue;
@@ -5266,6 +5429,7 @@ function renderAuto(){
   if(sub==='shop'){
     p.querySelectorAll('[data-buy-vehicle]').forEach(b=>{b.onclick=()=>buyVehicle(b.dataset.buyVehicle);});
     p.querySelectorAll('[data-lease-vehicle]').forEach(b=>{b.onclick=()=>openLeaseModal(b.dataset.leaseVehicle);});
+    p.querySelectorAll('[data-bulk-vehicle]').forEach(b=>{b.onclick=()=>openBulkBuyModal(b.dataset.bulkVehicle);});
     p.querySelectorAll('[data-buy-trailer]').forEach(b=>{b.onclick=()=>buyTrailer(b.dataset.buyTrailer);});
   }
      if(sub==='insurance'){
@@ -5770,9 +5934,10 @@ function autoShopContent(){
     html+=`<div class="card"><div class="row"><span class="route">${v.icon} ${v.n}
       <small>${v.radius} км · ${v.cap} т · ${v.speed} км/ч</small></span></div>
       <div class="row"><span class="muted" style="font-size:10.5px">${v.desc}</span></div>
-      <div class="row" style="margin-top:6px;gap:5px"><span class="money">${fmt(price)} ₽</span>
+           <div class="row" style="margin-top:6px;gap:5px"><span class="money">${fmt(price)} ₽</span>
       <button class="${can?'ok':''}" data-buy-vehicle="${id}" ${can?'':'disabled'}>${label}</button>
-      ${isIP()&&v.price>0?`<button class="gold" data-lease-vehicle="${id}">🏦</button>`:''}</div></div>`;
+      ${isIP()&&v.price>0?`<button class="gold" data-lease-vehicle="${id}">🏦</button>`:''}
+      ${v.price>0?`<button class="primary" data-bulk-vehicle="${id}">📦 Опт</button>`:''}</div></div>`;
   }
   html+=`<h3 style="margin-top:8px">🎪 Прицепы</h3>`;
   for(const id in TRAILERS){
