@@ -792,6 +792,9 @@ button.sm{font-size:10px;padding:3px 7px}
   <div class="tb-block tb-date"><span class="ic">📅</span><b id="uiDate">День 1 · 06:00</b></div>
       <div class="tb-block tb-money"><span class="ic">💰</span><b id="uiMoney">0 ₽</b></div>
       <div class="tb-block tb-passive"><span class="ic">📈</span><b id="uiPassive">0 ₽/нед</b></div>
+	      <div class="tb-block" id="uiReliabilityBox" title="Надёжность как перевозчика">
+        <span class="ic">🎯</span><b id="uiReliability">50</b>
+      </div>
       <div class="tb-block tb-debt" id="uiDebtBox" title="Открыть финансы" style="display:none">
         <span class="ic">🏦</span><b id="uiDebt">0 ₽</b>
       </div>
@@ -1142,6 +1145,38 @@ const LEASE_FINE_PCT = 0.15;
 const LOAN_DAYS = 7;
 const LOAN_RATE = 0.10;
 const LOAN_MAX_PCT = 0.70;
+	/* ============ ТЕНДЕРЫ v19 ============ */
+const TENDER_LEVELS = {
+  local:    {n:'Локальный',     icon:'🥉', minRep:20, minRel:0,  rate:110, tripsMin:2,  tripsMax:3,  days:10, penaltyPct:0.20, color:'#cd7f32'},
+  regional: {n:'Региональный',  icon:'🥈', minRep:40, minRel:30, rate:115, tripsMin:4,  tripsMax:8,  days:18, penaltyPct:0.25, color:'#c0c0c0'},
+  inter:    {n:'Межрегион',     icon:'🥇', minRep:60, minRel:50, rate:125, tripsMin:10, tripsMax:15, days:28, penaltyPct:0.30, color:'#ffd700'},
+  federal:  {n:'Федеральный',   icon:'💎', minRep:75, minRel:65, rate:135, tripsMin:15, tripsMax:25, days:45, penaltyPct:0.35, color:'#4da3ff'},
+  intl:     {n:'Международный', icon:'👑', minRep:85, minRel:80, rate:150, tripsMin:20, tripsMax:40, days:60, penaltyPct:0.40, color:'#c0a0ff'},
+};
+const TENDER_ORDER = ['local','regional','inter','federal','intl'];
+const TENDER_REWARDS = {
+  local:    {rep:2,  rel:3,  repPerTrip:0.15, relPerTrip:0.3, failRep:-1, failRel:-8},
+  regional: {rep:4,  rel:5,  repPerTrip:0.20, relPerTrip:0.4, failRep:-2, failRel:-12},
+  inter:    {rep:7,  rel:8,  repPerTrip:0.30, relPerTrip:0.5, failRep:-3, failRel:-20},
+  federal:  {rep:10, rel:12, repPerTrip:0.40, relPerTrip:0.7, failRep:-5, failRel:-25},
+  intl:     {rep:15, rel:18, repPerTrip:0.50, relPerTrip:1.0, failRep:-7, failRel:-35},
+};
+const MISSION_STUCK_HOURS = 72;     // 3 игровых часа до stuck
+const MISSION_AUTO_FIRE_HOURS = 120; // 5 дней до автоснятия
+
+function reliabilityMul(){
+  return 0.70 + clamp((S.reliability||50)/100, 0, 1) * 0.60;
+}
+function playerTenderLevel(){
+  const rep = S.reputation;
+  const rel = S.reliability||50;
+  let best = 'local';
+  for(const lv of TENDER_ORDER){
+    const L = TENDER_LEVELS[lv];
+    if(rep >= L.minRep && rel >= L.minRel) best = lv;
+  }
+  return best;
+}
 /* ============ ГОСНОМЕРА (v18.2) ============ */
 const PLATE_LETTERS = 'АВЕКМНОРСТУХ';
 const CITY_REGION_CODE = [
@@ -1334,6 +1369,11 @@ function plateStopMultiplier(inst){
 }
 let vehIdCounter=1,trlIdCounter=1,drvIdCounter=1,contractId=1,baseIdCounter=1,questId=1,tenderId=1;
 const S = {
+	  reliability: 50,
+  tenderHistory: {won:0, failed:0, active:0},
+  tenderRideMode: false,
+  lastTenderGenDay: 0,
+  regularRoutes: [],
 	  timeSpeed: 1,      // 0 = пауза, 1 = норм, 2, 3 = ускорение
   money: START_MONEY,
   firmName: null, firmFounded: 0, firmLevel: 'person',
@@ -1736,9 +1776,21 @@ w=Math.max(0.01, w); w=r3(w);
   const rateBase=baseRatePerKm(km)*rm*wmul*repRateBonus(from, to)*(1+lic)*rMul*sMul*routeBonusFor(from,to);
   const cashMul=(local?0.72:0.85)*ti.cashMul;const bankMul=(local?0.88:1.02)*firmLevelBonus()*ti.bankMul;
   const minC=local?1500:3000;const minB=local?1800:3500;
+  // Спец-заказ?
+  let special = null;
+  if(!local && Math.random() < 0.18){
+    const types = ['express','fragile','vip','multi','danger','kid'];
+    special = pick(types);
+  }
   return {id:++orderId,from,to,km,ctype:ct,weight:w,rating,local,orderType:otype,company:genCompany(),
+    special,
     rateCash:Math.max(20,Math.round(rateBase*cashMul)),rateBank:Math.max(25,Math.round(rateBase*bankMul)),
-    totalCash:Math.max(minC,Math.round(rateBase*cashMul*km)),totalBank:Math.max(minB,Math.round(rateBase*bankMul*km)),
+     totalCash:Math.max(minC,Math.round(rateBase*cashMul*km*(
+      special==='express'?2.0:special==='fragile'?1.8:special==='vip'?2.5:
+      special==='multi'?1.6:special==='danger'?1.9:special==='kid'?1.4:1)),
+    totalBank:Math.max(minB,Math.round(rateBase*bankMul*km*(
+      special==='express'?2.0:special==='fragile'?1.8:special==='vip'?2.5:
+      special==='multi'?1.6:special==='danger'?1.9:special==='kid'?1.4:1)),
     expires:S.gameTime+rnd(300,700)};
 }
 function refillATI(){
@@ -2833,32 +2885,416 @@ function buyCompetitor(id){
 }
 
 /* ============ ТЕНДЕРЫ ============ */
-function genTender(){
-  const from=ri(0,CITIES.length-1);let to=ri(0,CITIES.length-1);while(to===from)to=ri(0,CITIES.length-1);
-  const km=roadKm(from,to);
-  const reward=Math.round(km*80*rnd(0.8,1.5));
-  const minRep=ri(40,65);
-  const deadline=S.gameTime+1440*3;
-  const id='tn'+(++tenderId);
-  TENDERS.push({id,from,to,km,reward,minRep,deadline,
-    aiScore:[rnd(40,90),rnd(40,90)]});
-  addNews(`📢 Тендер: ${CITIES[from].n} → ${CITIES[to].n} · ${fmt(reward)} ₽`,'info','world');
-}
-function participateTender(id){
-  const t=TENDERS.find(x=>x.id===id);if(!t)return;
-  if(S.reputation<t.minRep){toast(`Репутация ≥ ${t.minRep}`,'bad');return;}
-  const myScore=rnd(30,100)+S.reputation/2+S.bases.length*3;
-  const bestAI=Math.max(...t.aiScore);
-  if(myScore>bestAI){
-    moneyAdd(t.reward,'Тендер');
-    S.reputation=clamp(S.reputation+2,0,100);
-    toast(`🏆 Тендер выигран! +${fmt(t.reward)} ₽`,'ok');
-    addNews(`🏆 Выиграли тендер: +${fmt(t.reward)} ₽`,'ok');
-  } else {
-    toast(`😞 Тендер проигран`,'warn');
-    addNews(`😞 Проиграли тендер`,'warn');
+/* ============ НОВАЯ СИСТЕМА ТЕНДЕРОВ ============ */
+function genTender(forceLevel){
+  const pl = playerTenderLevel();
+  const idx = TENDER_ORDER.indexOf(pl);
+  let lv = forceLevel;
+  if(!lv){
+    const roll = Math.random()*100;
+    if(roll < 60) lv = pl;
+    else if(roll < 80 && idx>0) lv = TENDER_ORDER[idx-1];
+    else if(roll < 85 && idx>1) lv = TENDER_ORDER[idx-2];
+    else if(idx < TENDER_ORDER.length-1) lv = TENDER_ORDER[idx+1];
+    else lv = pl;
   }
-  TENDERS=TENDERS.filter(x=>x.id!==id);updateUI();
+  const L = TENDER_LEVELS[lv];
+  if(S.reputation < L.minRep || (S.reliability||50) < L.minRel) lv = 'local';
+  const LL = TENDER_LEVELS[lv];
+
+  const from = ri(0, CITIES.length-1);
+  let to = ri(0, CITIES.length-1);
+  let attempts = 0;
+  while(to === from && attempts++ < 20) to = ri(0, CITIES.length-1);
+  const km = roadKm(from, to);
+  const trips = ri(LL.tripsMin, LL.tripsMax);
+  const rate = LL.rate * reliabilityMul();
+  const budget = Math.round(rate * km * trips);
+  const advancePct = (S.reliability||50) >= 90 ? 0.30 : (S.reliability||50) >= 80 ? 0.25 : (S.reliability||50) >= 70 ? 0.20 : 0;
+  const advancePaid = Math.round(budget * advancePct);
+  const deadline = S.gameTime + LL.days * 1440;
+
+  const clients = ['X5 Retail','Магнит','Пятёрочка','Лукойл','Газпром','Почта России','Wildberries','Ozon','РЖД Логистика'];
+  const client = pick(clients);
+
+  const id = 'tn' + (++tenderId);
+  const aiRate = Math.round(rate * rnd(0.85, 1.15));
+  TENDERS.push({
+    id, level:lv, from, to, km, trips, rate,
+    budget, advancePaid, advancePct, deadline,
+    penaltyPct: LL.penaltyPct,
+    client, aiRate,
+    createdAt: S.gameTime,
+    status: 'available',
+    assignedDrivers: [],
+    progress: 0, progressMy: 0, progressDrivers: 0,
+    acceptedAt: 0,
+  });
+  addNews(`📢 ${LL.icon} ${LL.n} тендер: ${CITIES[from].n} → ${CITIES[to].n} · ${trips} рейсов`,
+    lv==='intl'||lv==='federal' ? 'warn' : 'info', 'world');
+}
+
+function tenderTick(){
+  // Генерация раз в 7 дней
+  const nd = Math.floor(S.gameTime/1440);
+  const canGen = (TENDERS.filter(t=>t.status==='available'||t.status==='active').length < 6)
+              && (S.bases.length > 0 || S.drivers.length >= 2)
+              && S.reputation >= 15;
+  if(canGen && nd - S.lastTenderGenDay >= 7){
+    S.lastTenderGenDay = nd;
+    genTender();
+    if(Math.random() < 0.35) genTender();
+  }
+
+  // Обработка активных
+  for(let i = TENDERS.length-1; i>=0; i--){
+    const t = TENDERS[i];
+    if(t.status !== 'active') {
+      if(t.status === 'available' && S.gameTime > t.createdAt + 7*1440){
+        TENDERS.splice(i,1);
+      }
+      continue;
+    }
+    // Дедлайн
+    if(S.gameTime > t.deadline){
+      failTender(t);
+      TENDERS.splice(i,1);
+      continue;
+    }
+    // Успех
+    if(t.progress >= t.trips){
+      completeTender(t);
+      TENDERS.splice(i,1);
+    }
+  }
+}
+
+function failTender(t){
+  const R = TENDER_REWARDS[t.level];
+  const done = t.progress;
+  const undone = t.trips - done;
+  const pct = undone / t.trips;
+  const penalty = Math.round(t.budget * t.penaltyPct * pct);
+  const realPenalty = Math.min(penalty, S.money);
+  if(realPenalty > 0) moneySpend(realPenalty, `Провал тендера ${t.client}`);
+  if(t.advancePaid > 0){
+    const refund = Math.min(t.advancePaid, Math.max(0, S.money));
+    if(refund > 0) moneySpend(refund, `Возврат аванса ${t.client}`);
+  }
+  S.reputation = clamp(S.reputation + R.failRep, 0, 100);
+  S.reliability = clamp((S.reliability||50) + R.failRel, 0, 100);
+  S.tenderHistory.failed++;
+  // Снять водителей с миссии
+  for(const d of S.drivers){
+    if(d.mission && d.mission.tenderId === t.id){
+      d.mission = null; d.status = 'idle'; d.route = null;
+    }
+  }
+  addNews(`❌ Провал тендера ${t.client} · штраф ${fmt(realPenalty)} ₽`, 'bad', 'notify');
+  Modal.show(`<h2>❌ Провал тендера</h2>
+    <div class="big-event danger"><h3>${t.client}</h3>
+      <p>${CITIES[t.from].n} → ${CITIES[t.to].n}</p>
+      <p>Выполнено ${done}/${t.trips} рейсов. Заказчик разрывает контракт.</p></div>
+    <div class="card">
+      <div class="row"><span class="muted">Штраф</span><b style="color:#ff8d99">−${fmt(realPenalty)} ₽</b></div>
+      ${t.advancePaid>0?`<div class="row"><span class="muted">Возврат аванса</span><b style="color:#ff8d99">−${fmt(t.advancePaid)} ₽</b></div>`:''}
+      <div class="row"><span class="muted">Репутация</span><b style="color:#ff8d99">${R.failRep}</b></div>
+      <div class="row"><span class="muted">Надёжность</span><b style="color:#ff8d99">${R.failRel}</b></div>
+    </div>
+    <button class="wide primary" onclick="Modal.next()" style="margin-top:8px">Понятно</button>`, 1);
+}
+
+function completeTender(t){
+  const R = TENDER_REWARDS[t.level];
+  const payout = t.budget - t.advancePaid;
+  if(payout > 0) moneyAdd(payout, `Тендер ${t.client}`);
+  S.reputation = clamp(S.reputation + R.rep, 0, 100);
+  S.reliability = clamp((S.reliability||50) + R.rel, 0, 100);
+  S.tenderHistory.won++;
+  // Освободить водителей
+  for(const d of S.drivers){
+    if(d.mission && d.mission.tenderId === t.id){
+      d.mission = null;
+    }
+  }
+  if(S.tenderRideMode && TENDERS.filter(x=>x.status==='active').length === 0){
+    S.tenderRideMode = false;
+  }
+  addNews(`✅ Тендер ${t.client} выполнен · +${fmt(payout)} ₽`, 'ok', 'notify');
+  Modal.show(`<h2>✅ Тендер выполнен</h2>
+    <div class="big-event"><h3>${t.client}</h3>
+      <p>${CITIES[t.from].n} → ${CITIES[t.to].n} · ${t.trips} рейсов</p></div>
+    <div class="card">
+      <div class="row"><span class="muted">Выплата</span><b style="color:#39d98a">+${fmt(payout)} ₽</b></div>
+      <div class="row"><span class="muted">Репутация</span><b style="color:#39d98a">+${R.rep}</b></div>
+      <div class="row"><span class="muted">Надёжность</span><b style="color:#39d98a">+${R.rel}</b></div>
+    </div>
+    <button class="wide primary" onclick="Modal.next()" style="margin-top:8px">Отлично!</button>`, 1);
+}
+
+function progressTenderFromRoute(fromIdx, toIdx, isMine){
+  // Ищем активный тендер на этом маршруте
+  for(const t of TENDERS){
+    if(t.status !== 'active') continue;
+    if(t.from === fromIdx && t.to === toIdx){
+      t.progress++;
+      if(isMine) t.progressMy++;
+      else t.progressDrivers++;
+      const R = TENDER_REWARDS[t.level];
+      S.reputation = clamp(S.reputation + R.repPerTrip, 0, 100);
+      S.reliability = clamp((S.reliability||50) + R.relPerTrip, 0, 100);
+      return t;
+    }
+  }
+  return null;
+}
+
+function openTenderAuction(id){
+  const t = TENDERS.find(x=>x.id===id);
+  if(!t || t.status !== 'available') return;
+  const L = TENDER_LEVELS[t.level];
+  // 4 ставки: -20%, -10%, база, +15%
+  const variants = [
+    {pct:-0.20, n:'Низкая'},
+    {pct:-0.10, n:'Умеренная'},
+    {pct:0,    n:'Базовая'},
+    {pct:+0.15, n:'Высокая'},
+  ];
+  let html = `<h2>${L.icon} ${L.n} тендер · ${t.client}</h2>
+    <p>${CITIES[t.from].n} → ${CITIES[t.to].n} · ${fmt(t.km)} км</p>
+    <div class="card">
+      <div class="row"><span class="muted">Рейсов</span><b>${t.trips}</b></div>
+      <div class="row"><span class="muted">Срок</span><b>${L.days} дней</b></div>
+      <div class="row"><span class="muted">Аванс</span><b style="color:#5ef0a0">${t.advancePct>0?fmt(t.advancePaid)+' ₽':'нет'}</b></div>
+      <div class="row"><span class="muted">Штраф за провал</span><b style="color:#ff8d99">${Math.round(L.penaltyPct*100)}%</b></div>
+      <div class="row"><span class="muted">Средняя ставка AI</span><b>${t.aiRate} ₽/км</b></div>
+    </div>
+    <h3>Ваша ставка</h3>`;
+  for(const v of variants){
+    const myRate = Math.round(t.rate * (1+v.pct));
+    const myBudget = myRate * t.km * t.trips;
+    let chance = 1.3 - (myRate / t.aiRate) * 0.8
+                 + ((S.reliability||50) - 50) / 300
+                 + Math.max(0, (S.reputation - L.minRep)) / 500;
+    chance = clamp(chance, 0.05, 0.95);
+    const pct = Math.round(chance*100);
+    const cls = pct>=70?'ok':pct>=40?'warn':'bad';
+    html += `<button class="wide ${cls}" data-bet="${v.pct}" style="margin-top:6px">
+      ${v.n}: ${myRate} ₽/км · шанс ${pct}%<br>
+      <small style="font-size:10.5px;opacity:.85">Бюджет: ${fmt(myBudget)} ₽</small>
+    </button>`;
+  }
+  html += `<button class="wide primary" id="tenderDecline" style="margin-top:12px">Отказаться</button>`;
+  Modal.show(html, 1, ()=>{
+    $('modalBox').querySelectorAll('[data-bet]').forEach(b=>{
+      b.onclick = ()=>{
+        const pct = parseFloat(b.dataset.bet);
+        const myRate = Math.round(t.rate * (1+pct));
+        let chance = 1.3 - (myRate/t.aiRate)*0.8
+                     + ((S.reliability||50)-50)/300
+                     + Math.max(0, (S.reputation - L.minRep))/500;
+        chance = clamp(chance, 0.05, 0.95);
+        const win = Math.random() < chance;
+        Modal.next();
+        if(win) acceptTender(t.id, myRate);
+        else {
+          TENDERS = TENDERS.filter(x=>x.id !== t.id);
+          toast(`😞 Тендер ушёл конкурентам`,'warn');
+          addNews(`😞 Проиграли аукцион ${t.client}`,'warn','world');
+        }
+        updateUI();
+      };
+    });
+    const dec = $('tenderDecline');
+    if(dec) dec.onclick = ()=>{
+      TENDERS = TENDERS.filter(x=>x.id !== t.id);
+      Modal.next(); toast('Отказ','warn'); updateUI();
+    };
+  });
+}
+
+function acceptTender(id, myRate){
+  const t = TENDERS.find(x=>x.id===id);
+  if(!t) return;
+  t.status = 'active';
+  t.rate = myRate;
+  t.budget = myRate * t.km * t.trips;
+  t.advancePaid = Math.round(t.budget * t.advancePct);
+  t.acceptedAt = S.gameTime;
+  t.deadline = S.gameTime + TENDER_LEVELS[t.level].days * 1440;
+  if(t.advancePaid > 0) moneyAdd(t.advancePaid, `Аванс ${t.client}`);
+  toast(`🏆 Тендер выигран! Аванс: ${fmt(t.advancePaid)} ₽`,'ok');
+  addNews(`🏆 Тендер ${t.client} · ${fmt(t.budget)} ₽`,'ok','world');
+  updateUI();
+}
+
+function assignDriverToTender(driverId, tenderId){
+  const d = S.drivers.find(x=>x.id===driverId);
+  const t = TENDERS.find(x=>x.id===tenderId);
+  if(!d || !t) return false;
+  if(d.mission) { toast(`${d.name} уже на миссии`,'bad'); return false; }
+  d.mission = {
+    type:'tender', tenderId, from:t.from, to:t.to,
+    delivered:0, stuck:false, stuckSince:0
+  };
+  if(!t.assignedDrivers.includes(driverId)) t.assignedDrivers.push(driverId);
+  return true;
+}
+
+function unassignDriverFromTender(driverId){
+  const d = S.drivers.find(x=>x.id===driverId);
+  if(!d || !d.mission) return;
+  const t = TENDERS.find(x=>x.id===d.mission.tenderId);
+  if(t) t.assignedDrivers = t.assignedDrivers.filter(x=>x!==driverId);
+  d.mission = null;
+  if(d.status === 'idle') d.route = null;
+}
+
+function openAssignModal(tenderId){
+  const t = TENDERS.find(x=>x.id===tenderId);
+  if(!t) return;
+  const suitable = S.drivers.filter(d=>!d.sick && d.vehicleId);
+  if(!suitable.length){ toast('Нет доступных водителей','bad'); return; }
+  let sel = new Set(t.assignedDrivers);
+  function render(){
+    let html = `<h2>👷 Назначить водителей</h2>
+      <p>${CITIES[t.from].n} → ${CITIES[t.to].n} · осталось ${t.trips - t.progress} рейсов</p>`;
+    for(const d of suitable){
+      const has = sel.has(d.id);
+      const inCity = d.cityIdx === t.from;
+      const stuck = d.mission && d.mission.tenderId !== t.id;
+      html += `<div class="vpick ${has?'sel':''}" data-drv="${d.id}" style="${stuck?'opacity:.5':''}">
+        <div class="row">
+          <span>${has?'☑️':'☐'} ${d.avatar||'👤'} <b>${d.name}</b></span>
+          <span class="rt ${ratingCls(d.rating)}">★${d.rating.toFixed(1)}</span>
+        </div>
+        <div class="s">🏙️ ${CITIES[d.cityIdx].n}${inCity?' ✅ (в городе отправки)':' ⚠️ не в городе'}</div>
+        ${stuck?`<div class="s" style="color:#ff8d99">Уже на другой миссии</div>`:''}
+      </div>`;
+    }
+    html += `<div style="display:flex;gap:8px;margin-top:10px">
+      <button id="assignOk" class="ok" style="flex:1">Назначить (${sel.size})</button>
+      <button id="assignCancel" class="primary" style="flex:1">Отмена</button>
+    </div>`;
+    $('modalBox').innerHTML = html;
+    $('modalBox').querySelectorAll('[data-drv]').forEach(el=>{
+      el.onclick = ()=>{
+        const id = el.dataset.drv;
+        const d = S.drivers.find(x=>x.id===id);
+        if(d.mission && d.mission.tenderId !== t.id) return;
+        if(sel.has(id)) sel.delete(id); else sel.add(id);
+        render();
+      };
+    });
+    $('assignOk').onclick = ()=>{
+      // Снять тех, кого убрали
+      for(const did of t.assignedDrivers.slice()){
+        if(!sel.has(did)) unassignDriverFromTender(did);
+      }
+      // Назначить новых
+      let ok = 0;
+      for(const did of sel){
+        if(t.assignedDrivers.includes(did)) continue;
+        if(assignDriverToTender(did, t.id)) ok++;
+      }
+      Modal.next(); toast(`Назначено ${ok} вод.`,'ok'); updateUI();
+    };
+    $('assignCancel').onclick = ()=>Modal.next();
+  }
+  render();
+}
+
+function openTenderDetail(tenderId){
+  const t = TENDERS.find(x=>x.id===tenderId);
+  if(!t) return;
+  const L = TENDER_LEVELS[t.level];
+  const left = Math.max(0, t.deadline - S.gameTime);
+  const days = Math.floor(left/1440);
+  const pct = Math.round(t.progress / t.trips * 100);
+
+  // Список водителей
+  let drvHtml = '';
+  if(t.assignedDrivers.length){
+    for(const did of t.assignedDrivers){
+      const d = S.drivers.find(x=>x.id===did);
+      if(!d){ continue; }
+      const inFrom = d.cityIdx === t.from;
+      const inTo = d.cityIdx === t.to;
+      let where = CITIES[d.cityIdx].n;
+      let cls = '';
+      let note = '';
+      if(d.mission && d.mission.stuck){
+        cls = 'bad'; note = `🚨 застрял в ${CITIES[d.cityIdx].n}`;
+      } else if(d.status==='trip'){
+        cls = 'hl'; note = `🚚 едет ${CITIES[d.route.from].n} → ${CITIES[d.route.to].n}`;
+      } else if(inFrom){
+        cls = 'ok'; note = '✅ в городе отправки';
+      } else if(inTo){
+        cls = 'warn'; note = '⏳ в городе доставки';
+      } else {
+        cls = ''; note = `📍 ${where}`;
+      }
+      drvHtml += `<div class="card ${cls}" style="margin-top:5px">
+        <div class="row">
+          <span>${d.avatar||'👤'} <b>${d.name}</b></span>
+          <span class="rt ${ratingCls(d.rating)}">★${d.rating.toFixed(1)}</span>
+        </div>
+        <div class="muted" style="font-size:10.5px;margin-top:2px">${note}</div>
+        <div class="row" style="margin-top:4px;gap:5px">
+          ${d.mission && d.mission.stuck ? `<button class="warn sm" data-move="${d.id}">🚀 Перегнать</button>`:''}
+          <button class="bad sm" data-unsign="${d.id}">Снять</button>
+        </div>
+      </div>`;
+    }
+  } else {
+    drvHtml = '<div class="muted" style="padding:8px;text-align:center">Водители не назначены</div>';
+  }
+
+  let html = `<h2>${L.icon} ${L.n} тендер</h2>
+    <p>${t.client}</p>
+    <div class="card hl">
+      <div class="row"><b>${CITIES[t.from].n} → ${CITIES[t.to].n}</b><b>${fmt(t.km)} км</b></div>
+      <div class="row" style="margin-top:6px"><span class="muted">Прогресс</span><b>${t.progress}/${t.trips}</b></div>
+      <div class="bar" style="height:6px"><i style="width:${pct}%;background:linear-gradient(90deg,#4da3ff,#39d98a)"></i></div>
+      <div class="row" style="margin-top:6px"><span class="muted">Твой вклад</span><b>${t.progressMy}</b></div>
+      <div class="row"><span class="muted">Водители</span><b>${t.progressDrivers}</b></div>
+    </div>
+    <div class="card">
+      <div class="row"><span class="muted">Ставка</span><b>${t.rate} ₽/км</b></div>
+      <div class="row"><span class="muted">Бюджет</span><b>${fmt(t.budget)} ₽</b></div>
+      <div class="row"><span class="muted">Аванс</span><b>${fmt(t.advancePaid)} ₽</b></div>
+      <div class="row"><span class="muted">Осталось</span><b style="color:${days<=3?'#ff8d99':'#ffb84d'}">${days} дн.</b></div>
+    </div>
+    <h3>Водители · ${t.assignedDrivers.length}</h3>
+    ${drvHtml}
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="ok" id="assignMore" style="flex:1">👷 Назначить</button>
+      <button class="primary" id="toggleRide" style="flex:1">${S.tenderRideMode?'🎯 Режим ВКЛ':'🎯 Возить самому'}</button>
+    </div>
+    <button class="wide" id="detailClose" style="margin-top:8px">Закрыть</button>`;
+
+  Modal.show(html, 1, ()=>{
+    $('modalBox').querySelectorAll('[data-unsign]').forEach(b=>{
+      b.onclick = ()=>{ unassignDriverFromTender(b.dataset.unsign); Modal.next(); openTenderDetail(tenderId); updateUI(); };
+    });
+    $('modalBox').querySelectorAll('[data-move]').forEach(b=>{
+      b.onclick = ()=>{
+        const d = S.drivers.find(x=>x.id===b.dataset.move);
+        if(!d) return;
+        const cost = roadKm(d.cityIdx, t.from) * 55;
+        if(S.money < cost){ toast(`Нужно ${fmt(cost)} ₽`,'bad'); return; }
+        moneySpend(cost, `Перегон ${d.name}`);
+        d.cityIdx = t.from; d.mission.stuck = false; d.mission.stuckSince = 0;
+        d.status = 'idle'; d.route = null; d.progress = 0;
+        Modal.next(); openTenderDetail(tenderId); updateUI();
+        toast(`🚀 ${d.name} перегнан за ${fmt(cost)} ₽`,'ok');
+      };
+    });
+    $('assignMore').onclick = ()=>{ Modal.next(); setTimeout(()=>openAssignModal(tenderId), 300); };
+    $('toggleRide').onclick = ()=>{ S.tenderRideMode = !S.tenderRideMode;
+      Modal.next(); openTenderDetail(tenderId); updateUI(); };
+       $('detailClose').onclick = ()=>Modal.next();
+  });
 }
 function intlBranch(cityIdx){
   if(!isOOO()){toast('После ООО','bad');return;}
@@ -3219,6 +3655,17 @@ S.reputation=clamp(S.reputation+succ*0.08-(lines.length-succ)*0.5,0,100);
       toast(`<b>${l.o.company}</b> ★${l.o.rating.toFixed(1)} — ${l.res.text}<br>${s}`,l.res.cls);
     },i*400);
   });
+	  // Тендер: свой вклад
+  for(const o of del){
+    if(!o.local && S.tenderRideMode){
+      const t = progressTenderFromRoute(o.from, o.to, true);
+      if(t) toast(`🎯 Тендер: ${t.progress}/${t.trips}`,'ok');
+    }
+  }
+  // Регулярные маршруты
+  for(const o of del){
+    if(!o.local) progressRegularRoute(o.from, o.to, true);
+  }
   checkQuests();
 }
 function refuel(){
@@ -3559,7 +4006,7 @@ function openDriverHireModal(c){
   cityIdx:S.truck.cityIndex,status:'idle',progress:0,duration:0,route:null,
   hiredAt:S.gameTime,trips:0,hoursDriven:0,sick:0,
   serviceIntervalOverride:null, repairThresholdOverride:null,
-  stats:newDriverStats()});
+   stats:newDriverStats(), mission:null});
       S.laborMarket=S.laborMarket.filter(x=>x.id!==c.id);refillLaborMarket();
       Modal.next();toast(`👷 ${c.name} нанят`,'ok');updateUI();
     };
@@ -3719,7 +4166,97 @@ function driverTick(dt){
       continue;
     }
     if(inst.wear>=90&&d.status==='idle')continue;
-	    if(d.status==='idle'){
+	  	    if(d.status==='idle'){
+      // === Проверка миссии ===
+      if(d.mission){
+        const mt = TENDERS.find(x=>x.id===d.mission.tenderId);
+        if(!mt){ d.mission = null; }
+        else {
+          const maxR = driverRadius(d);
+          const from = d.cityIdx;
+          let target = null;
+          // Если в городе отправки — приоритет маршруту тендера
+          if(from === mt.from && roadKm(mt.from, mt.to) <= maxR){
+            if(Math.random() < 0.85){
+              target = { idx: mt.to, km: roadKm(mt.from, mt.to), isTender: true };
+            }
+          }
+          // Если в городе доставки — ищем обратный
+          else if(from === mt.to && roadKm(mt.to, mt.from) <= maxR){
+            if(Math.random() < 0.7){
+              target = { idx: mt.from, km: roadKm(mt.to, mt.from), isTender: false };
+            }
+          }
+          // Если не нашли по миссии — обычный поиск, но с приоритетом «в сторону from»
+          if(!target){
+            const pool = [];
+            for(let j=0;j<CITIES.length;j++){
+              if(j===from)continue;
+              const c=CITIES[j];
+              if(c.intl&&!isOOO())continue;
+              if(SEASONS[S.season].northClosed&&c.type==='north')continue;
+              const km=roadKm(from,j);
+              if(km<=maxR) pool.push({idx:j,km});
+            }
+            if(pool.length){
+              // Сортируем: те что ближе к mt.from — приоритетнее
+              const distToFrom = (idx)=> roadKm(idx, mt.from);
+              pool.sort((a,b)=> distToFrom(a.idx) - distToFrom(b.idx));
+              // Берём одного из топ-3 с шансом 70%
+              if(Math.random() < 0.7) target = pool[ri(0, Math.min(2, pool.length-1))];
+              else target = pick(pool);
+            }
+          }
+          // Ничего не нашли
+          if(!target){
+            if(!d.mission.stuckSince) d.mission.stuckSince = S.gameTime;
+            const hoursStuck = (S.gameTime - d.mission.stuckSince) / 60;
+            if(hoursStuck > MISSION_STUCK_HOURS && !d.mission.stuck){
+              d.mission.stuck = true;
+              toast(`🚨 ${d.name} застрял в ${CITIES[d.cityIdx].n}`,'warn');
+              addNews(`🚨 ${d.name} не может вернуться к тендеру`,'warn','notify');
+            }
+            if(hoursStuck > MISSION_AUTO_FIRE_HOURS){
+              unassignDriverFromTender(d.id);
+              toast(`⚠️ ${d.name} снят с тендера (застрял)`,'warn');
+            }
+            continue;
+          }
+          if(d.mission.stuck){ d.mission.stuck = false; d.mission.stuckSince = 0; }
+          // Дальше — стандартная обработка target
+          const cl=driverCargo(d); if(!cl.length)continue;
+          const ct=pick(cl); const cap=driverCap(d);
+          const w=r3(rnd(cap*0.4, cap*0.99));
+          const wmul=weightMul(w);
+          // Ставка: для тендера — по тендерной, для обратного — рыночная
+          let rate;
+          if(target.isTender){
+            rate = mt.rate;
+          } else {
+            rate = baseRatePerKm(target.km)*wmul*repRateBonus(from, target.idx);
+          }
+          if(hasTrait(d,'pro'))rate*=1.1;
+          const ratingMul = 1 + d.rating*0.05;
+          const expMul = 1 + Math.min(0.3, (d.stats.trips||0)/50*0.10);
+          const pay=Math.round(rate*target.km*ratingMul*expMul);
+          if(!driverAutoRefuel(d,inst,target.km)){d.status='idle';d.waitingFunding=true;continue;}
+          d.waitingFunding=false;
+          const nf=target.km*driverVehModel(d).cons/100*SEASONS[S.season].fuelMul;
+          inst.fuel-=nf;const wr=vehWearRate(inst, true);
+          inst.wear=Math.min(100,inst.wear+target.km*wr);
+          inst.odometer=(inst.odometer||0)+target.km;
+          const _v=driverVehModel(d);
+          const _spd=_v?_v.speed:90;
+          const _sm=SEASONS[S.season].speedMul;
+          let dur=Math.max(5,(target.km/(_spd*_sm))*60/TIME_SCALE);
+          dur*=rnd(1.05,1.20);
+          if(hasTrait(d,'lazy'))dur*=1.2;
+          d.route={from,to:target.idx,km:target.km,pay,ctype:ct,weight:w,isTender:!!target.isTender,tenderId:mt.id};
+          d.status='trip';d.progress=0;d.duration=dur;d.hoursDriven=0;
+          continue;
+        }
+      }
+           // === Обычный поиск (без миссии) ===
       if(Math.random()<dt*0.03*boost){
         const from=d.cityIdx;const maxR=driverRadius(d);const pool=[];
         for(let j=0;j<CITIES.length;j++){
@@ -3729,36 +4266,33 @@ function driverTick(dt){
           const km=roadKm(from,j);if(km<=maxR)pool.push({idx:j,km});
         }
         if(!pool.length)continue;
-                const filteredPool=applyDispatcherRules(d,pool);
+        const filteredPool=applyDispatcherRules(d,pool);
         if(!filteredPool.length)continue;
-        const target=pick(filteredPool);const cl=driverCargo(d);if(!cl.length)continue;
+        const target=pick(filteredPool);
+        const cl=driverCargo(d);if(!cl.length)continue;
         const ct=pick(cl);const cap=driverCap(d);
-       const w=r3(rnd(cap*0.4, cap*0.99));
-const wmul=weightMul(w);let rate=baseRatePerKm(target.km)*wmul*repRateBonus(from, target.idx);
-if(hasTrait(d,'pro'))rate*=1.1;
-// Бонус за загруженность
-let loadMul=1;
-if(w>cap*0.8) loadMul=1.15;
-else if(w>cap*0.6) loadMul=1.08;
-// Бонус от рейтинга водителя (★4 = +20%, ★5 = +25%)
-const ratingMul = 1 + d.rating*0.05;
-// Бонус от опыта (каждые 50 рейсов +10%)
-const expMul = 1 + Math.min(0.3, (d.stats.trips||0)/50*0.10);
-const pay=Math.round(rate*target.km*loadMul*ratingMul*expMul);
+        const w=r3(rnd(cap*0.4, cap*0.99));
+        const wmul=weightMul(w);let rate=baseRatePerKm(target.km)*wmul*repRateBonus(from, target.idx);
+        if(hasTrait(d,'pro'))rate*=1.1;
+        let loadMul=1;
+        if(w>cap*0.8) loadMul=1.15;
+        else if(w>cap*0.6) loadMul=1.08;
+        const ratingMul = 1 + d.rating*0.05;
+        const expMul = 1 + Math.min(0.3, (d.stats.trips||0)/50*0.10);
+        const pay=Math.round(rate*target.km*loadMul*ratingMul*expMul);
         if(!driverAutoRefuel(d,inst,target.km)){d.status='idle';d.waitingFunding=true;continue;}
         d.waitingFunding=false;
         const nf=target.km*driverVehModel(d).cons/100*SEASONS[S.season].fuelMul;
         inst.fuel-=nf;const wr=vehWearRate(inst, true);
         inst.wear=Math.min(100,inst.wear+target.km*wr);
         inst.odometer=(inst.odometer||0)+target.km;
-      // Скорость берём от машины + сезон + черта лени
-const _v=driverVehModel(d);
-const _spd=_v?_v.speed:90;
-const _sm=SEASONS[S.season].speedMul;
-let dur=Math.max(5,(target.km/(_spd*_sm))*60/TIME_SCALE);
-dur*=rnd(1.05,1.20);  // водитель едет на 5-20% медленнее, чем теоретически
-if(hasTrait(d,'lazy'))dur*=1.2;
-        d.route={from,to:target.idx,km:target.km,pay,ctype:ct,weight:w};
+        const _v=driverVehModel(d);
+        const _spd=_v?_v.speed:90;
+        const _sm=SEASONS[S.season].speedMul;
+        let dur=Math.max(5,(target.km/(_spd*_sm))*60/TIME_SCALE);
+        dur*=rnd(1.05,1.20);
+        if(hasTrait(d,'lazy'))dur*=1.2;
+        d.route={from,to:target.idx,km:target.km,pay,ctype:ct,weight:w,isTender:false};
         d.status='trip';d.progress=0;d.duration=dur;d.hoursDriven=0;
       }
     }else if(d.status==='trip'){
@@ -3782,16 +4316,24 @@ if(Math.random()<accChance){
         inst.wear=Math.min(100,inst.wear+20);
         d.status='idle';d.progress=0;d.route=null;continue;
       }
-           if(d.progress>=1){
-        const gross=d.route.pay;const net=Math.round(gross*(1-d.share));
+                   if(d.progress>=1){
+        const ri2=d.route;
+        const gross=ri2.pay;const net=Math.round(gross*(1-d.share));
         moneyAdd(net,`Рейс ${d.name}`);
-        d.stats.earned+=net;d.stats.trips++;d.stats.km+=d.route.km;
-        S.stats.totalTrips++;S.stats.totalKm+=d.route.km;
+        d.stats.earned+=net;d.stats.trips++;d.stats.km+=ri2.km;
+        S.stats.totalTrips++;S.stats.totalKm+=ri2.km;
+        // Тендер
+        if(ri2.isTender){
+          progressTenderFromRoute(ri2.from, ri2.to, false);
+          if(d.mission) d.mission.delivered = (d.mission.delivered||0)+1;
+        }
+        // Регулярные маршруты
+        if(!ri2.isTender) progressRegularRoute(ri2.from, ri2.to, false);
         S.reputation=clamp(S.reputation+0.2,0,100);
         d.rating=Math.round(Math.min(5,d.rating+0.02)*10)/10;
-        d.trips=(d.trips||0)+1;d.cityIdx=d.route.to;
+        d.trips=(d.trips||0)+1;d.cityIdx=ri2.to;
         d.status='idle';d.progress=0;
-        const ri2=d.route;d.route=null;
+        d.route=null;
         _addDrvTrip({
           name: d.name,
           from: CITIES[ri2.from].n,
@@ -3832,7 +4374,10 @@ if(currDay > prevDay){
     }
   }
 }
-  if(S.bases.length)S.reputation=clamp(S.reputation+h*0.05,0,100);
+    if(S.bases.length){
+    const baseRate = Math.min(0.06, S.bases.length * 0.01);
+    S.reputation = clamp(S.reputation + h * baseRate, 0, 100);
+  }
   const house=HOUSES[S.houseLevel];
   if(house.repBonus>0&&S.houseCityIdx===S.truck.cityIndex)S.reputation=clamp(S.reputation+h*house.repBonus,0,100);
   if(Math.random()<h*0.02){
@@ -3910,13 +4455,12 @@ if(currDay > prevDay){
     const news=['📻 Цены на топливо выросли','📻 Ставка по межгороду 100 ₽/км',`📻 ${SEASONS[S.season].n}`];
    const t=pick(news);toast(t,'info');addNews(t,'info','world');}
    processStolenQuests();processPendingEvents();checkAchievements();checkQuests();
-   megaContractTick();tenderRouteTick();
+       megaContractTick();tenderTick();regularRouteTick();
   const nd=Math.floor(S.gameTime/1440)+1;
   if(nd!==S.day){
     S.day=nd;S.laborMarket=[];refillLaborMarket();
     if(nd!==S.dailyTaskDay)generateDailyTasks(nd);
     if(nd%7===0)refillContracts();
-    if(nd%7===0){tenderTimer++;genTender();}
     tryNomination();
   }
   if(S.nomination && S.gameTime >= S.nomination.ceremonyAt) resolveNomination();
@@ -4077,6 +4621,9 @@ function renderTopbar(){
   $('uiMoney').textContent=fmt(S.money)+' ₽';
   const passive=calcPassivePerWeek();
   $('uiPassive').textContent=(passive>0?'+':'')+fmt(passive)+' ₽/нед';
+	  const rel = Math.round(S.reliability||50);
+  $('uiReliability').textContent = rel;
+  $('uiReliability').style.color = rel>=80?'#5ef0a0':rel>=50?'#cfe0f5':rel>=30?'#ffb84d':'#ff8d99';
   let totalDebt=0;for(const v of S.ownedVehicles)if(v.lease)totalDebt+=v.lease.monthly*v.lease.monthsLeft+v.lease.debt;
   const dBox=$('uiDebtBox');
   if(totalDebt>0){dBox.style.display='';$('uiDebt').textContent='−'+fmt(totalDebt)+' ₽';}
@@ -4135,16 +4682,16 @@ function renderSubtabsBar(){
   const tabId=activeTab.dataset.tab;
   const bar=$('subtabsBar');
   let items=null,currentSub=null;
-   if(tabId==='orders'){
-    items=[{k:'ati',n:'📋 Биржа АТИ'},{k:'contracts',n:'📝 Контракты'},{k:'mega',n:'🏢 Корпорации'}];
+  if(tabId==='orders'){
+    items=[{k:'ati',n:'📋 Биржа АТИ'},{k:'contracts',n:'📝 Контракты'},{k:'mega',n:'🏢 Корпорации'},{k:'tenders',n:'📢 Тендеры'}];
     currentSub=uiSubTab.orders;
-  } else if(tabId==='auto'){
+} else if(tabId==='auto'){
     items=[{k:'current',n:'🚗 Текущий'},{k:'garage',n:'🏢 Гараж'},{k:'shop',n:'🏬 Салон'},{k:'insurance',n:'🛡️ Страховка'}];
     currentSub=uiSubTab.auto;
   } else if(tabId==='world'){
-    items=[{k:'news',n:'📰 Новости'},{k:'comps',n:'🏢 Конкуренты'},{k:'tenders',n:'📢 Тендеры'},{k:'intl',n:'🌍 Филиалы'}];
+    items=[{k:'news',n:'📰 Новости'},{k:'comps',n:'🏢 Конкуренты'},{k:'intl',n:'🌍 Филиалы'}];
     currentSub=uiSubTab.world;
-   } else if(tabId==='labor'){
+}else if(tabId==='labor'){
     items=[{k:'staff',n:'👷 Водители'},{k:'hire',n:'📋 Найм'},{k:'office',n:'💼 Офис'},{k:'dispatcher',n:'📞 Диспетчер'}];
     currentSub=uiSubTab.labor;
   } else if(tabId==='firm'){
@@ -4170,6 +4717,65 @@ function renderSubtabsBar(){
     };
   });
 }
+	/* ===== Анти-мерцание кнопок ===== */
+let _paneFreezeUntil = 0;
+let _paneFreezeId = null;
+let _paneSigs = {};
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  document.querySelectorAll('.pane').forEach(pane=>{
+    pane.addEventListener('pointerdown', ()=>{
+      _paneFreezeUntil = performance.now() + 800;
+      _paneFreezeId = pane.id;
+    }, true);
+    pane.addEventListener('pointerover', (e)=>{
+      if(e.target.closest('button')){
+        _paneFreezeUntil = Math.max(_paneFreezeUntil, performance.now() + 400);
+        _paneFreezeId = pane.id;
+      }
+    }, true);
+  });
+});
+
+function sigOrders(){
+  return [uiSubTab.orders, atiOrders.length, S.truck.cityIndex,
+    S.routeFilter.from, S.routeFilter.to, sortBy.field, sortBy.dir,
+    S.contracts.length, S.megaOffer?1:0,
+    (S.megaContracts||[]).length, TENDERS.length, S.tenderRideMode?1:0,
+    S.money>200000?1:0].join('|');
+}
+function sigAuto(){
+  const c=curVehInst();
+  return [uiSubTab.auto, S.currentVehicleId,
+    c?Math.round(c.fuel):0, c?Math.round(c.wear):0,
+    c?Math.round((c.odometer||0)/100):0,
+    S.ownedVehicles.length, S.money>100000?1:0].join('|');
+}
+function sigFirm(){
+  return [S.firmLevel, S.firmName||'', firmSubTab,
+    Math.round(S.reputation), Math.round(S.reliability||50),
+    S.ownedVehicles.length, S.drivers.length, S.bases.length,
+    Math.round(S.money/1000), S.autoServiceInterval,
+    S.autoRepair?1:0, S.autoRepairThreshold,
+    S.intlBranches.length, S.leasesCount||0].join('|');
+}
+function sigTrips(){
+  const t=S.truck;
+  return [t.traveling?1:0, t.cityIndex, Math.round((t.progress||0)*100),
+    S.activeOrders.length, S.dailyTasks.length].join('|');
+}
+function sigLabor(){
+  return [uiSubTab.labor, S.drivers.length, S.laborMarket.length,
+    S.staff.length, staffSlots()].join('|');
+}
+function sigWorld(){
+  return [uiSubTab.world, S.news.items.length,
+    COMPETITORS.filter(c=>!c.dead).length,
+    S.intlBranches.length, TENDERS.length].join('|');
+}
+function sigBases(){
+  return [S.truck.cityIndex, S.bases.length, S.money>100000?1:0].join('|');
+}
 function updateUI(){
   try{
     ensureNewState();
@@ -4192,13 +4798,38 @@ function updateUI(){
     const ae=document.activeElement;
     const editing=ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'||ae.tagName==='SELECT');
     const busy=(id)=>editing&&$(id).contains(ae);
-    if(!busy('pane-orders')) renderOrders();
-    if(!busy('pane-trips')) renderTrips();
-    if(!busy('pane-auto')) renderAuto();
-    if(!busy('pane-bases')) renderBases();
-    if(!busy('pane-labor')) renderLabor();
-    if(!busy('pane-world')) renderWorld();
-    if(!busy('pane-firm')) renderFirm();
+       const now = performance.now();
+    const frozen = now < _paneFreezeUntil;
+    const skip = (id) => frozen && _paneFreezeId === id;
+
+    const s1=sigOrders();
+    if(!busy('pane-orders') && !skip('pane-orders') && _paneSigs.orders!==s1){
+      _paneSigs.orders=s1; renderOrders();
+    }
+    const s2=sigTrips();
+    if(!busy('pane-trips') && !skip('pane-trips') && _paneSigs.trips!==s2){
+      _paneSigs.trips=s2; renderTrips();
+    }
+    const s3=sigAuto();
+    if(!busy('pane-auto') && !skip('pane-auto') && _paneSigs.auto!==s3){
+      _paneSigs.auto=s3; renderAuto();
+    }
+    const s4=sigBases();
+    if(!busy('pane-bases') && !skip('pane-bases') && _paneSigs.bases!==s4){
+      _paneSigs.bases=s4; renderBases();
+    }
+    const s5=sigLabor();
+    if(!busy('pane-labor') && !skip('pane-labor') && _paneSigs.labor!==s5){
+      _paneSigs.labor=s5; renderLabor();
+    }
+    const s6=sigWorld();
+    if(!busy('pane-world') && !skip('pane-world') && _paneSigs.world!==s6){
+      _paneSigs.world=s6; renderWorld();
+    }
+    const s7=sigFirm();
+    if(!busy('pane-firm') && !skip('pane-firm') && _paneSigs.firm!==s7){
+      _paneSigs.firm=s7; renderFirm();
+    }
 	updateTicker();
   }catch(e){console.error('updateUI fail:',e);throw e;}
 }
@@ -4238,8 +4869,20 @@ function renderOrders(){
   const sub=uiSubTab.orders;
    if(sub==='contracts'){p.innerHTML=renderContractsContent();bindContractsHandlers(p);return;}
   if(sub==='mega'){p.innerHTML=renderMegaContractsContent();bindMegaContractsHandlers(p);return;}
-  const here=S.truck.cityIndex;
+  if(sub==='tenders'){p.innerHTML=renderTendersContent();bindTendersHandlers(p);return;}
+    const here=S.truck.cityIndex;
   let list=applyRouteFilter(atiOrders.slice());
+
+  // Фильтр тендера
+  let tenderFilter = null;
+  if(S.tenderRideMode){
+    const active = TENDERS.filter(t=>t.status==='active');
+    if(active.length){
+      tenderFilter = {
+        routes: active.map(t=>({from:t.from, to:t.to, id:t.id, color:TENDER_LEVELS[t.level].color}))
+      };
+    } else S.tenderRideMode = false;
+  }
   list=sortOrders(list);
   const mine=(here===null)?[]:list.filter(o=>o.from===here);
   const other=(here===null)?list:list.filter(o=>o.from!==here);
@@ -4264,6 +4907,12 @@ function renderOrders(){
     <button class="clr" id="rfClr">×</button>
   </div></div>`;
  html+=`<div style="font-size:10px;padding:6px 0 2px;text-transform:uppercase;letter-spacing:.05em;font-weight:700;color:#8ba0bd">📍 Из ${here!==null?CITIES[here].n:'—'} · ${mine.length}</div>`;
+	  if(tenderFilter){
+    html += `<div class="card warn" style="font-size:11px;margin-bottom:4px">
+      🎯 Режим тендера ВКЛ · маршруты: ${tenderFilter.routes.map(r=>`${CITIES[r.from].n}→${CITIES[r.to].n}`).join(', ')}
+      <button class="sm" style="float:right" id="disableTenderRide">ВЫКЛ</button>
+    </div>`;
+  }
 html+=mine.length?mine.map(o=>orderCard(o)).join(''):`<div class="empty">Нет заказов</div>`;
 html+=`<div style="font-size:10px;padding:10px 0 2px;text-transform:uppercase;letter-spacing:.05em;font-weight:700;color:#8ba0bd">🌍 Другие · ${other.length}</div>`;
 html+=other.length?other.slice(0,25).map(o=>orderCard(o)).join(''):`<div class="empty">Пусто</div>`;
@@ -4281,6 +4930,8 @@ html+=other.length?other.slice(0,25).map(o=>orderCard(o)).join(''):`<div class="
   p.querySelectorAll('[data-quick-route]').forEach(b=>{b.onclick=()=>{
     const o=atiOrders.find(x=>x.id===+b.dataset.quickRoute);if(!o)return;
     S.routeFilter={from:o.from,to:o.to};renderOrders();};});
+	  const dtr = $('disableTenderRide');
+  if(dtr) dtr.onclick = ()=>{ S.tenderRideMode = false; renderOrders(); };
   p.querySelectorAll('[data-hl]').forEach(el=>{
     el.onmouseenter=()=>{highlightedOrderId=+el.dataset.hl;};
     el.onmouseleave=()=>{highlightedOrderId=null;};});
@@ -4309,6 +4960,7 @@ function closeAllDropdowns(){
 }
 function orderCard(o){
   const ci=CARGO[o.ctype];const comp=compatibleWith(o);
+  const isTenderRoute = S.tenderRideMode && TENDERS.some(t=>t.status==='active' && t.from===o.from && t.to===o.to);
   const here=S.truck.cityIndex===o.from;const myCity=S.truck.cityIndex!==null;
   const wouldOverload=(truckLoad()+o.weight)>curCap()+0.001;
   const overkill=(truckLoad()+o.weight)>curCap()*1.5+0.001;
@@ -4322,6 +4974,14 @@ function orderCard(o){
     : o.orderType==='urgent'
     ? `<span class="badge urgent">🟡 Срочный ×1.3</span>`
     : `<span class="badge">🟢 Обычный</span>`;
+	  const specialInfo = o.special ? {
+    express:{i:'🕐',n:'Срочный',c:'express'},
+    fragile:{i:'💎',n:'Хрупкий',c:'urgent'},
+    vip:{i:'👑',n:'VIP',c:'gold'},
+    multi:{i:'📦',n:'Мульти',c:'local'},
+    danger:{i:'⚠️',n:'ADR',c:'urgent'},
+    kid:{i:'👶',n:'Детский',c:'ok'},
+  }[o.special] : null;
  const routeLbl = o.local ? CITIES[o.from].n : `${CITIES[o.from].n} → ${CITIES[o.to].n}`;
 const localTag = o.local ? ` <span style="color:#7ad6ff;font-size:11px">🏙️ (по городу)</span>` : '';
   let sb='';
@@ -4339,10 +4999,14 @@ const localTag = o.local ? ` <span style="color:#7ad6ff;font-size:11px">🏙️ 
   return `<div class="card ${here&&comp?'hl':''}" style="${comp?'':'opacity:.55'};padding:9px 11px" data-hl="${o.id}">
     <div class="row">
       <span style="display:flex;gap:6px;align-items:center;flex:1;min-width:0">
-        ${typeBadge}
+         ${typeBadge}
+        ${specialInfo?`<span class="badge ${specialInfo.c}">${specialInfo.i} ${specialInfo.n}</span>`:''}
         <span class="route" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${routeLbl}${localTag}</span>
       </span>
-      <span class="rt ${ratingCls(o.rating)}">★ ${o.rating.toFixed(1)}</span>
+           <span style="display:flex;gap:5px;align-items:center">
+        ${isTenderRoute?'<span class="badge ok">🎯 Тендер</span>':''}
+        <span class="rt ${ratingCls(o.rating)}">★ ${o.rating.toFixed(1)}</span>
+      </span>
     </div>
     <div class="row" style="margin-top:3px;font-size:11.5px;color:#8ba0bd;gap:6px">
       <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${o.company}</span>
@@ -5690,23 +6354,7 @@ function renderWorld(){
       </div>`;
     }
   }
-   } else if(sub==='tenders'){
-    html+=renderTenderRoutesContent();
-    html+=`<h3>📢 Разовые тендеры</h3>`;
-    TENDERS=TENDERS.filter(t=>t.deadline>S.gameTime);
-    if(!TENDERS.length)html+=`<div class="empty">Пока нет активных тендеров. Появятся каждые 7 игровых дней.</div>`;
-    for(const t of TENDERS){
-      const left=t.deadline-S.gameTime;
-      const days=Math.floor(left/1440);const hrs=Math.floor((left%1440)/60);
-      const can=S.reputation>=t.minRep;
-      html+=`<div class="card tender">
-        <div class="row"><b>${CITIES[t.from].n} → ${CITIES[t.to].n}</b><b class="money">${fmt(t.reward)} ₽</b></div>
-        <div class="muted">${t.km} км · мин. репутация ${t.minRep}</div>
-        <div class="muted">Осталось: ${days}д ${hrs}ч</div>
-        <button class="primary" data-tender="${t.id}" ${can?'':'disabled'} style="margin-top:6px;width:100%">Участвовать${!can?' (реп. '+t.minRep+')':''}</button>
-      </div>`;
-    }
-  } else if(sub==='intl'){
+    } else if(sub==='intl'){
     html+=`<h3>🌍 Международные филиалы</h3>`;
     if(!isOOO())html+=`<div class="card warn">Требуется ООО. Филиал даёт +3 к каждому лимиту машин и +3 водителя.</div>`;
     for(let i=0;i<CITIES.length;i++){
@@ -5721,9 +6369,7 @@ function renderWorld(){
     }
   }
   p.innerHTML=html;
-  p.querySelectorAll('[data-buycomp]').forEach(b=>{b.onclick=()=>buyCompetitor(b.dataset.buycomp);});
-  p.querySelectorAll('[data-tender]').forEach(b=>{b.onclick=()=>participateTender(b.dataset.tender);});
-	  p.querySelectorAll('[data-tender-route]').forEach(b=>{b.onclick=()=>participateTenderRoute(b.dataset.tenderRoute);});
+   p.querySelectorAll('[data-buycomp]').forEach(b=>{b.onclick=()=>buyCompetitor(b.dataset.buycomp);});
   p.querySelectorAll('[data-intl]').forEach(b=>{b.onclick=()=>intlBranch(+b.dataset.intl);});
 }
 
@@ -5811,6 +6457,23 @@ function firmGeneralContent(){
     html2+=`</div>`;
     return html2;
   })()}
+    <h3>🎯 Надёжность перевозчика</h3>
+  <div class="card hl">
+    <div class="row">
+      <b>${Math.round(S.reliability||50)} / 100</b>
+      <span class="muted">${(S.reliability||50)>=80?'🏆 Отличная':(S.reliability||50)>=50?'👍 Хорошая':(S.reliability||50)>=30?'⚠️ Средняя':'🚨 Плохая'}</span>
+    </div>
+    <div class="bar" style="margin-top:6px;height:6px">
+      <i style="width:${S.reliability||50}%;background:linear-gradient(90deg,#ff6b6b,#ffb84d,#39d98a)"></i>
+    </div>
+    <div class="row" style="margin-top:6px;font-size:11px">
+      <span class="muted">Успешных: ${S.tenderHistory.won}</span>
+      <span class="muted">Провалов: ${S.tenderHistory.failed}</span>
+    </div>
+    <div class="muted" style="margin-top:4px;font-size:10.5px">
+      Влияет на бюджет тендеров, аванс и шанс победы в аукционе.
+    </div>
+  </div>
     <h3>🎖️ Звание</h3>
   <div class="card hl">
     <div class="row"><b>${rk.icon} ${rk.n}</b><span class="muted">${getRankIndex()+1}/${RANKS.length}</span></div>
@@ -6532,6 +7195,29 @@ function loadGame(){
     if(!S.regionRep)S.regionRep={NW:30,C:30,S:30,V:30,U:30,SIB:30,FE:30,N:30};
     if(!S.leasesCount)S.leasesCount=0;
     if(!S.activeQuests)S.activeQuests={};
+	      if(S.reliability===undefined)S.reliability=50;
+    if(!S.tenderHistory)S.tenderHistory={won:0,failed:0,active:0};
+    if(S.tenderRideMode===undefined)S.tenderRideMode=false;
+    if(S.lastTenderGenDay===undefined)S.lastTenderGenDay=0;
+    if(!S.regularRoutes)S.regularRoutes=[];
+    if(TENDERS){
+      TENDERS=TENDERS.filter(t=>t && t.id);
+      // Совместимость со старым форматом
+      TENDERS.forEach(t=>{
+        if(!t.level) t.level='local';
+        if(t.status===undefined) t.status='available';
+        if(!t.assignedDrivers) t.assignedDrivers=[];
+        if(t.progress===undefined) t.progress=0;
+        if(t.progressMy===undefined) t.progressMy=0;
+        if(t.progressDrivers===undefined) t.progressDrivers=0;
+        if(t.advancePaid===undefined) t.advancePaid=0;
+        if(t.advancePct===undefined) t.advancePct=0;
+        if(!t.createdAt) t.createdAt=S.gameTime;
+        if(!t.client) t.client='Клиент';
+        if(!t.aiRate) t.aiRate=Math.round((t.rate||115)*1.05);
+        if(!t.penaltyPct) t.penaltyPct=TENDER_LEVELS[t.level].penaltyPct;
+      });
+    }
 	      if(!S.finance)S.finance={income:0,expense:0,history:[],monthIncome:0,monthExpense:0};
     if(S.finance.monthIncome===undefined)S.finance.monthIncome=0;
     if(S.finance.monthExpense===undefined)S.finance.monthExpense=0;
@@ -6545,6 +7231,7 @@ function loadGame(){
       if(S.drivers)for(const dr of S.drivers){
       if(!dr.stats)dr.stats=newDriverStats();
       if(!dr.traits)dr.traits=[];
+		        if(dr.mission===undefined)dr.mission=null;
       if(dr.serviceIntervalOverride===undefined)dr.serviceIntervalOverride=null;
       if(dr.repairThresholdOverride===undefined)dr.repairThresholdOverride=null;
       if(dr.unpaidService===undefined)dr.unpaidService=false;
@@ -6832,6 +7519,103 @@ function renderWizardStep(){
 window.addEventListener('resize',()=>{
   if(document.querySelector('.wiz-box'))renderWizardStep();
 });
+	function renderTendersContent(){
+  let html='';
+  html += `<div class="card hl" style="font-size:11.5px;line-height:1.5">
+    <b>🎯 Тендерная работа</b><br>
+    Тендер — обязательство перед клиентом: сделать N рейсов за срок.
+    Можно возить самому, назначить водителей или совмещать.
+    <div class="muted" style="margin-top:6px;font-size:10.5px">
+      Надёжность: <b>${Math.round(S.reliability||50)}/100</b> · 
+      Ваш уровень: <b>${TENDER_LEVELS[playerTenderLevel()].icon} ${TENDER_LEVELS[playerTenderLevel()].n}</b>
+    </div>
+  </div>`;
+
+  // Активные
+  const active = TENDERS.filter(t=>t.status==='active');
+  if(active.length){
+    html += `<h3>📄 Активные · ${active.length}</h3>`;
+    if(S.tenderRideMode) html += `<div class="card warn" style="font-size:11px;margin-bottom:6px">🎯 Режим тендера ВКЛ — биржа фильтруется под маршруты</div>`;
+    for(const t of active){
+      const L = TENDER_LEVELS[t.level];
+      const left = Math.max(0, t.deadline - S.gameTime);
+      const days = Math.floor(left/1440);
+      const pct = Math.round(t.progress / t.trips * 100);
+      html += `<div class="card" style="border-left:3px solid ${L.color};background:#0f1a2a;cursor:pointer" data-tender-detail="${t.id}">
+        <div class="row">
+          <b>${L.icon} ${CITIES[t.from].n} → ${CITIES[t.to].n}</b>
+          <b>${t.progress}/${t.trips}</b>
+        </div>
+        <div class="bar" style="margin-top:6px"><i style="width:${pct}%;background:linear-gradient(90deg,#4da3ff,#39d98a)"></i></div>
+        <div class="row" style="margin-top:6px;font-size:11px">
+          <span class="muted">${t.client}</span>
+          <span class="muted" style="color:${days<=3?'#ff8d99':'#ffb84d'}">${days} дн.</span>
+        </div>
+        <div class="row" style="margin-top:4px;font-size:10.5px">
+          <span class="muted">Мои: ${t.progressMy} · Водители: ${t.progressDrivers} (${t.assignedDrivers.length})</span>
+          <span class="muted">${fmt(t.budget)} ₽</span>
+        </div>
+      </div>`;
+    }
+  }
+
+  // Доступные к аукциону
+  const avail = TENDERS.filter(t=>t.status==='available');
+  html += `<h3>📢 Доступные · ${avail.length}</h3>`;
+  if(!avail.length){
+    html += `<div class="empty">Новые тендеры появятся через 7 дней</div>`;
+  }
+  for(const t of avail){
+    const L = TENDER_LEVELS[t.level];
+    const ttl = Math.max(0, t.createdAt + 7*1440 - S.gameTime);
+    const ttlDays = Math.floor(ttl/1440);
+    const canBid = S.reputation >= L.minRep && (S.reliability||50) >= L.minRel;
+    html += `<div class="card tender" style="border-left:3px solid ${L.color}">
+      <div class="row">
+        <b>${L.icon} ${L.n}</b>
+        <span class="badge" style="background:#4a3a14;color:#ffd479">${t.trips} рейсов</span>
+      </div>
+      <div class="row" style="margin-top:5px"><b>${CITIES[t.from].n} → ${CITIES[t.to].n}</b><b>${fmt(t.km)} км</b></div>
+      <div class="row" style="margin-top:3px;font-size:11px">
+        <span class="muted">${t.client}</span>
+        <span class="muted">до ${fmt(t.budget)} ₽</span>
+      </div>
+      <div class="row" style="margin-top:3px;font-size:10.5px">
+        <span class="muted">Мин. реп. ${L.minRep} · Надёж. ${L.minRel}</span>
+        <span class="muted" style="color:${ttlDays<=2?'#ff8d99':'#ffb84d'}">до конца ${ttlDays} дн.</span>
+      </div>
+      <button class="primary" data-tender-bid="${t.id}" ${canBid?'':'disabled'} style="margin-top:8px;width:100%">
+        ${canBid ? '💰 Участвовать в аукционе' : '🚫 Не хватает реп/надёж.'}
+      </button>
+    </div>`;
+  }
+  // Регулярные маршруты
+  const regs = S.regularRoutes || [];
+  if(regs.length){
+    html += `<h3>🔁 Регулярные маршруты · ${regs.length}</h3>`;
+    for(const r of regs){
+      const left = Math.max(0, 7*1440 - (S.gameTime - r.weekStart));
+      const daysLeft = Math.floor(left/1440);
+      html += `<div class="card" style="cursor:pointer" data-regular="${r.id}">
+        <div class="row"><b>🔁 ${CITIES[r.from].n} → ${CITIES[r.to].n}</b><b>${r.weekProgress}/${r.tripsPerWeek}</b></div>
+        <div class="muted" style="font-size:10.5px;margin-top:3px">${r.rate} ₽/км · до конца недели ${daysLeft} дн.</div>
+      </div>`;
+    }
+  }
+  return html;
+}
+
+function bindTendersHandlers(p){
+  p.querySelectorAll('[data-tender-bid]').forEach(b=>{
+    b.onclick = ()=>openTenderAuction(b.dataset.tenderBid);
+  });
+  p.querySelectorAll('[data-tender-detail]').forEach(b=>{
+    b.onclick = ()=>openTenderDetail(b.dataset.tenderDetail);
+  });
+  p.querySelectorAll('[data-regular]').forEach(b=>{
+    b.onclick = ()=>openRegularDetail(b.dataset.regular);
+  });
+}
 	/* ============ НОВЫЕ МЕХАНИКИ: Мега-контракты, Диспетчер, Тендеры маршрутов ============ */
 
 /* --- Инициализация новых полей S (совместимость с сейвами) --- */
@@ -7145,6 +7929,97 @@ function participateTenderRoute(id){
     addNews(`😞 Проиграли тендер на маршрут`,'warn','world');
   }
   updateUI();
+}
+	/* ============ РЕГУЛЯРНЫЕ МАРШРУТЫ (сетка) ============ */
+function genRegularOffer(){
+  if(S.regularRoutes.filter(r=>r.status==='active').length >= 3) return;
+  if(S.reputation < 30) return;
+  const from = S.truck.cityIndex !== null ? S.truck.cityIndex : ri(0, CITIES.length-1);
+  let to = ri(0, CITIES.length-1);
+  let att=0; while(to===from && att++<20) to = ri(0, CITIES.length-1);
+  const km = roadKm(from, to);
+  const tripsPerWeek = ri(2, 5);
+  const rate = 90 + Math.random()*20;
+  S.regularRoutes.push({
+    id: 'rr'+(++tenderId),
+    from, to, km,
+    tripsPerWeek,
+    rate: Math.round(rate),
+    status: 'active',
+    level: 'bronze',
+    weekProgress: 0,
+    weekStart: S.gameTime,
+    missedWeeks: 0,
+    totalTrips: 0,
+  });
+  addNews(`🔁 Новый регулярный маршрут: ${CITIES[from].n} → ${CITIES[to].n}`,'info','world');
+}
+
+function regularRouteTick(){
+  // Генерация
+  if(S.gameTime - (S.lastRegularGen||0) > 10*1440){
+    S.lastRegularGen = S.gameTime;
+    if(Math.random() < 0.6) genRegularOffer();
+  }
+  // Недельный подсчёт
+  for(const r of S.regularRoutes){
+    if(r.status !== 'active') continue;
+    if(S.gameTime - r.weekStart >= 7*1440){
+      if(r.weekProgress >= r.tripsPerWeek){
+        // Успешная неделя
+        r.level = r.level==='bronze'?'silver':r.level==='silver'?'gold':'platinum';
+      } else {
+        const missed = r.tripsPerWeek - r.weekProgress;
+        const penalty = missed * r.rate * r.km * 0.3;
+        const realP = Math.min(penalty, S.money);
+        if(realP>0) moneySpend(realP, `Пропуск по маршруту`);
+        r.missedWeeks++;
+        if(r.missedWeeks >= 2) r.status = 'failed';
+        else r.level = r.level==='platinum'?'gold':r.level==='gold'?'silver':'bronze';
+        addNews(`⚠️ Регулярный маршрут: пропуск недели`,'warn','notify');
+      }
+      r.weekStart = S.gameTime;
+      r.weekProgress = 0;
+    }
+  }
+  // Убираем failed
+  S.regularRoutes = S.regularRoutes.filter(r=>r.status==='active');
+}
+
+function progressRegularRoute(from, to, isMine){
+  for(const r of S.regularRoutes){
+    if(r.status!=='active') continue;
+    if(r.from===from && r.to===to){
+      r.weekProgress++;
+      r.totalTrips++;
+      return r;
+    }
+  }
+  return null;
+}
+
+function openRegularDetail(id){
+  const r = S.regularRoutes.find(x=>x.id===id);
+  if(!r) return;
+  const left = Math.max(0, 7*1440 - (S.gameTime - r.weekStart));
+  const daysLeft = Math.floor(left/1440);
+  const lvlIcons = {bronze:'🥉', silver:'🥈', gold:'🥇', platinum:'💎'};
+  let html = `<h2>🔁 Регулярный маршрут</h2>
+    <p>${CITIES[r.from].n} → ${CITIES[r.to].n} · ${fmt(r.km)} км</p>
+    <div class="card hl">
+      <div class="row"><span class="muted">Уровень</span><b>${lvlIcons[r.level]} ${r.level}</b></div>
+      <div class="row"><span class="muted">Норма в неделю</span><b>${r.tripsPerWeek} рейсов</b></div>
+      <div class="row"><span class="muted">Выполнено на этой неделе</span><b>${r.weekProgress}/${r.tripsPerWeek}</b></div>
+      <div class="row"><span class="muted">Ставка</span><b>${r.rate} ₽/км</b></div>
+      <div class="row"><span class="muted">До конца недели</span><b style="color:${daysLeft<=1?'#ff8d99':'#ffb84d'}">${daysLeft} дн.</b></div>
+    </div>
+    <div class="card warn" style="font-size:11px">
+      Не выполнишь норму — штраф и понижение уровня. 2 пропуска подряд — маршрут потерян.
+    </div>
+    <button class="wide primary" id="regClose" style="margin-top:10px">Закрыть</button>`;
+  Modal.show(html, 1, ()=>{
+    $('regClose').onclick = ()=>Modal.next();
+  });
 }
 /* ============ /НОВЫЕ МЕХАНИКИ ============ */
 /* ============ СТАРТ ============ */
