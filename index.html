@@ -6150,8 +6150,9 @@ function vehTileHTML(i, busy){
     const curInt = serviceIntervalOf(i);   // ← единая логика, как везде
     const minInt = Math.round(vBase*0.5);
     const maxInt = Math.round(vBase*1.5);
-    const mult = (curInt/vBase).toFixed(2);
+      const mult = (curInt/vBase).toFixed(2);
     const bonusPct = ((0.02-(curInt/vBase-1)*0.09)*100).toFixed(1);
+    const bonusColor = bonusPct>0?'#5ef0a0':bonusPct<0?'#ff8d99':'#cfe0f5';
    detail = `<div class="vdetail open">
       <div class="kv"><span>🚗 Ресурс</span><b style="color:${odoCol}">${fmt(odo)} / ${fmt(maxK)} км</b></div>
       <div class="kv"><span>🛠 Регламент ТО</span><b>${fmt(vBase)} км</b></div>
