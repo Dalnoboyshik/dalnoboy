@@ -4775,11 +4775,11 @@ function driverTick(dt){
           const w=r3(rnd(cap*0.4, cap*0.99));
           const wmul=weightMul(w);
           // Ставка: для тендера — по тендерной, для обратного — рыночная
-          let rate;
+                  let rate;
           if(target.isTender){
             rate = mt.rate;
           } else {
-            rate = baseRatePerKm(target.km)*wmul*repRateBonus(from, target.idx);
+            rate = baseRatePerKm(target.km)*wmul*repRateBonus(from, target.idx)*routeBonusFor(from, target.idx);
           }
           if(hasTrait(d,'pro'))rate*=1.1;
           const ratingMul = 1 + d.rating*0.05;
@@ -4834,10 +4834,10 @@ function driverTick(dt){
         } else {
           target=pick(filteredPool);
         }
-        const cl=driverCargo(d);if(!cl.length)continue;
+               const cl=driverCargo(d);if(!cl.length)continue;
         const ct=pick(cl);const cap=driverCap(d);
         const w=r3(rnd(cap*0.4, cap*0.99));
-        const wmul=weightMul(w);let rate=baseRatePerKm(target.km)*wmul*repRateBonus(from, target.idx);
+        const wmul=weightMul(w);let rate=baseRatePerKm(target.km)*wmul*repRateBonus(from, target.idx)*routeBonusFor(from, target.idx);
         if(hasTrait(d,'pro'))rate*=1.1;
         let loadMul=1;
         if(w>cap*0.8) loadMul=1.15;
