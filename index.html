@@ -2559,10 +2559,13 @@ function openLeaseModal(model){
   function render(){
     if(count>maxCount)count=maxCount;
     if(count<1)count=1;
-    const t=LEASE_TERMS[selectedTerm];
+      const t=LEASE_TERMS[selectedTerm];
     const advanceOne=Math.round(basePrice*t.advancePct);
     const monthlyOne=Math.round(basePrice*t.monthlyPct);
     const totalOne=advanceOne+monthlyOne;
+    const maxByMoney = Math.max(1, Math.floor(S.money / Math.max(1, totalOne)));
+    const maxAffordable = Math.max(1, Math.min(maxCount, maxByMoney));
+    if(count > maxAffordable) count = maxAffordable;
     const entryTotal=totalOne*count;
     const monthlyTotal=monthlyOne*count;
     const totalPaid=(advanceOne+monthlyOne*t.months)*count;
@@ -2580,12 +2583,13 @@ function openLeaseModal(model){
         <div class="s">Аванс ${fmt(a)} ₽ · ${fmt(m)} ₽/мес · +${ov}%</div></div>`;
     });
     html+=`</div>
-      <h3>Сколько машин</h3>
+           <h3>Сколько машин</h3>
       <div class="card" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;gap:8px">
         <button id="lcMinus" class="warn" style="width:48px;height:48px;font-size:24px;padding:0;font-weight:700">−</button>
         <div style="text-align:center;flex:1">
           <div style="font-size:26px;font-weight:700;line-height:1">${count}</div>
-          <div class="muted" style="font-size:10px;margin-top:2px">максимум ${maxCount}</div>
+          <div class="muted" style="font-size:10px;margin-top:2px">максимум по деньгам: ${maxAffordable} из ${maxCount}</div>
+          <button id="lcMax" class="gold" style="margin-top:6px;font-size:11px;padding:4px 14px;font-weight:700" ${count>=maxAffordable?'disabled':''}>⬆️ ВЗЯТЬ МАКС</button>
         </div>
         <button id="lcPlus" class="ok" style="width:48px;height:48px;font-size:24px;padding:0;font-weight:700">+</button>
       </div>
@@ -2611,8 +2615,9 @@ function openLeaseModal(model){
         <button id="lsNo" class="ok" style="flex:1">Отмена</button></div>`;
     Modal._render(html);
     $('modalBox').querySelectorAll('[data-term]').forEach(el=>{el.onclick=()=>{selectedTerm=+el.dataset.term;render();};});
-    const mn=$('lcMinus'); if(mn) mn.onclick=()=>{ if(count>1){count--; render();} };
-    const pl=$('lcPlus');  if(pl) pl.onclick=()=>{ if(count<maxCount){count++; render();} };
+       const mn=$('lcMinus'); if(mn) mn.onclick=()=>{ if(count>1){count--; render();} };
+    const pl=$('lcPlus');  if(pl) pl.onclick=()=>{ if(count<maxAffordable){count++; render();} };
+    const mx=$('lcMax');   if(mx) mx.onclick=()=>{ count=maxAffordable; render(); };
     $('lsNo').onclick=()=>Modal.next();
     $('lsYes').onclick=()=>{
       if(S.money<entryTotal){toast(`Нужно ${fmt(entryTotal)} ₽ на входе`,'bad');return;}
@@ -2680,6 +2685,21 @@ function openLeaseModal(model){
   function render(){
     if(count > maxCount) count = maxCount;
     if(count < 1) count = 1;
+    const maxByMoney = (()=>{
+      let n = maxCount;
+      while(n > 1){
+        const d = bulkDiscount(n);
+        const pu = Math.round(basePrice * (1 - d));
+        const t = pu * n
+                + (doIns ? insPerUnit * n : 0)
+                + (doPlate ? platePerUnit * n : 0);
+        if(S.money >= t) return n;
+        n--;
+      }
+      return 1;
+    })();
+    const maxAffordable = Math.max(1, maxByMoney);
+    if(count > maxAffordable) count = maxAffordable;
     const disc = bulkDiscount(count);
     const perUnit = Math.round(basePrice * (1 - disc));
     const carsTotal = perUnit * count;
@@ -2705,7 +2725,8 @@ function openLeaseModal(model){
         <button id="bbMinus" class="warn" style="width:48px;height:48px;font-size:24px;padding:0;font-weight:700">−</button>
         <div style="text-align:center;flex:1">
           <div style="font-size:26px;font-weight:700;line-height:1">${count}</div>
-          <div class="muted" style="font-size:10px;margin-top:2px">максимум ${maxCount}</div>
+          <div class="muted" style="font-size:10px;margin-top:2px">максимум по деньгам: ${maxAffordable} из ${maxCount}</div>
+          <button id="bbMax" class="gold" style="margin-top:6px;font-size:11px;padding:4px 14px;font-weight:700" ${count>=maxAffordable?'disabled':''}>⬆️ ВЗЯТЬ МАКС</button>
         </div>
         <button id="bbPlus" class="ok" style="width:48px;height:48px;font-size:24px;padding:0;font-weight:700">+</button>
       </div>
@@ -2744,8 +2765,9 @@ function openLeaseModal(model){
       </div>`;
 
     Modal._render(html);
-    $('bbMinus').onclick = ()=>{ if(count>1){ count--; render(); } };
-    $('bbPlus').onclick  = ()=>{ if(count<maxCount){ count++; render(); } };
+     $('bbMinus').onclick = ()=>{ if(count>1){ count--; render(); } };
+    $('bbPlus').onclick  = ()=>{ if(count<maxAffordable){ count++; render(); } };
+    $('bbMax').onclick   = ()=>{ count = maxAffordable; render(); };
     $('bbIns').onchange  = ()=>{ doIns = $('bbIns').checked; render(); };
     $('bbPlate').onchange= ()=>{ doPlate = $('bbPlate').checked; render(); };
     $('bbNo').onclick    = ()=>Modal.next();
@@ -4295,9 +4317,22 @@ function openBulkHireModal(){
   const maxHire = Math.min(slots.length, sortedCand.length);
   let count = Math.min(3, maxHire);
 
+  function maxAffordableHire(){
+    let n = 0, cost = 0;
+    for(let i = 0; i < maxHire; i++){
+      const c = sortedCand[i];
+      if(cost + c.hireCost > S.money) break;
+      cost += c.hireCost;
+      n++;
+    }
+    return Math.max(1, n);
+  }
+
   function render(){
     if(count > maxHire) count = maxHire;
     if(count < 1) count = 1;
+    const maxAffordable = maxAffordableHire();
+    if(count > maxAffordable) count = maxAffordable;
 
     const picked = sortedCand.slice(0, count);
     const totalCost = picked.reduce((s,c)=>s+c.hireCost, 0);
@@ -4306,12 +4341,13 @@ function openBulkHireModal(){
 
     let html = `<h2>👥 Массовый найм</h2>
       <p>Свободных мест: <b>${slots.length}</b> · кандидатов: <b>${S.laborMarket.length}</b></p>
-      <h3>Сколько нанять</h3>
+            <h3>Сколько нанять</h3>
       <div class="card" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;gap:8px">
         <button id="bhMinus" class="warn" style="width:48px;height:48px;font-size:24px;padding:0;font-weight:700">−</button>
         <div style="text-align:center;flex:1">
           <div style="font-size:26px;font-weight:700;line-height:1">${count}</div>
-          <div class="muted" style="font-size:10px;margin-top:2px">максимум ${maxHire}</div>
+          <div class="muted" style="font-size:10px;margin-top:2px">максимум по деньгам: ${maxAffordable} из ${maxHire}</div>
+          <button id="bhMax" class="gold" style="margin-top:6px;font-size:11px;padding:4px 14px;font-weight:700" ${count>=maxAffordable?'disabled':''}>⬆️ ВЗЯТЬ МАКС</button>
         </div>
         <button id="bhPlus" class="ok" style="width:48px;height:48px;font-size:24px;padding:0;font-weight:700">+</button>
       </div>
@@ -4353,8 +4389,9 @@ function openBulkHireModal(){
 
     Modal._render(html);
 
-    $('bhMinus').onclick = ()=>{ if(count>1){ count--; render(); } };
-    $('bhPlus').onclick  = ()=>{ if(count<maxHire){ count++; render(); } };
+     $('bhMinus').onclick = ()=>{ if(count>1){ count--; render(); } };
+    $('bhPlus').onclick  = ()=>{ if(count<maxAffordable){ count++; render(); } };
+    $('bhMax').onclick   = ()=>{ count = maxAffordable; render(); };
     $('bhNo').onclick    = ()=>Modal.next();
     $('bhYes').onclick   = ()=>confirmHire(picked, count);
   }
