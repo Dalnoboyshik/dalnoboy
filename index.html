@@ -207,6 +207,24 @@
   border-radius:10px;padding:10px 12px;margin-top:4px;margin-bottom:10px;z-index:5;
   box-shadow:0 6px 20px rgba(0,0,0,.4);
   display:none;flex-direction:column;gap:8px}
+.mass-filter{background:#0a1119;border:1px solid #1e2c3f;border-radius:8px;
+  padding:10px 12px;margin-bottom:10px;display:flex;flex-direction:column;
+  animation:mfIn .18s ease}
+@keyframes mfIn{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+@keyframes mfIn{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+.mf-sect-title{font-size:10px;text-transform:uppercase;letter-spacing:.05em;
+  color:#8ba0bd;font-weight:700;margin-bottom:5px}
+.mf-chips{display:flex;flex-wrap:wrap;gap:5px}
+.mf-chip{font-size:10.5px;padding:5px 10px;background:#0c141e;border:1px solid var(--line);
+  border-radius:12px;color:#8ba0bd;cursor:pointer;transition:.15s;font-family:inherit;
+  font-weight:600;white-space:nowrap;min-height:auto}
+.mf-chip:hover{background:#16202f;color:#cfe0f5}
+.mf-chip.on{background:#1a5ba0;border-color:#2b7bd4;color:#fff}
+.mf-chip.preset{background:#1a3a4a;border-color:#2f5a7a;color:#7ad6ff}
+.mf-chip.preset:hover{background:#26506a}
+.mf-slider{display:flex;align-items:center;gap:8px}
+.mf-slider input[type=range]{flex:1;accent-color:var(--acc)}
+.mf-slider .val{font-weight:700;color:#ffd479;min-width:56px;text-align:right;font-size:12px}
 	.garage-sticky-head{
   position:sticky;
   top:-8px;
@@ -1580,6 +1598,8 @@ let sortBy={field:'total',dir:-1};
 let oblExpanded=false;
 let massMode=false;
 let massSelected={};
+let massFilterOpen = false;
+const massFilter = { cls:'all', resMax:0, to:'any', drv:'any' };
 let vehGroupCollapsed={car:false,small:false,tractor:false};
 let uiSubTab={orders:'ati', auto:'current', world:'news', labor:'staff'};
 let firmSubTab='general';
@@ -2892,7 +2912,7 @@ function doMassRenew(groups){
   toast(`🔄 Обновлено ${renewedCount} машин${parts.length ? ' · сохранено: ' + parts.join(', ') : ''}`, 'ok');
   addNews(`🔄 Обновление парка: ${renewedCount} машин · ${diff>=0?'+':'−'}${fmt(Math.abs(diff))} ₽`, 'info', 'finance');
 }
-	/* ============ МАСС-ФИЛЬТР ============ */
+/* ============ МАСС-ФИЛЬТР (инлайн, как в демо v3) ============ */
 function massFilterEligible(){
   const busy = busyVehicleIds();
   return S.ownedVehicles.filter(v=>{
@@ -2905,138 +2925,163 @@ function massFilterEligible(){
   });
 }
 
-function applyMassPreset(preset){
-  const eligible = massFilterEligible();
-  if(!eligible.length){ toast('Нет подходящих машин','warn'); return; }
+function massMatchesFilter(v){
+  const cat = vehCategory(v.model);
+  if(massFilter.cls !== 'all' && cat !== massFilter.cls) return false;
+  const remain = Math.round(resourceRemainPct(v)*100);
+  if(massFilter.resMax > 0 && remain >= massFilter.resMax) return false;
+  const physical = serviceOverdue(v);
+  const planned  = plannedOverdue(v);
+  if(massFilter.to === 'ok'      && physical > 0) return false;
+  if(massFilter.to === 'todo'    && !(planned > 0 && physical <= 0)) return false;
+  if(massFilter.to === 'overdue' && physical <= 0) return false;
+  const hasDrv = S.drivers.some(d=>d.vehicleId===v.id);
+  if(massFilter.drv === 'has'  && !hasDrv) return false;
+  if(massFilter.drv === 'none' &&  hasDrv) return false;
+  return true;
+}
+
+function applyMassFilterLive(){
   massSelected = {};
-  let count = 0;
-  for(const v of eligible){
-    let ok = false;
-    if(preset === 'repair')       ok = (v.wear||0) >= 80;
-    else if(preset === 'overdue') ok = serviceOverdue(v) > 0;
-    else if(preset === 'todo')    ok = plannedOverdue(v) > 0 && serviceOverdue(v) <= 0;
-    else if(preset === 'noveh')   ok = !S.drivers.some(d=>d.vehicleId===v.id);
-    else if(preset === 'fav')     ok = !!v.isFavorite;
-    else if(preset === 'lowres')  ok = resourceRemainPct(v) < 0.30;
-    if(ok){ massSelected[v.id] = true; count++; }
-  }
-  Modal.next();
+  const elig = massFilterEligible();
+  for(const v of elig){ if(massMatchesFilter(v)) massSelected[v.id] = true; }
   renderAuto();
-  toast(count > 0 ? `🔍 Выбрано: ${count} машин` : '🔍 Ничего не найдено', count > 0 ? 'ok' : 'warn');
 }
 
-function openMassFilterModal(){
-  const eligible = massFilterEligible();
-  if(!eligible.length){ toast('Нет подходящих машин для выбора','warn'); return; }
-
-  const f = { cls:'all', resMax:0, to:'any', drv:'any' };
-
-  function matchFilter(v){
-    const cat = vehCategory(v.model);
-    if(f.cls !== 'all' && cat !== f.cls) return false;
-    const remain = Math.round(resourceRemainPct(v)*100);
-    if(f.resMax > 0 && remain >= f.resMax) return false;
-    const physical = serviceOverdue(v);
-    const planned  = plannedOverdue(v);
-    if(f.to === 'ok'      && physical > 0) return false;
-    if(f.to === 'todo'    && !(planned > 0 && physical <= 0)) return false;
-    if(f.to === 'overdue' && physical <= 0) return false;
-    const hasDrv = S.drivers.some(d=>d.vehicleId===v.id);
-    if(f.drv === 'has'  && !hasDrv) return false;
-    if(f.drv === 'none' &&  hasDrv) return false;
-    return true;
-  }
-
-  function render(){
-    const matched = eligible.filter(matchFilter);
-
-    let html = `<h2>🔍 Выбрать по фильтру</h2>
-      <p>Подходит: <b style="color:#5ef0a0">${matched.length}</b> из ${eligible.length}</p>
-
-      <h3>⚡ Быстрые пресеты</h3>
-      <div style="display:flex;flex-wrap:wrap;gap:5px">
-        <button class="sort-btn" data-preset="repair">🔧 Износ ≥80%</button>
-        <button class="sort-btn" data-preset="overdue">🛠 ТО просрочено</button>
-        <button class="sort-btn" data-preset="todo">⏰ ТО пора</button>
-        <button class="sort-btn" data-preset="noveh">🚫 Без водителя</button>
-        <button class="sort-btn" data-preset="fav">⭐ Избранные</button>
-        <button class="sort-btn" data-preset="lowres">💀 Ресурс &lt;30%</button>
-      </div>
-
-      <h3>Класс</h3>
-      <div style="display:flex;gap:5px;flex-wrap:wrap">
-        <button class="sort-btn ${f.cls==='all'?'on':''}"     data-cls="all">Все</button>
-        <button class="sort-btn ${f.cls==='car'?'on':''}"     data-cls="car">🚗 Легк.</button>
-        <button class="sort-btn ${f.cls==='small'?'on':''}"   data-cls="small">🚚 Малые</button>
-        <button class="sort-btn ${f.cls==='tractor'?'on':''}" data-cls="tractor">🚛 Тягачи</button>
-      </div>
-
-      <h3>Остаток ресурса — меньше чем</h3>
-      <div class="card">
-        <div class="row">
-          <span class="muted">Порог</span>
-          <b style="color:#ffd479">${f.resMax > 0 ? '≤ '+f.resMax+'%' : 'выкл'}</b>
-        </div>
-        <input type="range" id="mfRes" min="0" max="100" step="5" value="${f.resMax}"
-          style="width:100%;margin-top:8px;accent-color:#4da3ff">
-      </div>
-
-      <h3>Состояние ТО</h3>
-      <div style="display:flex;gap:5px;flex-wrap:wrap">
-        <button class="sort-btn ${f.to==='any'?'on':''}"     data-to="any">Любое</button>
-        <button class="sort-btn ${f.to==='ok'?'on':''}"      data-to="ok">✓ ОК</button>
-        <button class="sort-btn ${f.to==='todo'?'on':''}"    data-to="todo">⏰ Пора</button>
-        <button class="sort-btn ${f.to==='overdue'?'on':''}" data-to="overdue">🛠 Просроч.</button>
-      </div>
-
-      <h3>Водитель</h3>
-      <div style="display:flex;gap:5px;flex-wrap:wrap">
-        <button class="sort-btn ${f.drv==='any'?'on':''}"  data-drv="any">Любой</button>
-        <button class="sort-btn ${f.drv==='has'?'on':''}"  data-drv="has">Есть</button>
-        <button class="sort-btn ${f.drv==='none'?'on':''}" data-drv="none">Нет</button>
-      </div>
-
-      <div style="display:flex;gap:8px;margin-top:14px">
-        <button class="ok" id="mfApply" style="flex:1" ${matched.length?'':'disabled'}>
-          ✓ Выбрать ${matched.length}
-        </button>
-        <button class="warn" id="mfReset" style="flex:1">Сбросить</button>
-      </div>
-      <button class="wide primary" id="mfClose" style="margin-top:6px">Отмена</button>`;
-
-    Modal._render(html);
-
-    $('modalBox').querySelectorAll('[data-preset]').forEach(b=>{
-      b.onclick = ()=>applyMassPreset(b.dataset.preset);
-    });
-    $('modalBox').querySelectorAll('[data-cls]').forEach(b=>{
-      b.onclick = ()=>{ f.cls = b.dataset.cls; render(); };
-    });
-    $('modalBox').querySelectorAll('[data-to]').forEach(b=>{
-      b.onclick = ()=>{ f.to = b.dataset.to; render(); };
-    });
-    $('modalBox').querySelectorAll('[data-drv]').forEach(b=>{
-      b.onclick = ()=>{ f.drv = b.dataset.drv; render(); };
-    });
-    const rng = $('mfRes');
-    if(rng) rng.oninput = ()=>{ f.resMax = parseInt(rng.value,10); render(); };
-    $('mfApply').onclick = ()=>{
-      if(!matched.length) return;
-      massSelected = {};
-      for(const v of matched) massSelected[v.id] = true;
-      Modal.next();
-      renderAuto();
-      toast(`🔍 Выбрано: ${matched.length} машин`, 'ok');
-    };
-    $('mfReset').onclick = ()=>{
-      f.cls = 'all'; f.resMax = 0; f.to = 'any'; f.drv = 'any';
-      render();
-    };
-    $('mfClose').onclick = ()=>Modal.next();
-  }
-  render();
+function massFilterResetAll(){
+  massFilter.cls = 'all';
+  massFilter.resMax = 0;
+  massFilter.to = 'any';
+  massFilter.drv = 'any';
+  massSelected = {};
+  renderAuto();
 }
 
+function massFilterPreset(kind){
+  massSelected = {};
+  const elig = massFilterEligible();
+  for(const v of elig){
+    let ok = false;
+    if(kind === 'repair')       ok = (v.wear||0) >= 80;
+    else if(kind === 'overdue') ok = serviceOverdue(v) > 0;
+    else if(kind === 'todo')    ok = plannedOverdue(v) > 0 && serviceOverdue(v) <= 0;
+    else if(kind === 'noveh')   ok = !S.drivers.some(d=>d.vehicleId===v.id);
+    else if(kind === 'fav')     ok = !!v.isFavorite;
+    else if(kind === 'lowres')  ok = resourceRemainPct(v) < 0.30;
+    if(ok) massSelected[v.id] = true;
+  }
+  renderAuto();
+  const cnt = Object.keys(massSelected).length;
+  toast(cnt > 0 ? `🔍 Выбрано: ${cnt}` : '🔍 Ничего не найдено', cnt > 0 ? 'ok' : 'warn');
+}
+
+/* Обновление галочек и счётчиков БЕЗ полного рендера — чтобы не сбить фокус ползунка */
+function applyMassSelectionToTiles(){
+  document.querySelectorAll('#pane-auto [data-mass-check]').forEach(chk=>{
+    const id = chk.dataset.massCheck;
+    const on = !!massSelected[id];
+    chk.checked = on;
+    const tile = chk.closest('.vtile');
+    if(tile) tile.classList.toggle('picked', on);
+  });
+  const selCount = Object.keys(massSelected).length;
+  const btnSell  = document.querySelector('[data-mass-sell]');
+  const btnScrap = document.querySelector('[data-mass-scrap]');
+  const btnRenew = document.querySelector('[data-mass-renew]');
+  if(btnSell){  btnSell.textContent  = `💸 Продать (${selCount})`;  btnSell.disabled  = !selCount; }
+  if(btnScrap){ btnScrap.textContent = `♻️ Списать (${selCount})`; btnScrap.disabled = !selCount; }
+  if(btnRenew){ btnRenew.textContent = `🔄 Обновить парк (${selCount})`; btnRenew.disabled = !selCount; }
+}
+
+/* Живое обновление при движении ползунка — без re-render, чтобы не терять фокус */
+function massFilterSliderLive(sliderEl){
+  massFilter.resMax = parseInt(sliderEl.value,10);
+  const valSpan = sliderEl.parentElement.querySelector('.val');
+  if(valSpan) valSpan.textContent = massFilter.resMax > 0 ? '≤ '+massFilter.resMax+'%' : 'выкл';
+
+  massSelected = {};
+  const elig = massFilterEligible();
+  for(const v of elig){ if(massMatchesFilter(v)) massSelected[v.id] = true; }
+
+  const counter = document.getElementById('mfCounter');
+  if(counter){
+    const matched = elig.filter(massMatchesFilter).length;
+    counter.innerHTML = `Подходит: <b>${matched}</b> из ${elig.length}`;
+  }
+  const applyBtn = document.getElementById('mfApplyBtn');
+  if(applyBtn){
+    const matched = elig.filter(massMatchesFilter).length;
+    applyBtn.textContent = '✓ Применить ' + matched;
+  }
+  applyMassSelectionToTiles();
+}
+
+function renderMassFilterInline(){
+  const elig = massFilterEligible();
+  const matched = elig.filter(massMatchesFilter).length;
+  const c = massFilter;
+
+  return `<div class="mass-filter">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <span style="font-size:12px;font-weight:700;color:#cfe0f5">🔍 Фильтр выбора</span>
+      <span id="mfCounter" style="font-size:11px;color:#5ef0a0">Подходит: <b>${matched}</b> из ${elig.length}</span>
+    </div>
+
+    <div>
+      <div class="mf-sect-title">⚡ Быстрые пресеты</div>
+      <div class="mf-chips">
+        <button class="mf-chip preset" data-mf-preset="repair">🔧 Износ ≥80%</button>
+        <button class="mf-chip preset" data-mf-preset="overdue">🛠 ТО просрочено</button>
+        <button class="mf-chip preset" data-mf-preset="todo">⏰ ТО пора</button>
+        <button class="mf-chip preset" data-mf-preset="noveh">🚫 Без водителя</button>
+        <button class="mf-chip preset" data-mf-preset="fav">⭐ Избранные</button>
+        <button class="mf-chip preset" data-mf-preset="lowres">💀 Ресурс &lt;30%</button>
+      </div>
+    </div>
+
+    <div style="margin-top:10px">
+      <div class="mf-sect-title">Класс</div>
+      <div class="mf-chips">
+        <button class="mf-chip ${c.cls==='all'?'on':''}"     data-mf-cls="all">Все</button>
+        <button class="mf-chip ${c.cls==='car'?'on':''}"     data-mf-cls="car">🚗 Легк.</button>
+        <button class="mf-chip ${c.cls==='small'?'on':''}"   data-mf-cls="small">🚚 Малые</button>
+        <button class="mf-chip ${c.cls==='tractor'?'on':''}" data-mf-cls="tractor">🚛 Тягачи</button>
+      </div>
+    </div>
+
+    <div style="margin-top:10px">
+      <div class="mf-sect-title">Остаток ресурса — меньше чем</div>
+      <div class="mf-slider">
+        <input type="range" id="mfRes" min="0" max="100" step="5" value="${c.resMax}">
+        <span class="val">${c.resMax > 0 ? '≤ '+c.resMax+'%' : 'выкл'}</span>
+      </div>
+    </div>
+
+    <div style="margin-top:10px">
+      <div class="mf-sect-title">Состояние ТО</div>
+      <div class="mf-chips">
+        <button class="mf-chip ${c.to==='any'?'on':''}"     data-mf-to="any">Любое</button>
+        <button class="mf-chip ${c.to==='ok'?'on':''}"      data-mf-to="ok">✓ ОК</button>
+        <button class="mf-chip ${c.to==='todo'?'on':''}"    data-mf-to="todo">⏰ Пора</button>
+        <button class="mf-chip ${c.to==='overdue'?'on':''}" data-mf-to="overdue">🛠 Просроч.</button>
+      </div>
+    </div>
+
+    <div style="margin-top:10px">
+      <div class="mf-sect-title">Водитель</div>
+      <div class="mf-chips">
+        <button class="mf-chip ${c.drv==='any'?'on':''}"  data-mf-drv="any">Любой</button>
+        <button class="mf-chip ${c.drv==='has'?'on':''}"  data-mf-drv="has">Есть</button>
+        <button class="mf-chip ${c.drv==='none'?'on':''}" data-mf-drv="none">Нет</button>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:6px;margin-top:12px">
+      <button class="ok" style="flex:1" data-mf-act="apply" id="mfApplyBtn">✓ Применить ${matched}</button>
+      <button class="warn" style="flex:1" data-mf-act="reset">Сбросить</button>
+    </div>
+  </div>`;
+}
 	
 	function openBulkBuyModal(model){
   const v = VEHICLES[model];
@@ -6249,11 +6294,11 @@ function renderAuto(){
       S.vehDetailOpen[id] = !S.vehDetailOpen[id];
       renderAuto();
     };});
-    p.querySelectorAll('[data-mass-toggle]').forEach(b=>{b.onclick=()=>{
-      massMode = !massMode;
-      if(!massMode) massSelected = {};
-      renderAuto();
-    };});
+   p.querySelectorAll('[data-mass-toggle]').forEach(b=>{b.onclick=()=>{
+  massMode = !massMode;
+  if(!massMode){ massSelected = {}; massFilterOpen = false; }
+  renderAuto();
+};});
     p.querySelectorAll('[data-mass-all]').forEach(b=>{b.onclick=()=>{
       const busy = busyVehicleIds();
       S.ownedVehicles.forEach(v=>{
@@ -6273,7 +6318,23 @@ function renderAuto(){
 p.querySelectorAll('[data-mass-sell]').forEach(b=>{b.onclick=massSellVehicles;});
 p.querySelectorAll('[data-mass-scrap]').forEach(b=>{b.onclick=massScrapVehicles;});
 p.querySelectorAll('[data-mass-renew]').forEach(b=>{b.onclick=openMassRenewModal;});
-p.querySelectorAll('[data-mass-filter]').forEach(b=>{b.onclick=openMassFilterModal;});
+p.querySelectorAll('[data-mass-filter]').forEach(b=>{b.onclick=()=>{
+  massFilterOpen = !massFilterOpen;
+  renderAuto();
+};});
+
+// === Фильтр (инлайн) ===
+p.querySelectorAll('[data-mf-preset]').forEach(b=>{b.onclick=()=>massFilterPreset(b.dataset.mfPreset);});
+p.querySelectorAll('[data-mf-cls]').forEach(b=>{b.onclick=()=>{ massFilter.cls=b.dataset.mfCls; applyMassFilterLive(); };});
+p.querySelectorAll('[data-mf-to]').forEach(b=>{b.onclick=()=>{ massFilter.to=b.dataset.mfTo; applyMassFilterLive(); };});
+p.querySelectorAll('[data-mf-drv]').forEach(b=>{b.onclick=()=>{ massFilter.drv=b.dataset.mfDrv; applyMassFilterLive(); };});
+const mfRes = p.querySelector('#mfRes');
+if(mfRes) mfRes.oninput = ()=> massFilterSliderLive(mfRes);
+p.querySelectorAll('[data-mf-act]').forEach(b=>{b.onclick=()=>{
+  const a = b.dataset.mfAct;
+  if(a === 'apply'){ massFilterOpen = false; renderAuto(); }
+  else if(a === 'reset'){ massFilterResetAll(); }
+};});
      p.querySelectorAll('[data-mass-check]').forEach(b=>{b.onchange=()=>{
       const id = b.dataset.massCheck;
       if(b.checked) massSelected[id] = true;
@@ -6611,7 +6672,10 @@ function autoGarageContent(){
   }
   html += `</div>`;   // ← закрытие garage-sticky-head
 
-  // === Группы ===
+  // === Инлайн-фильтр — как в v3: разворачивается между масс-панелью и списком ===
+  if(massMode && massFilterOpen){
+    html += renderMassFilterInline();
+  }
 
   // === Группы ===
   if(S.ownedVehicles.length <= 1){
