@@ -402,8 +402,29 @@ button.sm{font-size:10px;padding:3px 7px}
   width:100%;max-width:560px;max-height:86vh;overflow-y:auto;padding:16px}
 .modal-box h2{font-size:16px;margin-bottom:6px}
 .modal-box p{font-size:12px;color:var(--dim);margin-bottom:12px}
-#toasts{position:absolute;top:12px;right:12px;display:flex;flex-direction:column;
+#toasts{position:absolute;top:52px;right:12px;display:flex;flex-direction:column;
   align-items:flex-end;gap:5px;pointer-events:none;z-index:20;max-width:320px}
+#toastFilter{
+  position:absolute;top:10px;right:52px;width:36px;height:36px;
+  background:#0f1722cc;border:1px solid #2f4a75;border-radius:8px;
+  color:#cfe0f5;cursor:pointer;font-size:16px;
+  display:flex;align-items:center;justify-content:center;
+  z-index:5;backdrop-filter:blur(6px);transition:.15s;padding:0;font-family:inherit;
+}
+#toastFilter:hover{background:#1f2d42;border-color:#4da3ff}
+#toastFilter.off{background:#5c1a24cc;border-color:#8a2f3e;color:#ff8d99}
+#toastFilterPopover{
+  position:absolute;top:50px;right:12px;
+  background:#0f1722;border:1px solid #2f4a75;border-radius:8px;
+  padding:8px 12px;z-index:23;min-width:200px;
+  box-shadow:0 8px 24px rgba(0,0,0,.6);display:none;
+}
+#toastFilterPopover.show{display:block}
+#toastFilterPopover label{
+  display:flex;align-items:center;gap:8px;padding:5px 0;
+  font-size:12px;color:#cfe0f5;cursor:pointer;user-select:none;
+}
+#toastFilterPopover input{width:14px;height:14px;accent-color:#4da3ff;cursor:pointer;margin:0;flex-shrink:0}
 .toast{background:#1b2740f0;border:1px solid #2f4a75;padding:7px 12px;border-radius:8px;
   font-size:12px;animation:pop .25s ease;backdrop-filter:blur(6px);text-align:left}
 .toast.ok{border-color:#2b6b4c;color:#8ff0bd}
@@ -819,6 +840,14 @@ button.sm{font-size:10px;padding:3px 7px}
   <div id="zoomCtrl"><button id="zoomIn">+</button><button id="zoomOut">−</button><button id="zoomReset" style="font-size:12px">⌂</button></div>
       <button id="adminBtn" title="F9">⚙</button>
       <div id="adminIndicator">ADMIN</div>
+      <button id="toastFilter" title="Фильтр уведомлений">🔔</button>
+      <div id="toastFilterPopover">
+        <label><input type="checkbox" data-toast-filter="ok"> ✅ Успехи</label>
+        <label><input type="checkbox" data-toast-filter="warn"> ⚠️ Предупреждения</label>
+        <label><input type="checkbox" data-toast-filter="bad"> ❌ Проблемы</label>
+        <label><input type="checkbox" data-toast-filter="info"> ℹ️ Информация</label>
+        <label><input type="checkbox" data-toast-filter="default"> 📢 Обычные</label>
+      </div>
       <div id="toasts"></div>
     </div>
     <div id="panel">
@@ -1445,6 +1474,7 @@ const S = {
   intlBranches:[],
      autoService:true, autoServiceInterval:30000,
   autoRepair:false, autoRepairThreshold:70,
+  toastsFilter:{ok:true, warn:true, bad:true, info:true, default:true},
      driverSort:{field:'profit',dir:-1},
   driverStatsOpen:{},
   lastNominationDay:0,
@@ -1878,6 +1908,8 @@ function rollPayment(rating){
   return r<0.55?{mult:1.25,text:'+25%!',cls:'ok'}:r<0.58?{mult:0.70,text:'70%',cls:'warn'}:r<0.72?{mult:0.30,text:'30%',cls:'warn'}:{mult:0.00,text:'КИДОК!',cls:'bad'};
 }
 function toast(msg,type){
+  const key = type || 'default';
+  if(S && S.toastsFilter && S.toastsFilter[key] === false) return;
   const d=document.createElement('div');d.className='toast '+(type||'');d.innerHTML=msg;
   $('toasts').appendChild(d);setTimeout(()=>{d.classList.add('out');setTimeout(()=>d.remove(),300);},3200);
 }
@@ -4777,10 +4809,29 @@ function driverTick(dt){
           if(SEASONS[S.season].northClosed&&c.type==='north')continue;
           const km=roadKm(from,j);if(km<=maxR)pool.push({idx:j,km});
         }
-        if(!pool.length)continue;
+              if(!pool.length)continue;
         const filteredPool=applyDispatcherRules(d,pool);
         if(!filteredPool.length)continue;
-        const target=pick(filteredPool);
+        // Приоритет маршрутов корпораций (S.megaContracts)
+        let target;
+        const mcTargets=new Set();
+        if(S.megaContracts){
+          for(const mc of S.megaContracts){
+            if(mc.endAt<=S.gameTime) continue;
+            if(mc.from===from) mcTargets.add(mc.to);
+            if(mc.to===from)   mcTargets.add(mc.from);
+          }
+        }
+        if(mcTargets.size){
+          const priority=filteredPool.filter(p=>mcTargets.has(p.idx));
+          if(priority.length && Math.random()<0.85){
+            target=pick(priority);
+          } else {
+            target=pick(filteredPool);
+          }
+        } else {
+          target=pick(filteredPool);
+        }
         const cl=driverCargo(d);if(!cl.length)continue;
         const ct=pick(cl);const cap=driverCap(d);
         const w=r3(rnd(cap*0.4, cap*0.99));
@@ -4834,13 +4885,26 @@ if(Math.random()<accChance){
         moneyAdd(net,`Рейс ${d.name}`);
         d.stats.earned+=net;d.stats.trips++;d.stats.km+=ri2.km;
         S.stats.totalTrips++;S.stats.totalKm+=ri2.km;
-        // Тендер
+              // Тендер
         if(ri2.isTender){
           progressTenderFromRoute(ri2.from, ri2.to, false);
           if(d.mission) d.mission.delivered = (d.mission.delivered||0)+1;
         }
         // Регулярные маршруты
         if(!ri2.isTender) progressRegularRoute(ri2.from, ri2.to, false);
+        // Долгосрочные контракты (водители тоже закрывают)
+        for(const c of S.contracts){
+          if(c.accepted && c.tripsLeft>0 && c.from===ri2.from && c.to===ri2.to){
+            c.tripsLeft--;
+            moneyAdd(c.payPerTrip, `Контракт ${c.company} · ${d.name}`);
+            if(c.tripsLeft===0){
+              S.reputation=clamp(S.reputation+5,0,100);
+              toast(`✅ Контракт <b>${c.company}</b> выполнен водителем ${d.name}!`,'ok');
+              addNews(`✅ Контракт ${c.company} закрыт (${d.name})`,'ok','finance');
+            }
+            break;
+          }
+        }
         S.reputation=clamp(S.reputation+0.2,0,100);
         d.rating=Math.round(Math.min(5,d.rating+0.02)*10)/10;
         d.trips=(d.trips||0)+1;d.cityIdx=ri2.to;
@@ -7643,6 +7707,37 @@ function updateTicker(){
 }
 $('ticker').onclick=openJournal;
 $('journalClose').onclick=closeJournal;
+(function(){
+  const btn=document.getElementById('toastFilter');
+  const pop=document.getElementById('toastFilterPopover');
+  if(!btn || !pop) return;
+  function syncChecks(){
+    if(!S.toastsFilter) S.toastsFilter={ok:true,warn:true,bad:true,info:true,default:true};
+    pop.querySelectorAll('[data-toast-filter]').forEach(chk=>{
+      chk.checked = S.toastsFilter[chk.dataset.toastFilter] !== false;
+    });
+    const anyOff = Object.values(S.toastsFilter).some(v=>v===false);
+    btn.classList.toggle('off', anyOff);
+    btn.textContent = anyOff ? '🔕' : '🔔';
+  }
+  btn.onclick = (e)=>{
+    e.stopPropagation();
+    pop.classList.toggle('show');
+    syncChecks();
+  };
+  pop.querySelectorAll('[data-toast-filter]').forEach(chk=>{
+    chk.onchange = ()=>{
+      if(!S.toastsFilter) S.toastsFilter={ok:true,warn:true,bad:true,info:true,default:true};
+      S.toastsFilter[chk.dataset.toastFilter] = chk.checked;
+      syncChecks();
+      saveGame();
+    };
+  });
+  document.addEventListener('click', (e)=>{
+    if(!pop.contains(e.target) && e.target !== btn) pop.classList.remove('show');
+  });
+  syncChecks();
+})();
 document.querySelectorAll('#journalTabs .jt').forEach(t=>{
   t.onclick=()=>{
     journalTab=t.dataset.jt;
@@ -8068,8 +8163,9 @@ function loadGame(){
     if(S.stats.scandals===undefined)S.stats.scandals=0;
     if(S.autoService===undefined)S.autoService=true;
     if(S.autoServiceInterval===undefined)S.autoServiceInterval=30000;
-    if(S.autoRepair===undefined)S.autoRepair=false;
+      if(S.autoRepair===undefined)S.autoRepair=false;
     if(S.autoRepairThreshold===undefined)S.autoRepairThreshold=70;
+    if(!S.toastsFilter)S.toastsFilter={ok:true,warn:true,bad:true,info:true,default:true};
    if(S.ownedVehicles)for(const v of S.ownedVehicles){
   if(!v.insurance)v.insurance={osago:false,osagoExpires:0,osagoRenew:false,kasko:false,kaskoExpires:0,kaskoRenew:false};
 	     if(v.isFavorite===undefined)v.isFavorite=false;
@@ -9050,6 +9146,14 @@ if(_codexTick>2){_codexTick=0;tryCodex();}
 }
 S.ownedVehicles=[];S.ownedTrailers=[];
 showStartCityPicker();updateUI();
+setTimeout(()=>{
+  const btn=document.getElementById('toastFilter');
+  if(btn && S.toastsFilter){
+    const anyOff = Object.values(S.toastsFilter).some(v=>v===false);
+    btn.classList.toggle('off', anyOff);
+    btn.textContent = anyOff ? '🔕' : '🔔';
+  }
+},100);
 requestAnimationFrame(loop);
 </script>
 </body>
