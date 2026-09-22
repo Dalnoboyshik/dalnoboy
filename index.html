@@ -2502,20 +2502,20 @@ function ensureInsurance(inst){if(!inst.insurance)inst.insurance={osago:false,os
 
     <h3 style="margin-top:10px">🎁 Задобрить сотрудника</h3>
     <div class="card" style="font-size:11px">
-      ${S.plateBoost && S.plateBoost.rollsLeft > 0
+           ${S.plateBoost && S.plateBoost.rollsLeft > 0
         ? `<div class="row" style="margin-bottom:6px">
              <b style="color:#5ef0a0">🎁 Услуга активна</b>
-             <b style="color:#5ef0a0">×${S.plateBoost.multiplier} · осталось ${S.plateBoost.rollsLeft} кр.</b>
+             <b style="color:#5ef0a0">×${S.plateBoost.multiplier} · осталось ${S.plateBoost.rollsLeft} попыток</b>
            </div>`
-        : `<div class="muted" style="margin-bottom:6px">Временный буст к шансам на редкие номера. Действует N прокруток.</div>`}
-      <button class="wide gold" data-bribe="1" style="text-align:left;padding:8px 10px">
-        💵 1 000 000 ₽ · ×2 на 5 прокруток
+        : `<div class="muted" style="margin-bottom:6px">Временный буст к шансам на редкие номера. Действует N попыток.</div>`}
+           <button class="wide gold" data-bribe="1" style="text-align:left;padding:8px 10px">
+        💵 1 000 000 ₽ · ×2 на 5 попыток
       </button>
       <button class="wide gold" data-bribe="2" style="text-align:left;padding:8px 10px;margin-top:4px">
-        💵 10 000 000 ₽ · ×3 на 10 прокруток
+        💵 10 000 000 ₽ · ×3 на 10 попыток
       </button>
       <button class="wide gold" data-bribe="3" style="text-align:left;padding:8px 10px;margin-top:4px">
-        💵 25 000 000 ₽ · ×4.5 на 15 прокруток
+        💵 25 000 000 ₽ · ×4.5 на 15 попыток
       </button>
     </div>
 
@@ -2533,7 +2533,7 @@ function ensureInsurance(inst){if(!inst.insurance)inst.insurance={osago:false,os
     2: { price: 10000000, mult: 3.0, rolls: 10 },
     3: { price: 25000000, mult: 4.5, rolls: 15 },
   };
-  $('modalBox').querySelectorAll('[data-bribe]').forEach(b=>{
+    $('modalBox').querySelectorAll('[data-bribe]').forEach(b=>{
     b.onclick = ()=>{
       const cfg = BRIBE_TIERS[+b.dataset.bribe];
       if(!cfg) return;
@@ -2542,9 +2542,20 @@ function ensureInsurance(inst){if(!inst.insurance)inst.insurance={osago:false,os
         return;
       }
       moneySpend(cfg.price, `Задобрить сотрудника ГИБДД`);
-      S.plateBoost = { rollsLeft: cfg.rolls, multiplier: cfg.mult };
-      toast(`🎁 Услуга активирована · ×${cfg.mult} на ${cfg.rolls} прокруток`, 'ok');
-      addNews(`🎁 Задобрил сотрудника: ×${cfg.mult} на ${cfg.rolls} номеров`, 'info', 'activity');
+
+      // === Складываем попытки, берём максимальный множитель ===
+      if(S.plateBoost && S.plateBoost.rollsLeft > 0){
+        const oldMult = S.plateBoost.multiplier;
+        const newMult = Math.max(oldMult, cfg.mult);
+        S.plateBoost.rollsLeft += cfg.rolls;
+        S.plateBoost.multiplier = newMult;
+        toast(`🎁 Продлено · ×${newMult} · всего ${S.plateBoost.rollsLeft} попыток`, 'ok');
+        addNews(`🎁 Задобрил сотрудника: +${cfg.rolls} попыток (итого ${S.plateBoost.rollsLeft})`, 'info', 'activity');
+      } else {
+        S.plateBoost = { rollsLeft: cfg.rolls, multiplier: cfg.mult };
+        toast(`🎁 Активировано · ×${cfg.mult} · ${cfg.rolls} попыток`, 'ok');
+        addNews(`🎁 Задобрил сотрудника: ×${cfg.mult} на ${cfg.rolls} попыток`, 'info', 'activity');
+      }
       // Переоткрываем модалку, чтобы обновилась плашка статуса
       setTimeout(()=>openPlateModal(vehicleId, isReReg), 100);
     };
