@@ -2892,6 +2892,152 @@ function doMassRenew(groups){
   toast(`🔄 Обновлено ${renewedCount} машин${parts.length ? ' · сохранено: ' + parts.join(', ') : ''}`, 'ok');
   addNews(`🔄 Обновление парка: ${renewedCount} машин · ${diff>=0?'+':'−'}${fmt(Math.abs(diff))} ₽`, 'info', 'finance');
 }
+	/* ============ МАСС-ФИЛЬТР ============ */
+function massFilterEligible(){
+  const busy = busyVehicleIds();
+  return S.ownedVehicles.filter(v=>{
+    if(v.lease) return false;
+    if(S.loan && S.loan.vehicleId===v.id) return false;
+    if(busy.has(v.id)) return false;
+    if(v.id === S.currentVehicleId) return false;
+    if((v.wear||0) >= 95) return false;
+    return true;
+  });
+}
+
+function applyMassPreset(preset){
+  const eligible = massFilterEligible();
+  if(!eligible.length){ toast('Нет подходящих машин','warn'); return; }
+  massSelected = {};
+  let count = 0;
+  for(const v of eligible){
+    let ok = false;
+    if(preset === 'repair')       ok = (v.wear||0) >= 80;
+    else if(preset === 'overdue') ok = serviceOverdue(v) > 0;
+    else if(preset === 'todo')    ok = plannedOverdue(v) > 0 && serviceOverdue(v) <= 0;
+    else if(preset === 'noveh')   ok = !S.drivers.some(d=>d.vehicleId===v.id);
+    else if(preset === 'fav')     ok = !!v.isFavorite;
+    else if(preset === 'lowres')  ok = resourceRemainPct(v) < 0.30;
+    if(ok){ massSelected[v.id] = true; count++; }
+  }
+  Modal.next();
+  renderAuto();
+  toast(count > 0 ? `🔍 Выбрано: ${count} машин` : '🔍 Ничего не найдено', count > 0 ? 'ok' : 'warn');
+}
+
+function openMassFilterModal(){
+  const eligible = massFilterEligible();
+  if(!eligible.length){ toast('Нет подходящих машин для выбора','warn'); return; }
+
+  const f = { cls:'all', resMax:0, to:'any', drv:'any' };
+
+  function matchFilter(v){
+    const cat = vehCategory(v.model);
+    if(f.cls !== 'all' && cat !== f.cls) return false;
+    const remain = Math.round(resourceRemainPct(v)*100);
+    if(f.resMax > 0 && remain >= f.resMax) return false;
+    const physical = serviceOverdue(v);
+    const planned  = plannedOverdue(v);
+    if(f.to === 'ok'      && physical > 0) return false;
+    if(f.to === 'todo'    && !(planned > 0 && physical <= 0)) return false;
+    if(f.to === 'overdue' && physical <= 0) return false;
+    const hasDrv = S.drivers.some(d=>d.vehicleId===v.id);
+    if(f.drv === 'has'  && !hasDrv) return false;
+    if(f.drv === 'none' &&  hasDrv) return false;
+    return true;
+  }
+
+  function render(){
+    const matched = eligible.filter(matchFilter);
+
+    let html = `<h2>🔍 Выбрать по фильтру</h2>
+      <p>Подходит: <b style="color:#5ef0a0">${matched.length}</b> из ${eligible.length}</p>
+
+      <h3>⚡ Быстрые пресеты</h3>
+      <div style="display:flex;flex-wrap:wrap;gap:5px">
+        <button class="sort-btn" data-preset="repair">🔧 Износ ≥80%</button>
+        <button class="sort-btn" data-preset="overdue">🛠 ТО просрочено</button>
+        <button class="sort-btn" data-preset="todo">⏰ ТО пора</button>
+        <button class="sort-btn" data-preset="noveh">🚫 Без водителя</button>
+        <button class="sort-btn" data-preset="fav">⭐ Избранные</button>
+        <button class="sort-btn" data-preset="lowres">💀 Ресурс &lt;30%</button>
+      </div>
+
+      <h3>Класс</h3>
+      <div style="display:flex;gap:5px;flex-wrap:wrap">
+        <button class="sort-btn ${f.cls==='all'?'on':''}"     data-cls="all">Все</button>
+        <button class="sort-btn ${f.cls==='car'?'on':''}"     data-cls="car">🚗 Легк.</button>
+        <button class="sort-btn ${f.cls==='small'?'on':''}"   data-cls="small">🚚 Малые</button>
+        <button class="sort-btn ${f.cls==='tractor'?'on':''}" data-cls="tractor">🚛 Тягачи</button>
+      </div>
+
+      <h3>Остаток ресурса — меньше чем</h3>
+      <div class="card">
+        <div class="row">
+          <span class="muted">Порог</span>
+          <b style="color:#ffd479">${f.resMax > 0 ? '≤ '+f.resMax+'%' : 'выкл'}</b>
+        </div>
+        <input type="range" id="mfRes" min="0" max="100" step="5" value="${f.resMax}"
+          style="width:100%;margin-top:8px;accent-color:#4da3ff">
+      </div>
+
+      <h3>Состояние ТО</h3>
+      <div style="display:flex;gap:5px;flex-wrap:wrap">
+        <button class="sort-btn ${f.to==='any'?'on':''}"     data-to="any">Любое</button>
+        <button class="sort-btn ${f.to==='ok'?'on':''}"      data-to="ok">✓ ОК</button>
+        <button class="sort-btn ${f.to==='todo'?'on':''}"    data-to="todo">⏰ Пора</button>
+        <button class="sort-btn ${f.to==='overdue'?'on':''}" data-to="overdue">🛠 Просроч.</button>
+      </div>
+
+      <h3>Водитель</h3>
+      <div style="display:flex;gap:5px;flex-wrap:wrap">
+        <button class="sort-btn ${f.drv==='any'?'on':''}"  data-drv="any">Любой</button>
+        <button class="sort-btn ${f.drv==='has'?'on':''}"  data-drv="has">Есть</button>
+        <button class="sort-btn ${f.drv==='none'?'on':''}" data-drv="none">Нет</button>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button class="ok" id="mfApply" style="flex:1" ${matched.length?'':'disabled'}>
+          ✓ Выбрать ${matched.length}
+        </button>
+        <button class="warn" id="mfReset" style="flex:1">Сбросить</button>
+      </div>
+      <button class="wide primary" id="mfClose" style="margin-top:6px">Отмена</button>`;
+
+    Modal._render(html);
+
+    $('modalBox').querySelectorAll('[data-preset]').forEach(b=>{
+      b.onclick = ()=>applyMassPreset(b.dataset.preset);
+    });
+    $('modalBox').querySelectorAll('[data-cls]').forEach(b=>{
+      b.onclick = ()=>{ f.cls = b.dataset.cls; render(); };
+    });
+    $('modalBox').querySelectorAll('[data-to]').forEach(b=>{
+      b.onclick = ()=>{ f.to = b.dataset.to; render(); };
+    });
+    $('modalBox').querySelectorAll('[data-drv]').forEach(b=>{
+      b.onclick = ()=>{ f.drv = b.dataset.drv; render(); };
+    });
+    const rng = $('mfRes');
+    if(rng) rng.oninput = ()=>{ f.resMax = parseInt(rng.value,10); render(); };
+    $('mfApply').onclick = ()=>{
+      if(!matched.length) return;
+      massSelected = {};
+      for(const v of matched) massSelected[v.id] = true;
+      Modal.next();
+      renderAuto();
+      toast(`🔍 Выбрано: ${matched.length} машин`, 'ok');
+    };
+    $('mfReset').onclick = ()=>{
+      f.cls = 'all'; f.resMax = 0; f.to = 'any'; f.drv = 'any';
+      render();
+    };
+    $('mfClose').onclick = ()=>Modal.next();
+  }
+  render();
+}
+
+	
 	function openBulkBuyModal(model){
   const v = VEHICLES[model];
   if(v.price <= 0){ toast('Нельзя','bad'); return; }
@@ -6126,7 +6272,8 @@ function renderAuto(){
     };});
 p.querySelectorAll('[data-mass-sell]').forEach(b=>{b.onclick=massSellVehicles;});
 p.querySelectorAll('[data-mass-scrap]').forEach(b=>{b.onclick=massScrapVehicles;});
-p.querySelectorAll('[data-mass-renew]').forEach(b=>{b.onclick=openMassRenewModal;});   // ← НОВОЕ
+p.querySelectorAll('[data-mass-renew]').forEach(b=>{b.onclick=openMassRenewModal;});
+p.querySelectorAll('[data-mass-filter]').forEach(b=>{b.onclick=openMassFilterModal;});
      p.querySelectorAll('[data-mass-check]').forEach(b=>{b.onchange=()=>{
       const id = b.dataset.massCheck;
       if(b.checked) massSelected[id] = true;
@@ -6437,11 +6584,14 @@ function autoGarageContent(){
   </div>`;
 // === Массовая панель ===
   if(S.ownedVehicles.length > 1){
-     if(massMode){
+    if(massMode){
   const selCount = Object.keys(massSelected).filter(k=>massSelected[k]).length;
   html += `<div class="mass-bar show">
     <div class="mass-toggle-row">
       <button class="ok" data-mass-all>Все свободные</button>
+      <button class="gold" data-mass-filter>🔍 По фильтру</button>
+    </div>
+    <div class="mass-toggle-row">
       <button data-mass-none>Снять</button>
       <button class="bad" data-mass-toggle>✕ Выйти</button>
     </div>
