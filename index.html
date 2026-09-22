@@ -1351,29 +1351,29 @@ function makeEliteLetters(){
 function genPlateText(level, cityIdx){
   const code = CITY_REGION_CODE[cityIdx];
   const isIntl = typeof code === 'string';
-  if(isIntl){
+   if(isIntl){
     if(code === 'BY'){
       const d = String(Math.floor(Math.random()*9000)+1000);
       const l = plateRndLetter()+plateRndLetter();
       const last = Math.floor(Math.random()*10);
-      return `${d} ${l}-${last}`;
+      return `🇧🇾 ${d} ${l}-${last}`;
     }
     if(code === 'KZ'){
       const d = String(Math.floor(Math.random()*1000)).padStart(3,'0');
       const l = plateRndLetter()+plateRndLetter()+plateRndLetter();
       const rg = String(Math.floor(Math.random()*20)).padStart(2,'0');
-      return `${d} ${l} ${rg}`;
+      return `🇰🇿 ${d} ${l} ${rg}`;
     }
     if(code === 'FIN'){
       const l = plateRndLetter()+plateRndLetter()+plateRndLetter();
       const d = String(Math.floor(Math.random()*1000)).padStart(3,'0');
-      return `${l}-${d}`;
+      return `🇫🇮 ${l}-${d}`;
     }
     if(code === 'CN'){
       const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
       const l = letters[Math.floor(Math.random()*letters.length)];
       const d = String(Math.floor(Math.random()*100000)).padStart(5,'0');
-      return `京${l}·${d}`;
+      return `🇨🇳 京${l}·${d}`;
     }
     return '—';
   }
@@ -1438,6 +1438,89 @@ function evaluatePlateLevel(text){
 
   return 'normal';
 }
+	function evaluateForeignPlate(text, countryCode){
+  if(!text || !countryCode) return null;
+  const parts = text.split(' ');
+  if(parts.length < 2) return null;
+  const rest = parts.slice(1).join(' ').trim();
+
+  if(countryCode === 'BY'){
+    // формат: 1234 АВ-5
+    const m = rest.match(/^(\d{4})\s([А-Я]{2})-(\d)$/);
+    if(!m) return null;
+    const d = m[1], l = m[2], last = m[3];
+    const allSame = d.split('').every(c => c === d[0]);
+    const lettersSame = l[0] === l[1];
+    if(allSame && lettersSame && last === d[0]) return 'legendary';
+    if(allSame) return 'super';
+    if((d[0]===d[1] && d[1]===d[2]) || (d[1]===d[2] && d[2]===d[3])) return 'elite';
+    const niceList = ['1000','2000','3000','4000','5000','6000','7000','8000','9000',
+                      '1234','2345','3456','4567','5678','6789',
+                      '9876','8765','7654','6543','5432','4321'];
+    if(niceList.includes(d)) return 'nice';
+    return null;
+  }
+
+  if(countryCode === 'KZ'){
+    // формат: 123 ABC 01
+    const m = rest.match(/^(\d{3})\s([А-Я]{3})\s(\d{2})$/);
+    if(!m) return null;
+    const d = m[1], l = m[2], region = m[3];
+    const allSameD = d[0]===d[1] && d[1]===d[2];
+    const allSameL = l[0]===l[1] && l[1]===l[2];
+    if(allSameD && allSameL && region === d[0]+d[0]) return 'legendary';
+    if(allSameD || allSameL) return 'super';
+    if(d[0]===d[1] || d[1]===d[2]) return 'elite';
+    const niceList = ['100','200','300','400','500','600','700','800','900','007'];
+    if(niceList.includes(d)) return 'nice';
+    return null;
+  }
+
+  if(countryCode === 'FIN'){
+    // формат: ABC-123
+    const m = rest.match(/^([А-Я]{3})-(\d{3})$/);
+    if(!m) return null;
+    const l = m[1], d = m[2];
+    const allSameL = l[0]===l[1] && l[1]===l[2];
+    const allSameD = d[0]===d[1] && d[1]===d[2];
+    if(allSameL && allSameD) return 'legendary';
+    if(allSameL || allSameD) return 'super';
+    const twoL = l[0]===l[1] || l[1]===l[2] || l[0]===l[2];
+    const twoD = d[0]===d[1] || d[1]===d[2] || d[0]===d[2];
+    if(twoL || twoD) return 'elite';
+    const niceList = ['100','200','500','007',
+                      '123','321','234','432','345','543',
+                      '456','654','567','765','678','876','789','987'];
+    if(niceList.includes(d)) return 'nice';
+    return null;
+  }
+
+  if(countryCode === 'CN'){
+    // формат: 京A·12345
+    const m = rest.match(/^京([A-Z])·(\d{5})$/);
+    if(!m) return null;
+    const d = m[2];
+    const allSame = d.split('').every(c => c === d[0]);
+    if(allSame){
+      return d === '44444' ? 'elite' : 'legendary';
+    }
+    const counts = {};
+    for(const c of d) counts[c] = (counts[c] || 0) + 1;
+    const maxCount = Math.max(...Object.values(counts));
+    const fours = (d.match(/4/g) || []).length;
+    const penalty = fours >= 3 ? -1 : 0;
+    const rank = ['normal','nice','elite','super','legendary'];
+    const bump = (base) => rank[Math.max(0, rank.indexOf(base) + penalty)];
+    if(maxCount >= 4) return bump('super');
+    if(maxCount === 3) return bump('elite');
+    if(d === '12345' || d === '54321') return 'nice';
+    if(d[0]===d[4] && d[1]===d[3]) return 'elite';
+    if(/^0{4}[1-9]$/.test(d) || d === '00010') return 'nice';
+    return null;
+  }
+
+  return null;
+}
 function generatePlate(cityIdx, isReReg){
   // Списываем заряд буста, если активен
   if(S.plateBoost && S.plateBoost.rollsLeft > 0){
@@ -1461,17 +1544,14 @@ function generatePlate(cityIdx, isReReg){
     level = rollPlateLevel(isReReg, isIntl);
     text = genPlateText(level, cityIdx);
   }
-    // === Пересчёт уровня по тексту (только повышение) ===
-  if(!isIntl){
-    const textLevel = evaluatePlateLevel(text);
-    if(textLevel){
-      const order = {normal:0, nice:1, elite:2, super:3, legendary:4};
-      if((order[textLevel]||0) > (order[level]||0)){
-        level = textLevel;
-      }
-    }
+       // === Пересчёт уровня по тексту (только повышение) ===
+  const levelOrder = {normal:0, nice:1, elite:2, super:3, legendary:4};
+  const textLevel = isIntl
+    ? evaluateForeignPlate(text, code)
+    : evaluatePlateLevel(text);
+  if(textLevel && (levelOrder[textLevel]||0) > (levelOrder[level]||0)){
+    level = textLevel;
   }
-
   return {text, level, regionCode: code, registeredAt: S.gameTime};
 }
 
