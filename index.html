@@ -1294,27 +1294,42 @@ function plateRndLetter(){return PLATE_LETTERS[Math.floor(Math.random()*PLATE_LE
 function plateRndDigit(){return String(Math.floor(Math.random()*10));}
 
 function rollPlateLevel(isReReg, isIntl){
-  // Международные: без super/legendary
+  // Международные: бусты не применяются
   if(isIntl){
     const r = Math.random()*100;
     if(r < 5) return 'elite';
     if(r < 30) return 'nice';
     return 'normal';
   }
-  const r = Math.random()*100;
+  // Активен ли буст «задобрить сотрудника»?
+  const M = (S.plateBoost && S.plateBoost.rollsLeft > 0) ? S.plateBoost.multiplier : 1;
+  let pLeg, pSup, pEl, pNic;
   if(isReReg){
-    if(r < 0.05) return 'legendary';
-    if(r < 0.50) return 'super';
-    if(r < 3.00) return 'elite';
-    if(r < 15.50) return 'nice';
-    return 'normal';
+    pLeg = 0.05 * M;
+    pSup = 0.45 * M;
+    pEl  = 2.50 * M;
+    pNic = 12.50;
   } else {
-    if(r < 0.10) return 'legendary';
-    if(r < 1.00) return 'super';
-    if(r < 6.00) return 'elite';
-    if(r < 31.00) return 'nice';
-    return 'normal';
+    pLeg = 0.10 * M;
+    pSup = 0.90 * M;
+    pEl  = 5.00 * M;
+    pNic = 25.00;
   }
+  // Ограничиваем, чтобы топ-уровни не съели всё место
+  const cap = 100 - pNic - 5;
+  const total = pLeg + pSup + pEl;
+  if(total > cap){
+    const k = cap / total;
+    pLeg *= k; pSup *= k; pEl *= k;
+  }
+  const r = Math.random()*100;
+  let acc = 0;
+  acc += pLeg; if(r < acc) return 'legendary';
+  acc += pSup; if(r < acc) return 'super';
+  acc += pEl;  if(r < acc) return 'elite';
+  acc += pNic; if(r < acc) return 'nice';
+  return 'normal';
+}
 }
 
 function makeNiceDigits(){
@@ -1424,10 +1439,19 @@ function evaluatePlateLevel(text){
   return 'normal';
 }
 function generatePlate(cityIdx, isReReg){
+  // Списываем заряд буста, если активен
+  if(S.plateBoost && S.plateBoost.rollsLeft > 0){
+    S.plateBoost.rollsLeft--;
+    if(S.plateBoost.rollsLeft === 0){
+      S.plateBoost.multiplier = 1;
+      toast('🎁 Услуга «задобрить сотрудника» закончилась','info');
+    }
+  }
   const code = CITY_REGION_CODE[cityIdx];
   const isIntl = typeof code === 'string';
   let level = rollPlateLevel(isReReg, isIntl);
   let text = genPlateText(level, cityIdx);
+  ...
   const taken = new Set();
   for(const v of S.ownedVehicles){
     if(v.plate && v.plate.text) taken.add(v.plate.text);
@@ -1505,10 +1529,11 @@ const S = {
   driverStatsOpen:{},
   lastNominationDay:0,
   nomination:null,
-  pendingEvents:[],
-   lastCityEventDay:0,
-  rateBonusUntil:0,
-  loan:null,
+pendingEvents:[],
+ lastCityEventDay:0,
+rateBonusUntil:0,
+loan:null,
+plateBoost:{rollsLeft:0, multiplier:1},
   };
 let COMPETITORS = [
   // Локальные — 1 база в одном городе, уровень covered
@@ -2466,7 +2491,7 @@ function ensureInsurance(inst){if(!inst.insurance)inst.insurance={osago:false,os
     html += `<div class="row" style="padding:2px 0"><span>${c.n}</span><b>${c.p}</b></div>`;
   }
   html += `</div>
-    <div class="card" style="font-size:11px;margin-top:6px">
+      <div class="card" style="font-size:11px;margin-top:6px">
       <div class="muted" style="margin-bottom:4px">Влияние на остановки ГИБДД:</div>
       <div class="row"><span>🚫 Без номера</span><b style="color:#ff8d99">×2.0</b></div>
       <div class="row"><span>😐 Обычный</span><b>×1.0</b></div>
@@ -2475,13 +2500,56 @@ function ensureInsurance(inst){if(!inst.insurance)inst.insurance={osago:false,os
       <div class="row"><span>👑 Супер-блатной</span><b style="color:#5ef0a0">×0.2</b></div>
       <div class="row"><span>⭐ Легендарный</span><b style="color:#5ef0a0">×0.0 в своём регионе</b></div>
     </div>
+
+    <h3 style="margin-top:10px">🎁 Задобрить сотрудника</h3>
+    <div class="card" style="font-size:11px">
+      ${S.plateBoost && S.plateBoost.rollsLeft > 0
+        ? `<div class="row" style="margin-bottom:6px">
+             <b style="color:#5ef0a0">🎁 Услуга активна</b>
+             <b style="color:#5ef0a0">×${S.plateBoost.multiplier} · осталось ${S.plateBoost.rollsLeft} кр.</b>
+           </div>`
+        : `<div class="muted" style="margin-bottom:6px">Временный буст к шансам на редкие номера. Действует N прокруток.</div>`}
+      <button class="wide gold" data-bribe="1" style="text-align:left;padding:8px 10px">
+        💵 1 000 000 ₽ · ×2 на 5 прокруток
+      </button>
+      <button class="wide gold" data-bribe="2" style="text-align:left;padding:8px 10px;margin-top:4px">
+        💵 10 000 000 ₽ · ×3 на 10 прокруток
+      </button>
+      <button class="wide gold" data-bribe="3" style="text-align:left;padding:8px 10px;margin-top:4px">
+        💵 25 000 000 ₽ · ×4.5 на 15 прокруток
+      </button>
+    </div>
+
     <div style="display:flex;gap:8px;margin-top:8px">
       <button id="plateYes" class="gold" style="flex:1">${isReReg?'Сменить':'Поставить'} · ${fmt(cost)} ₽</button>
       <button id="plateNo" class="ok" style="flex:1">Отмена</button>
     </div>`;
-  Modal._render(html);
+   Modal._render(html);
   $('plateNo').onclick = ()=>Modal.next();
   $('plateYes').onclick = ()=>doReroll();
+
+  // Задобрить сотрудника
+  const BRIBE_TIERS = {
+    1: { price: 1000000,  mult: 2.0, rolls: 5  },
+    2: { price: 10000000, mult: 3.0, rolls: 10 },
+    3: { price: 25000000, mult: 4.5, rolls: 15 },
+  };
+  $('modalBox').querySelectorAll('[data-bribe]').forEach(b=>{
+    b.onclick = ()=>{
+      const cfg = BRIBE_TIERS[+b.dataset.bribe];
+      if(!cfg) return;
+      if(S.money < cfg.price){
+        toast(`Нужно ${fmt(cfg.price)} ₽`, 'bad');
+        return;
+      }
+      moneySpend(cfg.price, `Задобрить сотрудника ГИБДД`);
+      S.plateBoost = { rollsLeft: cfg.rolls, multiplier: cfg.mult };
+      toast(`🎁 Услуга активирована · ×${cfg.mult} на ${cfg.rolls} прокруток`, 'ok');
+      addNews(`🎁 Задобрил сотрудника: ×${cfg.mult} на ${cfg.rolls} номеров`, 'info', 'activity');
+      // Переоткрываем модалку, чтобы обновилась плашка статуса
+      setTimeout(()=>openPlateModal(vehicleId, isReReg), 100);
+    };
+  });
 }
 function openInsuranceModal(vehicleId){
   if(!S.ownedVehicles.length){toast('Нет машин','bad');return;}
