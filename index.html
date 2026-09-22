@@ -2458,6 +2458,7 @@ function ensureInsurance(inst){if(!inst.insurance)inst.insurance={osago:false,os
     inst.plate = newPlate;
     const lv = PLATE_LEVELS[newPlate.level];
     addNews(`${lv.icon} ${VEHICLES[inst.model].n} · номер ${newPlate.text}`, 'info', 'activity');
+      const boostActive = S.plateBoost && S.plateBoost.rollsLeft > 0;
     const rHtml = `<h2>${lv.icon} ${lv.n} номер!</h2>
       <p>Ваш новый номер:</p>
       <div style="text-align:center;padding:16px 0">
@@ -2467,6 +2468,14 @@ function ensureInsurance(inst){if(!inst.insurance)inst.insurance={osago:false,os
         <div class="muted">Шанс остановки ГИБДД: <b style="color:#5ef0a0">×${lv.stopMul.toFixed(1)}</b></div>
         <div class="muted" style="margin-top:4px">В кошельке: <b>${fmt(S.money)} ₽</b></div>
       </div>
+      ${boostActive ? `
+        <div class="card" style="font-size:12px;margin-top:6px;background:#0e1e17;border-color:#1f6b46">
+          <div class="row">
+            <b style="color:#5ef0a0">🎁 Услуга активна</b>
+            <b style="color:#5ef0a0">×${S.plateBoost.multiplier} · осталось ${S.plateBoost.rollsLeft} попыток</b>
+          </div>
+        </div>
+      ` : ''}
       <div style="display:flex;gap:8px;margin-top:8px">
         <button id="plateReroll" class="gold" style="flex:1">🔄 Ещё раз · ${fmt(cost)} ₽</button>
         <button id="plateOk" class="primary" style="flex:1">Готово</button>
