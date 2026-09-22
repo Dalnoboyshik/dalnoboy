@@ -1574,12 +1574,28 @@ function vehCons(inst){
   return base*season.fuelMul*(1+S.achEffects.fuel)*overloadMul;
 }
 function vehTank(inst){return Math.round(VEHICLES[inst.model].tank*(1+upLevel(inst,'tank')*0.25));}
+/* Плановый интервал: твой override → общий по фирме → заводской.
+   Используется для напоминаний, авто-ТО у водителей и UI. */
 function serviceIntervalOf(inst){
   const v=VEHICLES[inst.model];
   const base=v?v.serviceInterval:0;
   return inst.serviceIntervalOverride || S.autoServiceInterval || base || 0;
 }
+/* Заводской интервал: жёсткий физический порог.
+   От него считаются износ, штраф и стоимость ТО. */
+function factoryIntervalOf(inst){
+  const v=VEHICLES[inst.model];
+  return v && v.serviceInterval ? v.serviceInterval : 0;
+}
+/* Физическая просрочка — превысил заводской порог. За это штраф. */
 function serviceOverdue(inst){
+  const interval=factoryIntervalOf(inst);
+  if(!interval)return 0;
+  const since=(inst.odometer||0)-(inst.lastServiceOdometer||0);
+  return Math.max(0, since-interval);
+}
+/* Плановая просрочка — превысил свой/фирменный интервал. Только напоминание. */
+function plannedOverdue(inst){
   const interval=serviceIntervalOf(inst);
   if(!interval)return 0;
   const since=(inst.odometer||0)-(inst.lastServiceOdometer||0);
@@ -1614,19 +1630,20 @@ function applyServiceEffect(inst, overdue){
   const base=v.maxKm||500000;
   const cap=base*2;
   const floor=base*0.3;
-  const interval=serviceIntervalOf(inst)||10000;
+  const planInterval=serviceIntervalOf(inst)||10000;
+  const factoryInterval=factoryIntervalOf(inst)||10000;
   const baseInterval=v.serviceInterval||10000;
-  // Отклонение от регламента: 1.0 = заводской, 0.5 = вдвое чаще, 1.5 = вдвое реже
-  const mult=clamp(interval/baseInterval, 0.5, 1.5);
 
   if(overdue<=0){
-    // Бонус за дисциплину: 0.5× → +6.5%, 1.0× → +2%, 1.5× → −2.5%
+    // Бонус считается от ТВОЕГО плана — чем чаще ТО, тем больше бонус
+    const mult=clamp(planInterval/baseInterval, 0.5, 1.5);
     const bonusPct = 0.02 - (mult - 1.0) * 0.09;
     const delta = Math.round(base * bonusPct);
     inst.maxKm = clamp(inst.maxKm + delta, floor, cap);
     inst.lastServiceTier = bonusPct >= 0 ? 'good' : 'warn';
   } else {
-    const tier=Math.min(3, Math.floor(overdue/interval)+1);
+    // Штраф считается от ЗАВОДСКОГО интервала
+    const tier=Math.min(3, Math.floor(overdue/factoryInterval)+1);
     inst.maxKm=Math.max(floor, Math.round((inst.maxKm||base)-base*0.05*tier));
     inst.lastServiceTier = 'bad';
   }
@@ -1643,7 +1660,7 @@ function resourceDepleted(inst){
 function serviceCost(inst, driver){
   const v=VEHICLES[inst.model];
   const od=serviceOverdue(inst);
-  const interval=serviceIntervalOf(inst)||10000;
+ const interval=factoryIntervalOf(inst)||10000;
   let cost = v.repairFull*0.05*(1+od/interval);
   if(driver){
     cost *= driverBaseRepairMul(driver);
@@ -4214,9 +4231,10 @@ function driverStatsBlock(d){
   if(v){
     const odo2=v.odometer||0;
     const maxK=getInstMaxKm(v);
-    const sinceS2=(v.odometer||0)-(v.lastServiceOdometer||0);
-    const interval2=serviceIntervalOf(v)||30000;
-    const od2=serviceOverdue(v);
+const sinceS2=(v.odometer||0)-(v.lastServiceOdometer||0);
+const interval2=serviceIntervalOf(v)||30000;
+const physicalOd2=serviceOverdue(v);
+const plannedOd2=plannedOverdue(v);
     const w2=Math.round(v.wear);
     const odoPct=Math.min(100,(odo2/maxK)*100);
     const sPct=Math.min(100,(sinceS2/interval2)*100);
@@ -4224,8 +4242,8 @@ function driverStatsBlock(d){
       <div class="drv-stats">
         <div class="ln"><span>🚗 Ресурс</span><b>${fmt(odo2)} / ${fmt(maxK)} км</b></div>
         <div class="bar" style="margin-top:2px"><i style="width:${odoPct}%;background:${odoPct>80?'#ff6b6b':odoPct>60?'#ffb84d':'#39d98a'}"></i></div>
-        <div class="ln" style="margin-top:6px"><span>🛠 ТО</span><b style="color:${od2>0?'#ff8d99':(sinceS2>=interval2*0.7?'#ffb84d':'#5ef0a0')}">${fmt(sinceS2)} / ${fmt(interval2)} км</b></div>
-        <div class="bar" style="margin-top:2px"><i style="width:${sPct}%;background:${od2>0?'#ff6b6b':sPct>80?'#ffb84d':'#39d98a'}"></i></div>
+ <div class="ln" style="margin-top:6px"><span>🛠 ТО</span><b style="color:${physicalOd2>0?'#ff8d99':(plannedOd2>0||sinceS2>=interval2*0.7?'#ffb84d':'#5ef0a0')}">${fmt(sinceS2)} / ${fmt(interval2)} км${physicalOd2>0?' ⚠️':plannedOd2>0?' ⏰':''}</b></div>
+        <div class="bar" style="margin-top:2px"><i style="width:${sPct}%;background:${physicalOd2>0?'#ff6b6b':(plannedOd2>0||sPct>80)?'#ffb84d':'#39d98a'}"></i></div>
               <div class="ln" style="margin-top:6px"><span>🛠 До ремонта</span><b style="color:${(100-w2)<=20?'#ff8d99':(100-w2)<=50?'#ffb84d':'#5ef0a0'}">${100-w2}%</b></div>
         <div class="bar" style="margin-top:2px"><i style="width:${100-w2}%;background:${(100-w2)<=20?'#ff6b6b':(100-w2)<=50?'#ffb84d':'#39d98a'}"></i></div>
       </div>`;
@@ -5864,28 +5882,38 @@ function autoCurrentContent(){
   </div>`:''}
    <h3>Ресурс и ТО</h3>
  
+   
+ 
      ${(()=>{
     const vv=VEHICLES[inst.model];
-    const interval=serviceIntervalOf(inst);
-    if(!interval) return `<div class="card"><div class="muted">Для этой машины ТО не предусмотрено</div></div>`;
+    const plannedInt = serviceIntervalOf(inst);
+    const factoryInt = factoryIntervalOf(inst);
+    if(!plannedInt && !factoryInt) return `<div class="card"><div class="muted">Для этой машины ТО не предусмотрено</div></div>`;
     const maxKm=getInstMaxKm(inst);
     const odoPct=Math.min(100,(odo/maxKm)*100);
     const sinceS=(inst.odometer||0)-(inst.lastServiceOdometer||0);
-    const od=serviceOverdue(inst);
-    const servicePct=Math.min(100,(sinceS/interval)*100);
+    const plannedOd = plannedOverdue(inst);
+    const physicalOd = serviceOverdue(inst);
+    const plannedPct = plannedInt ? Math.min(100,(sinceS/plannedInt)*100) : 0;
+    const factoryPct = factoryInt ? Math.min(100,(sinceS/factoryInt)*100) : 0;
     const odoColor = odoPct>80?'#ff6b6b':odoPct>60?'#ffb84d':'#39d98a';
-    const sColor = od>0?'#ff6b6b':servicePct>80?'#ffb84d':'#39d98a';
+    const plannedColor = plannedOd>0?'#ffb84d':plannedPct>80?'#ffb84d':'#39d98a';
+    const factoryColor = physicalOd>0?'#ff6b6b':factoryPct>80?'#ffb84d':'#39d98a';
     const bonusPct = Math.round(((maxKm/(vv.maxKm||maxKm))-1)*100);
     return `<div class="card">
       <div class="row"><span class="muted">🚗 Ресурс</span><b style="color:${odoColor}">${fmt(odo)} / ${fmt(maxKm)} км</b></div>
       <div class="bar"><i style="width:${odoPct}%;background:${odoColor}"></i></div>
-     ${bonusPct!==0?`<div class="muted" style="font-size:10px;margin-top:4px">Качество сборки: <b style="color:${bonusPct>0?'#5ef0a0':'#ff8d99'}">${bonusPct>0?'+':''}${bonusPct}%</b> ${bonusPct>0?'(удачная машина)':'(не повезло с завода)'}</div>`:''}
-      <div class="row" style="margin-top:8px"><span class="muted">🛠 ТО</span><b style="color:${sColor}">${fmt(sinceS)} / ${fmt(interval)} км</b></div>
-      <div class="bar"><i style="width:${servicePct}%;background:${sColor}"></i></div>
-      ${od>0?`<div class="muted" style="color:#ff6b6b;margin-top:6px;font-size:11px">⚠️ Просрочка ${fmt(od)} км — износ ×${servicePenalty(inst).toFixed(1)}</div>`:''}
+      ${bonusPct!==0?`<div class="muted" style="font-size:10px;margin-top:4px">Качество сборки: <b style="color:${bonusPct>0?'#5ef0a0':'#ff8d99'}">${bonusPct>0?'+':''}${bonusPct}%</b> ${bonusPct>0?'(удачная машина)':'(не повезло с завода)'}</div>`:''}
+      <div class="row" style="margin-top:10px"><span class="muted">🛠 ТО по твоему плану</span><b style="color:${plannedColor}">${fmt(sinceS)} / ${fmt(plannedInt)} км</b></div>
+      <div class="bar"><i style="width:${plannedPct}%;background:${plannedColor}"></i></div>
+      <div class="muted" style="font-size:10px;margin-top:3px">${plannedOd>0?`<span style="color:#ffb84d">⏰ Пора делать ТО (+${fmt(plannedOd)} км сверх плана)</span>`:'<span style="color:#8ba0bd">Плановое обслуживание в норме</span>'}</div>
+      <div class="row" style="margin-top:10px"><span class="muted">⚠️ Заводской регламент</span><b style="color:${factoryColor}">${fmt(sinceS)} / ${fmt(factoryInt)} км</b></div>
+      <div class="bar"><i style="width:${factoryPct}%;background:${factoryColor}"></i></div>
+      <div class="muted" style="font-size:10px;margin-top:3px">${physicalOd>0?`<span style="color:#ff6b6b">🔴 Просрочка! Износ ×${servicePenalty(inst).toFixed(1)}, ресурс падает</span>`:'<span style="color:#8ba0bd">Заводской регламент соблюдён</span>'}</div>
     </div>`;
   })()}
   <h3>Обслуживание</h3>
+ 
   <div class="card">
     <div class="row"><span class="muted">⛽ Топливо</span><b>${Math.round(fuel)} / ${vehTank(inst)} л</b></div>
     <div class="bar"><i style="width:${(fuel/vehTank(inst)*100)}%;background:linear-gradient(90deg,#ffb84d,#39d98a)"></i></div>
@@ -6154,19 +6182,20 @@ function vehTileHTML(i, busy){
   const w = Math.round(i.wear||0);
   const odo = i.odometer||0;
   const maxK = getInstMaxKm(i);
-  const sinceS = (i.odometer||0) - (i.lastServiceOdometer||0);
-  const interval = serviceIntervalOf(i) || 30000;
-  const od = serviceOverdue(i);
-  const odoPct = Math.min(100, (odo/Math.max(1,maxK))*100);
-  const sPct = Math.min(100, (sinceS/interval)*100);
-  const odoCol = odoPct>80?'#ff6b6b':odoPct>60?'#ffb84d':'#39d98a';
-  const sCol = od>0?'#ff6b6b':sPct>80?'#ffb84d':'#39d98a';
+ const sinceS = (i.odometer||0) - (i.lastServiceOdometer||0);
+const interval = serviceIntervalOf(i) || 30000;
+const physicalOd = serviceOverdue(i);
+const plannedOd = plannedOverdue(i);
+const odoPct = Math.min(100, (odo/Math.max(1,maxK))*100);
+const sPct = Math.min(100, (sinceS/interval)*100);
+const odoCol = odoPct>80?'#ff6b6b':odoPct>60?'#ffb84d':'#39d98a';
+const sCol = physicalOd>0 ? '#ff6b6b' : (plannedOd>0 || sPct>80) ? '#ffb84d' : '#39d98a';
     const cond = 100 - w;
   const wCol = cond<=10?'#ff6b6b':cond<=50?'#ffb84d':'#39d98a';
 
   const cat = vehCategory(i.model);
   const isPrem = (cat==='tractor') || (cat==='car' && ov.price>=1000000);
-  const isDanger = w>=90 || odoPct>=95 || od>0;
+  const isDanger = w>=90 || odoPct>=95 || physicalOd>0;
   const isPicked = !!(massMode && massSelected[i.id]);
    const canSelectForMass = !i.lease && !(S.loan && S.loan.vehicleId===i.id) && !isCur && w<95;
 
@@ -6291,7 +6320,7 @@ function vehTileHTML(i, busy){
         <div class="bar"><i style="width:${odoPct}%;background:${odoCol}"></i></div>
       </div>
       <div class="vbar">
-        <div class="lbl"><span>🛠 ТО</span><b style="color:${sCol}">${od>0?'просрочка':Math.round(sPct)+'%'}</b></div>
+        <div class="lbl"><span>🛠 ТО</span><b style="color:${sCol}">${physicalOd>0?'просрочка':plannedOd>0?'пора':Math.round(sPct)+'%'}</b></div>
         <div class="bar"><i style="width:${sPct}%;background:${sCol}"></i></div>
       </div>
            <div class="vbar">
@@ -8102,9 +8131,12 @@ const CODEX=[
    {id:'wear80',icon:'🛠',title:'До ремонта 20%',
    text:'Машина скоро попросит сервиса. Загляни в «Авто» → «Ремонт», пока не поздно.',
    when:s=>hasVehicle()&&curWear()>=80},
-  {id:'serviceOverdue',icon:'🛠',title:'ТО просрочено',
-   text:'Ресурс и ТО — разные вещи. Просрочил ТО — износ идёт быстрее. Сделай ТО в «Авто».',
-   when:s=>{const v=curVehInst();return v&&serviceOverdue(v)>0;}},
+{id:'serviceOverdue',icon:'🛠',title:'ТО просрочено',
+ text:'Твой план ТО — напоминание. А вот заводской регламент — жёсткий: перешёл его, износ ускоряется, ресурс падает. Сделай ТО в «Авто».',
+ when:s=>{const v=curVehInst();return v&&serviceOverdue(v)>0;}},
+{id:'serviceDue',icon:'⏰',title:'Пора делать ТО',
+ text:'Ты подошёл к своему интервалу ТО. Это только напоминание — штрафа нет, пока не перешёл заводской регламент. Но ресурс растёт за дисциплину.',
+ when:s=>{const v=curVehInst();return v&&plannedOverdue(v)>0&&serviceOverdue(v)<=0;}},
 	{id:'resourceLow',icon:'🕰️',title:'Ресурс машины на исходе',
  text:'Пробег подходит к концу ресурса. Когда счётчик дойдёт до нуля — машина встанет навсегда, отремонтировать её будет нельзя. Продай заранее или подготовь замену.',
  when:s=>{const v=curVehInst();return v && !resourceDepleted(v) && resourceRemainPct(v)<0.2;}},
