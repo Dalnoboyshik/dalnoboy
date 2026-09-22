@@ -2692,6 +2692,206 @@ function openLeaseModal(model){
   }
   render();
 }
+	/* ============ ОБНОВЛЕНИЕ ПАРКА 1:1 ============ */
+function computeSellPriceForRenew(inst){
+  const v = VEHICLES[inst.model];
+  if(!v) return 0;
+  const w = inst.wear||0, odo = inst.odometer||0;
+  const maxKm = getInstMaxKm(inst);
+  const remainPct = Math.max(0, 1 - odo/maxKm);
+  let resK;
+  if(remainPct>0.6) resK = 1.0;
+  else if(remainPct>0.4) resK = 0.85;
+  else if(remainPct>0.2) resK = 0.6;
+  else if(remainPct>0.05) resK = 0.3;
+  else resK = 0.1;
+  const bp = v.sellPrice || Math.round((v.price||50000)*0.7);
+  const basePrice = Math.round(bp*resK);
+  const repairCost = Math.round(v.repairFull*(w/100));
+  return Math.max(0, basePrice - repairCost);
+}
+
+function computeRenewBuyPrice(model, count){
+  const base = model.price;
+  const achDisc = S.achEffects.buy || 0;
+  const afterAch = base * (1 - achDisc);
+  const hasDealer = S.bases.some(b => b.businesses.includes('dealer'));
+  const afterDealer = hasDealer ? afterAch * 0.85 : afterAch;
+  let bulk = 0;
+  if(count >= 10) bulk = 0.12;
+  else if(count >= 6) bulk = 0.08;
+  else if(count >= 4) bulk = 0.05;
+  else if(count >= 2) bulk = 0.03;
+  const perUnit = Math.round(afterDealer * (1 - bulk));
+  return {
+    base, afterAch: Math.round(afterAch), achDisc,
+    afterDealer: Math.round(afterDealer),
+    dealerDisc: hasDealer ? 0.15 : 0, hasDealer,
+    bulkDisc: bulk, perUnit, total: perUnit * count
+  };
+}
+
+function openMassRenewModal(){
+  if(S.truck.traveling){ toast('🚫 В пути нельзя','bad'); return; }
+  const ids = Object.keys(massSelected).filter(k => massSelected[k]);
+  if(!ids.length){ toast('Ничего не выбрано','warn'); return; }
+  const selected = ids.map(id => getVeh(id))
+    .filter(v => v && !v.lease && !(S.loan && S.loan.vehicleId === v.id));
+  if(!selected.length){ toast('Нет подходящих машин','warn'); return; }
+
+  const groups = {};
+  for(const v of selected){
+    if(!groups[v.model]) groups[v.model] = [];
+    groups[v.model].push(v);
+  }
+
+  renderMassRenewModal(groups);
+  $('modal').classList.add('show');
+}
+
+function renderMassRenewModal(groups){
+  const totalCount = Object.keys(groups).reduce((s,k) => s + groups[k].length, 0);
+  const hasDealer = S.bases.some(b => b.businesses.includes('dealer'));
+  const achDisc = S.achEffects.buy || 0;
+
+  let html = `<h2>🔄 Обновление парка</h2>
+    <p>Заменяем на такие же машины — свежие, с нулевым пробегом.</p>`;
+
+  const discParts = [];
+  if(achDisc > 0) discParts.push(`🎖️ Ачивка −${Math.round(achDisc*100)}%`);
+  if(hasDealer) discParts.push(`🏬 Автосалон −15%`);
+  discParts.push(`📦 Опт: 2–3→−3%, 4–5→−5%, 6–9→−8%, 10+→−12%`);
+  html += `<div class="card" style="font-size:11px;line-height:1.5;background:#101c2f;border-left:3px solid #4da3ff;margin-bottom:10px">
+    ${discParts.join(' · ')}
+  </div>`;
+
+  let totalSell = 0, totalBuy = 0;
+
+  for(const modelId of Object.keys(groups)){
+    const list = groups[modelId];
+    const count = list.length;
+    const model = VEHICLES[modelId];
+    if(!model) continue;
+
+    const sellPrice = list.reduce((s,v) => s + computeSellPriceForRenew(v), 0);
+    totalSell += sellPrice;
+
+    const priceInfo = computeRenewBuyPrice(model, count);
+    totalBuy += priceInfo.total;
+
+    let cntIns = 0, cntUp = 0, cntDrv = 0, cntPlt = 0;
+    for(const v of list){
+      if(hasOsago(v) || hasKasko(v)) cntIns++;
+      if(v.upgrades && Object.keys(v.upgrades).length) cntUp++;
+      if(S.drivers.some(d => d.vehicleId === v.id)) cntDrv++;
+      if(v.plate) cntPlt++;
+    }
+
+    let breakdown = `<div style="background:#0a1119;border:1px solid #1e2c3f;border-radius:8px;padding:10px 12px;margin-top:8px;font-size:11.5px">`;
+    breakdown += `<div class="row" style="padding:3px 0;font-size:11.5px"><span class="muted">Базовая цена</span><b>${fmt(priceInfo.base)} ₽</b></div>`;
+    if(priceInfo.achDisc > 0) breakdown += `<div class="row" style="padding:3px 0;font-size:11.5px"><span class="muted">🎖️ Ачивка −${Math.round(priceInfo.achDisc*100)}%</span><b style="color:#5ef0a0">−${fmt(priceInfo.base - priceInfo.afterAch)} ₽</b></div>`;
+    if(priceInfo.hasDealer) breakdown += `<div class="row" style="padding:3px 0;font-size:11.5px"><span class="muted">🏬 Автосалон −15%</span><b style="color:#5ef0a0">−${fmt(priceInfo.afterAch - priceInfo.afterDealer)} ₽</b></div>`;
+    if(priceInfo.bulkDisc > 0) breakdown += `<div class="row" style="padding:3px 0;font-size:11.5px"><span class="muted">📦 Опт ×${count} (−${Math.round(priceInfo.bulkDisc*100)}%)</span><b style="color:#5ef0a0">−${fmt(priceInfo.afterDealer - priceInfo.perUnit)} ₽</b></div>`;
+    breakdown += `<div class="row" style="padding:6px 0 3px;border-top:1px solid #1e2c3f;margin-top:5px;font-size:12.5px"><span>Итого за штуку</span><b style="color:#ffd479">${fmt(priceInfo.perUnit)} ₽</b></div>`;
+    breakdown += `<div class="row" style="padding:3px 0;font-size:12.5px"><span>× ${count} шт</span><b style="color:#ff8d99">${fmt(priceInfo.total)} ₽</b></div>`;
+    breakdown += `</div>`;
+
+    html += `<div class="card" style="margin-bottom:10px">
+      <div class="row" style="margin-bottom:10px">
+        <span style="font-size:13px;font-weight:700">${model.icon} ${model.n}</span>
+        <span class="muted" style="font-size:11px">× ${count}</span>
+      </div>
+      <div class="row" style="padding:4px 0;font-size:12px"><span class="muted">💸 Продажа старых</span><b style="color:#5ef0a0">+ ${fmt(sellPrice)} ₽</b></div>
+      ${breakdown}
+      ${cntDrv > 0 ? `<div style="background:#101c2f;border:1px solid #2f4a75;border-left:3px solid #7ad6ff;border-radius:8px;padding:8px 12px;margin-top:8px;font-size:11px;color:#cfe0f5;line-height:1.5">👷 <b style="color:#7ad6ff">${cntDrv}</b> водител${cntDrv===1?'ь':'ей'} пересадятся автоматически</div>` : ''}
+      ${cntPlt > 0 ? `<div style="background:#101c2f;border:1px solid #2f4a75;border-left:3px solid #7ad6ff;border-radius:8px;padding:8px 12px;margin-top:6px;font-size:11px;color:#cfe0f5;line-height:1.5">🎫 <b style="color:#7ad6ff">${cntPlt}</b> номер${cntPlt===1?'':'а'} перейдут бесплатно</div>` : ''}
+      ${cntUp > 0 ? `<div style="background:#101c2f;border:1px solid #2f4a75;border-left:3px solid #7ad6ff;border-radius:8px;padding:8px 12px;margin-top:6px;font-size:11px;color:#cfe0f5;line-height:1.5">⚙️ <b style="color:#7ad6ff">${cntUp}</b> машин с апгрейдами — они перейдут на новые</div>` : ''}
+      ${cntIns > 0 ? `<div style="background:#101c2f;border:1px solid #2f4a75;border-left:3px solid #ffb84d;border-radius:8px;padding:8px 12px;margin-top:6px;font-size:11px;color:#cfe0f5;line-height:1.5">🛡️ <b style="color:#ffb84d">${cntIns}</b> машин с активной страховкой — она <b style="color:#ff8d99">не переносится</b></div>` : ''}
+    </div>`;
+  }
+
+  const diff = totalSell - totalBuy;
+  const after = S.money + diff;
+  const canAfford = after >= 0;
+
+  html += `<div class="card" style="margin-top:8px">
+    <div class="row" style="padding:5px 0"><span class="muted">Продажа старых</span><b style="color:#5ef0a0">+ ${fmt(totalSell)} ₽</b></div>
+    <div class="row" style="padding:5px 0"><span class="muted">Покупка новых</span><b style="color:#ff8d99">− ${fmt(totalBuy)} ₽</b></div>
+    <div class="row" style="padding:10px 0 5px;border-top:1px solid #1e2c3f;margin-top:6px;font-size:15px">
+      <span>Итого:</span>
+      <b style="color:${diff >= 0 ? '#5ef0a0' : '#ff8d99'};font-size:17px">${diff >= 0 ? '+' : '−'} ${fmt(Math.abs(diff))} ₽</b>
+    </div>
+    <div class="row" style="padding:5px 0"><span class="muted">В кошельке</span><b>${fmt(S.money)} ₽</b></div>
+    <div class="row" style="padding:5px 0"><span class="muted">Останется</span><b style="color:${after >= 0 ? '#5ef0a0' : '#ff8d99'}">${fmt(after)} ₽</b></div>
+  </div>`;
+
+  html += `<div style="display:flex;gap:8px;margin-top:12px">
+    <button class="ok" id="renewConfirmBtn" style="flex:1;padding:12px;font-size:13px;font-weight:600" ${canAfford ? '' : 'disabled'}>
+      🔄 Обновить ${totalCount} машин
+    </button>
+    <button class="bad" id="renewCancelBtn" style="flex:1;padding:12px;font-size:13px;font-weight:600">Отмена</button>
+  </div>`;
+
+  $('modalBox').innerHTML = html;
+  $('renewCancelBtn').onclick = () => { Modal.next(); updateUI(); };
+  const cb = $('renewConfirmBtn');
+  if(cb && !cb.disabled) cb.onclick = () => doMassRenew(groups);
+}
+
+function doMassRenew(groups){
+  if(S.truck.traveling){ toast('🚫 В пути нельзя','bad'); return; }
+
+  let totalSell = 0, totalBuy = 0;
+  let movedDrivers = 0, movedPlates = 0, movedUpgrades = 0;
+  let renewedCount = 0;
+
+  for(const modelId of Object.keys(groups)){
+    const list = groups[modelId];
+    const count = list.length;
+    const model = VEHICLES[modelId];
+    if(!model) continue;
+
+    const priceInfo = computeRenewBuyPrice(model, count);
+    totalBuy += priceInfo.total;
+
+    for(const oldCar of list){
+      totalSell += computeSellPriceForRenew(oldCar);
+      if(oldCar.plate) movedPlates++;
+      if(oldCar.upgrades && Object.keys(oldCar.upgrades).length) movedUpgrades++;
+      if(S.drivers.some(d => d.vehicleId === oldCar.id)) movedDrivers++;
+
+      // Обновляем машину in-place (id не меняется → водители/текущая остаются)
+      const baseMax = model.maxKm || 500000;
+      oldCar.wear = 0;
+      oldCar.odometer = 0;
+      oldCar.lastServiceOdometer = 0;
+      oldCar.fuel = model.tank;
+      oldCar.baseMaxKm = baseMax;
+      oldCar.maxKm = Math.round(baseMax * rnd(0.85, 1.15));
+      // Страховка сбрасывается (новая машина)
+      oldCar.insurance = {osago:false,osagoExpires:0,osagoRenew:false,kasko:false,kaskoExpires:0,kaskoRenew:false};
+      // plate, upgrades — остаются
+
+      renewedCount++;
+    }
+  }
+
+  const diff = totalSell - totalBuy;
+  if(diff > 0) moneyAdd(diff, `Обновление парка (${renewedCount})`);
+  else if(diff < 0) moneySpend(-diff, `Обновление парка (${renewedCount})`);
+
+  massSelected = {};
+  massMode = false;
+  Modal.next();
+  updateUI();
+
+  const parts = [];
+  if(movedDrivers) parts.push(`👷 ${movedDrivers}`);
+  if(movedPlates) parts.push(`🎫 ${movedPlates}`);
+  if(movedUpgrades) parts.push(`⚙️ ${movedUpgrades}`);
+  toast(`🔄 Обновлено ${renewedCount} машин${parts.length ? ' · сохранено: ' + parts.join(', ') : ''}`, 'ok');
+  addNews(`🔄 Обновление парка: ${renewedCount} машин · ${diff>=0?'+':'−'}${fmt(Math.abs(diff))} ₽`, 'info', 'finance');
+}
 	function openBulkBuyModal(model){
   const v = VEHICLES[model];
   if(v.price <= 0){ toast('Нельзя','bad'); return; }
@@ -5924,8 +6124,9 @@ function renderAuto(){
       massSelected = {};
       renderAuto();
     };});
-    p.querySelectorAll('[data-mass-sell]').forEach(b=>{b.onclick=massSellVehicles;});
-    p.querySelectorAll('[data-mass-scrap]').forEach(b=>{b.onclick=massScrapVehicles;});
+p.querySelectorAll('[data-mass-sell]').forEach(b=>{b.onclick=massSellVehicles;});
+p.querySelectorAll('[data-mass-scrap]').forEach(b=>{b.onclick=massScrapVehicles;});
+p.querySelectorAll('[data-mass-renew]').forEach(b=>{b.onclick=openMassRenewModal;});   // ← НОВОЕ
      p.querySelectorAll('[data-mass-check]').forEach(b=>{b.onchange=()=>{
       const id = b.dataset.massCheck;
       if(b.checked) massSelected[id] = true;
@@ -6236,20 +6437,23 @@ function autoGarageContent(){
   </div>`;
 // === Массовая панель ===
   if(S.ownedVehicles.length > 1){
-        if(massMode){
-      const selCount = Object.keys(massSelected).filter(k=>massSelected[k]).length;
-      html += `<div class="mass-bar show">
-        <div class="mass-toggle-row">
-          <button class="ok" data-mass-all>Все свободные</button>
-          <button data-mass-none>Снять</button>
-          <button class="bad" data-mass-toggle>✕ Выйти</button>
-        </div>
-        <div class="mass-actions">
-          <button class="ok" data-mass-sell ${selCount?'':'disabled'}>💸 Продать (${selCount})</button>
-          <button class="bad" data-mass-scrap ${selCount?'':'disabled'}>♻️ Списать (${selCount})</button>
-        </div>
-      </div>`;
-       } else {
+     if(massMode){
+  const selCount = Object.keys(massSelected).filter(k=>massSelected[k]).length;
+  html += `<div class="mass-bar show">
+    <div class="mass-toggle-row">
+      <button class="ok" data-mass-all>Все свободные</button>
+      <button data-mass-none>Снять</button>
+      <button class="bad" data-mass-toggle>✕ Выйти</button>
+    </div>
+    <div class="mass-actions">
+      <button class="ok" data-mass-sell ${selCount?'':'disabled'}>💸 Продать (${selCount})</button>
+      <button class="bad" data-mass-scrap ${selCount?'':'disabled'}>♻️ Списать (${selCount})</button>
+    </div>
+    <div class="mass-actions">
+      <button class="primary" data-mass-renew ${selCount?'':'disabled'}>🔄 Обновить парк (${selCount})</button>
+    </div>
+  </div>`;
+} else {
       html += `<div style="display:flex;gap:6px;margin-top:8px">
         <button class="primary" data-mass-toggle style="flex:1">☑️ Включить массовый режим</button>
       </div>`;
