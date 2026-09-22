@@ -4814,20 +4814,38 @@ function driverTick(dt){
               if(!pool.length)continue;
         const filteredPool=applyDispatcherRules(d,pool);
         if(!filteredPool.length)continue;
-        // Приоритет маршрутов корпораций (S.megaContracts)
+               // Приоритет маршрутов корпораций (S.megaContracts)
         let target;
+        let mcFrom=null, mcTo=null;
         const mcTargets=new Set();
         if(S.megaContracts){
           for(const mc of S.megaContracts){
             if(mc.endAt<=S.gameTime) continue;
-            if(mc.from===from) mcTargets.add(mc.to);
-            if(mc.to===from)   mcTargets.add(mc.from);
+            if(mc.from===from){ mcFrom=mc.from; mcTo=mc.to; mcTargets.add(mc.to); }
+            if(mc.to===from)  { mcFrom=mc.to;   mcTo=mc.from; mcTargets.add(mc.from); }
           }
         }
         if(mcTargets.size){
+          // 1) Водитель уже в городе маршрута — летит по нему с шансом 85%
           const priority=filteredPool.filter(p=>mcTargets.has(p.idx));
           if(priority.length && Math.random()<0.85){
             target=pick(priority);
+          } else if(mcFrom!==null){
+            // 2) Не в городе маршрута — стремится к ближайшему из mcFrom/mcTo
+            const curDistFrom = roadKm(from, mcFrom);
+            const curDistTo   = roadKm(from, mcTo);
+            const curMin = Math.min(curDistFrom, curDistTo);
+            const scored = filteredPool.map(p=>{
+              const dFrom = roadKm(p.idx, mcFrom);
+              const dTo   = roadKm(p.idx, mcTo);
+              return {p, improvement: curMin - Math.min(dFrom, dTo)};
+            }).filter(x=>x.improvement>0);
+            if(scored.length){
+              scored.sort((a,b)=>b.improvement - a.improvement);
+              target = scored[ri(0, Math.min(2, scored.length-1))].p;
+            } else {
+              target=pick(filteredPool);
+            }
           } else {
             target=pick(filteredPool);
           }
