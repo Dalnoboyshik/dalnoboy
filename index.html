@@ -1330,7 +1330,7 @@ function rollPlateLevel(isReReg, isIntl){
   acc += pNic; if(r < acc) return 'nice';
   return 'normal';
 }
-}
+
 
 function makeNiceDigits(){
   const seq = ['001','002','003','004','005','006','007','008','009',
@@ -1451,7 +1451,6 @@ function generatePlate(cityIdx, isReReg){
   const isIntl = typeof code === 'string';
   let level = rollPlateLevel(isReReg, isIntl);
   let text = genPlateText(level, cityIdx);
-  ...
   const taken = new Set();
   for(const v of S.ownedVehicles){
     if(v.plate && v.plate.text) taken.add(v.plate.text);
