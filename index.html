@@ -218,6 +218,10 @@
 .mf-chip{font-size:10px;padding:3px 8px;background:#0c141e;border:1px solid var(--line);
   border-radius:10px;color:#8ba0bd;cursor:pointer;transition:.15s;font-family:inherit;
   font-weight:600;white-space:nowrap;min-height:auto;line-height:1.3}
+.mf-chip:hover{background:#16202f;color:#cfe0f5}
+.mf-chip.on{background:#1a5ba0;border-color:#2b7bd4;color:#fff}
+.mf-chip.preset{background:#1a3a4a;border-color:#2f5a7a;color:#7ad6ff}
+.mf-chip.preset:hover{background:#26506a}
 .mf-slider{display:flex;align-items:center;gap:8px}
 .mf-slider input[type=range]{flex:1;accent-color:var(--acc);height:14px}
 .mf-slider .val{font-weight:700;color:#ffd479;min-width:48px;text-align:right;font-size:11px}
@@ -3004,7 +3008,7 @@ function massFilterSliderLive(sliderEl){
   const counter = document.getElementById('mfCounter');
   if(counter){
     const matched = elig.filter(massMatchesFilter).length;
-    counter.innerHTML = `Подходит: <b>${matched}</b> из ${elig.length}`;
+     counter.innerHTML = `Подходит: <b>${matched}</b> из <b>${elig.length}</b> доступных`;
   }
   const applyBtn = document.getElementById('mfApplyBtn');
   if(applyBtn){
@@ -3082,7 +3086,7 @@ function renderMassFilterInline(){
       </div>
     </div>
 
-    <div style="display:flex;gap:6px;margin-top:12px">
+        <div style="display:flex;gap:6px;margin-top:8px">
       <button class="ok" style="flex:1" data-mf-act="apply" id="mfApplyBtn">✓ Применить ${matched}</button>
       <button class="warn" style="flex:1" data-mf-act="reset">Сбросить</button>
     </div>
